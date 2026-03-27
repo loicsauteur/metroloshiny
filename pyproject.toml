@@ -17,7 +17,7 @@ platforms = ["linux-64", "osx-arm64"]
 metroloshiny = { path = ".", editable = true }
 
 [tool.pixi.tasks]
-deploy = "cp -R /users/stud/s/sautlo01/metroloshiny/power_at_objective /srv/shiny-server/power_at_objective/;sudo systemctl restart shiny-server"
+deploy = "sudo cp -R /users/stud/s/sautlo01/metroloshiny/power_at_objective /srv/shiny-server/power_at_objective/;sudo systemctl restart shiny-server"
 
 [tool.pixi.dependencies]
 pytest = ">=9.0.2,<10"
