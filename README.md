@@ -110,6 +110,7 @@ E.g. to copy a folder (with all it's content, parameter `-R` for recursive; if d
 E.g. (sudo may be required):
 
 `cp -R /users/stud/s/sautlo01/shiny_test/basic-navigation /srv/shiny-server/basic-test/`
+`cp -R /users/stud/s/sautlo01/metroloshiny/power_at_objective /srv/shiny-server/power_at_objective/`
 
 **--> todo: add pixi tasks for automatic copying the app folder to the correct location <---**
 
