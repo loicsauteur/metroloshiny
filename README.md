@@ -60,6 +60,8 @@ Info: "If all goes well, you should see a welcome page on http://hostname:3838/.
 
 Edit the file `/etc/shiny-server/shiny-server.conf` (root privileges are required). Add a line with python `<path-to-python-or-venv>`.
 
+20260327: changed to: `/users/stud/s/sautlo01/metroloshiny/.pixi/envs/default/bin/python3`
+
 In addition it should `run_as` my username (not `shiny`, which did not work, maybe also as `ubuntu` might work...)
 
 What I did:
