@@ -106,6 +106,7 @@ def get_private_data(key: str, data_path: str = None) -> str:
         if not os.path.exists(data_path):
             # Check if is running on the server and set the path absolute path
             import platform
+            print(f'<{data_path}> does not exist. platform.system =', platform.system)
             if platform.system == 'Linux':
                 data_path = "/users/stud/s/sautlo01/metroloshiny/data/private_data.csv"
     # Ensure the file exists
