@@ -103,13 +103,15 @@ A Shiny app `app.py` must be located in the shiny-server folder. I.e. Clear out 
 - If you’re only hosting a single app, you can put the `app.py` (and the rest of the app’s files) directly in `/srv/shiny-server/`, and it will be served from http://hostname:3838/.
 - If you have multiple apps, copy each app into a subdirectory; for example, `/srv/shiny-server/foo/app.py` would be served from http://hostname:3838/foo/. In this case, you can put static assets into the root `/srv/shiny-server/` directory, like an `index.html` file.
 
-E.g. to copy a folder (with all it's content, parameter `-R`for recursive; if destination does not exist it will be created) use:
+E.g. to copy a folder (with all it's content, parameter `-R` for recursive; if destination does not exist it will be created) use:
 
 `cp -R path/to/source path/to/destination/`
 
 E.g. (sudo may be required):
 
 `cp -R /users/stud/s/sautlo01/shiny_test/basic-navigation /srv/shiny-server/basic-test/`
+
+**--> todo: add pixi tasks for automatic copying the app folder to the correct location <---**
 
 Make sure to not forget the `/` at the end of the destination path
 

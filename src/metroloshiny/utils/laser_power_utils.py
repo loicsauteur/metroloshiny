@@ -2,7 +2,6 @@ import pandas as pd
 from typing import Union, Optional
 
 
-
 def get_linearity(df: pd.DataFrame, date: str, rename_cols: bool = False) -> pd.DataFrame:
     # FIXME unused
     df = df.pivot(index=df.columns[1], columns=df.columns[0], values=date)
@@ -95,13 +94,70 @@ def get_power_over_time_data(
         raise NotImplementedError("not yet implemented")
     return df
 
+
+def filter_by_column_value(
+        df: pd.DataFrame,
+        column_name: str,
+        value: str,
+        drop_column: bool = True
+) -> pd.DataFrame:
+    """
+    Filter a dataframe for rows according to column entry.
+
+    e.g. keeps only the rows which have `value` in column of interest.
+
+    :param df: pd.DataFrame.
+    :param column_name: str name of the column.
+    :param value: str column entries to keeps rows. 
+    :param drop_column: boolean, wether to keep the column or remove it.
+
+    :return: pd.DataFrame (new)
+    """
+    # Filter rows where column contains search value
+    df_filtered = df[df[column_name] == value]
+    # Remove the column from the dataframe
+    if drop_column:
+        df_filtered = df_filtered.drop(columns=[column_name])
+    return df_filtered
+
+def get_light_source_kinds(df: pd.DataFrame) -> list:
+    """
+    Check if the data frame columsn for Laser and LED contain values.
+
+    :param df: pd.DataFrame
+    
+    :return: list of column names with values
+    """
+    kinds = []
+    if not df["Laser Line [nm]"].isna().all():
+        kinds.append("Laser Line [nm]")
+    if not df["LED Line [nm]"].isna().all():
+        kinds.append("LED Line [nm]")
+    return kinds
+
+def keep_non_nan_rows(df: pd.DataFrame, column_name: str) -> pd.DataFrame:
+    if column_name not in df.columns:
+        raise RuntimeError(f'Column <{column_name}> not found.')
+    return df.dropna(subset=[column_name])
+
 if __name__ == "__main__":
-    from metroloshiny.utils.read_file import read_xlsx
-    raw_df = read_xlsx()
-
-    print(get_power_over_time_data(raw_df, 405, 100))
-
+    #from metroloshiny.utils.read_file import read_xlsx
+    from metroloshiny.utils.read_file import get_laser_power_objective_data
+    #raw_df = read_xlsx()
+    #print(get_power_over_time_data(raw_df, 405, 100))
     #df = get_linearity(raw_df, str(20240109))
+
+    # new tests
+    _, df = get_laser_power_objective_data(dev_local_file=True)
+    mic = "Ti CSU-W1"
+    #mic = "Ti2 Righty"
+    df = filter_by_column_value(df, "Site", "Hebelstrasse")
+    df = filter_by_column_value(df, "Microscope", mic)
+    df = filter_by_column_value(df, "Objective", "20x/0,75")
+    # skipping info sorting for testing
+    print(df)
+    df = keep_non_nan_rows(df, "LED Line [nm]")
+    print(df)
 
     
 

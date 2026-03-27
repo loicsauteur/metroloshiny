@@ -5,9 +5,8 @@ import gspread
 
 import numpy as np
 
-file = './data/deepsim_only.xlsx'
-
-def read_xlsx(file: str = file):
+@DeprecationWarning
+def read_xlsx(file: str):
     # Read the xlsx
     df = pd.read_excel(file)
     # Ensue that it is a laser powerment meausrement
@@ -30,6 +29,7 @@ def read_xlsx(file: str = file):
     #print(loc_line)
     #print(df)
 
+@DeprecationWarning
 def read_laserpower_xlsx_hebel(df: pd.DataFrame, header_row: int) -> pd.DataFrame:
     # Used to reorder the dataframe - basically to skip the unnecessary first rows...
 
@@ -86,16 +86,34 @@ def read_laserpower_xlsx_hebel(df: pd.DataFrame, header_row: int) -> pd.DataFram
     #print(df)
     return df
 
+
 def get_private_data(key: str, data_path: str = None) -> str:
+    """
+    Function to load 'private data' saved in a csv file.
+    Todo: provide example..
+
+    :param key: str key to look for value
+    :param data_path: str path to the csv file, if not provided will look for:
+                      "./data/private_data.csv"
+    :return: str value for the key
+    """
     # To read 'private' data (csv with key value pairs)
     # excepts the file ./data/private_data.csv, if not specified with data_path
-    # Load csv with Key column as index column
+    
+    # Use hard-coded path if data_path not supplied
     if data_path is None:
-        df = pd.read_csv("./data/private_data.csv", index_col="Key")
-    else:
-        df = pd.read_csv(data_path, index_col="Key")
+        data_path = "./data/private_data.csv"
+    # Ensure the file exists
+    if not os.path.exists(data_path):
+        raise FileExistsError(f'File does not exist: {data_path}')
+    # Load csv with Key column as index column
+    df = pd.read_csv(data_path, index_col="Key")
+        
     # Get the value row, and take the first (Value) column
-    value = df.loc[key].iloc[0]
+    try:
+        value = df.loc[key].iloc[0]
+    except KeyError as e:
+        raise KeyError(f'Could not find key <{key}> in file: {data_path}')
     # Return a string
     return str(value)
 
@@ -105,7 +123,20 @@ def load_gspread(
         data_path: str = None,
         path_service_account: str = None,
         api_key: str = None
-    ) -> gspread.worksheet:
+) -> gspread.worksheet:
+    """
+    Load a worksheet from a google sheet document.
+
+    :param gsheet_url: str url to the google sheet.
+    :param sheet_name: str name of the google worksheet to load.
+    :param data_path: deprecated, currently not in use...
+    :param path_service_account: str path to google-service-account JSON file.
+                                 Can be None if the JSON is installed in the
+                                 intended folder:
+                                `~/.config/gspread/service_account.json`
+    :param api_key: deprecated, currently not in use
+    :return: gspread.worksheet
+    """
     # Currently the api key is not used (only for viewing public gsheets)
     if api_key is None:
         api_key = get_private_data("Google API Key", data_path=data_path)
@@ -123,7 +154,24 @@ def load_gspread(
     #print("worksheet names:", sh.worksheets())
     return sh.worksheet(sheet_name)
 
-def get_laser_power_objective_data(data_path: str = None):
+def get_laser_power_objective_data(
+        data_path: str = None,
+        dev_local_file: bool = False
+):
+    """
+    Load google spread sheet & return it + DataFrame of it.
+
+    :param data_path: str path to csv file with key-value to access sheet.
+    :param dev_local_file: boolean to load from excel instead of google (hard-coded).
+    :return: gspread.worksheet (or None for dev_local_file = True).
+    :return: pd.DataFrame
+    """
+    # For testing on local file
+    if dev_local_file:
+        return None, ensure_numeric_data(
+            pd.read_excel('./data/metroloshiny_data.xlsx')
+        )
+    
     # Load laod google sheet with laser power at objective data
     url = get_private_data("Sheet URL", data_path=data_path)
     path_sa = get_private_data("PathToServiceAccountJSON", data_path=data_path)
@@ -132,7 +180,44 @@ def get_laser_power_objective_data(data_path: str = None):
         sheet_name="laser_power_objective_measurements",
         path_service_account=path_sa
     )
-    return sheet, pd.DataFrame(sheet.get_all_records())
+    df = pd.DataFrame(sheet.get_all_records())
+    # Make sure only numeric data for measurement columns (including lines & power)
+    df = ensure_numeric_data(df, first_column=4)
+    return sheet, df
+
+def ensure_numeric_data(
+        df: pd.DataFrame,
+        first_column: int = 7,
+        verbose: bool = False
+) -> pd.DataFrame:
+    """
+    Make sure / parse dataframe values to numeric.
+
+    My data frames my contain non-numeric entries.
+    This will try to separate string from numbers, and make empty cells NaNs.
+    It will not work for values e.g. `(SW=333) 4.05`, where it will yield 333.0.
+
+    :param df: pd.DataFrame
+    :param first_column: int start index for parsing (Default = 7 > first date column).
+
+    :return: pd.DataFrame
+    """
+    # Make all column names strings
+    df.columns = [str(c) for c in df.columns]
+
+    # Convert column values to numeric (doesn't work for e.g. `(SW=333) 4.05`)
+    for col in df.columns[first_column:]:
+        extracted = df[col].astype(str).str.extract(r'([-+]?\d*\.?\d+)')[0]
+        converted = pd.to_numeric(extracted, errors='coerce')
+        # Find failures: original not null but converted is null
+        mask = df[col].notna() & converted.isna()
+        
+        if verbose and mask.any():
+            print(f"\nColumn '{col}' - failed to convert:")
+            print(df.loc[mask, col])
+    
+        df[col] = converted
+    return df
 
 
 if __name__ == "__main__":
@@ -152,5 +237,7 @@ if __name__ == "__main__":
 
     #print(df_.loc[df_[df_.columns[0]] == 405])
 
-    sheet, df = get_laser_power_objective_data()
-    print(df.head())
+    #sheet, df = get_laser_power_objective_data()
+    #print(df.head())
+    _, df = get_laser_power_objective_data(dev_local_file=False)
+    #ensure_numeric_data(df, 8)
