@@ -136,9 +136,30 @@ def get_light_source_kinds(df: pd.DataFrame) -> list:
     return kinds
 
 def keep_non_nan_rows(df: pd.DataFrame, column_name: str) -> pd.DataFrame:
+    """
+    Keep only rows with non NaNs for the specified column.
+
+    :param df: pd.DataFrame
+    :param column_name: str name of column
+
+    :return: pd.DataFrame
+    """
     if column_name not in df.columns:
         raise RuntimeError(f'Column <{column_name}> not found.')
     return df.dropna(subset=[column_name])
+
+def parse_dates(dates: list[str]) -> list[str]:
+    """
+    Sort and ensure a list of yyyymmdd dates.
+
+    :param dates: list of str dates (yyyymmddx*)
+
+    :return: list of sorted str dates all in yyyymmdd
+    """
+    new_dates = [d[0:8] for d in dates]
+    new_dates.sort()
+    return new_dates
+
 
 if __name__ == "__main__":
     #from metroloshiny.utils.read_file import read_xlsx

@@ -2444,7 +2444,7 @@ packages:
 - pypi: ./
   name: metroloshiny
   version: 0.1.0
-  sha256: 008cb4ad70d4859cbaf2a845bab84e6357090c8abf2e75e372980d2bd7103037
+  sha256: da2eabefe30fe4cdfc00aa14de6c806eb5de396f5ef01c083de6fdc113103d5b
   requires_python: '>=3.11'
 - conda: https://conda.anaconda.org/conda-forge/linux-64/multidict-6.7.1-py311h3778330_0.conda
   sha256: 9f3d7b8d3543f667a2a918e4ac401d98fde65c874e08eb201a41ac735f8d9797

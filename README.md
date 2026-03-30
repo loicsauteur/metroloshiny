@@ -114,19 +114,31 @@ E.g. (sudo may be required):
 `cp -R /users/stud/s/sautlo01/shiny_test/basic-navigation /srv/shiny-server/basic-test/`
 `cp -R /users/stud/s/sautlo01/metroloshiny/power_at_objective /srv/shiny-server/power_at_objective/`
 
+**In case the destination exisits already, remove that folder before copying the new version**
+
+e.g.: `sudo rm -r /srv/shiny-server/power_at_objective/`
+
 **--> todo: add pixi tasks for automatic copying the app folder to the correct location <---**
 
 Make sure to not forget the `/` at the end of the destination path
 
 **Don't forget to restart the Shiny Server**
 
-## Shiny Server restart
+### Shiny Server restart
 
 `sudo systemctl restart shiny-server`
 
 `sudo systemctl start shiny-server`
 
 `sudo systemctl stop shiny-server`
+
+### Use pixi task to delete previous folder, copy new folder and restart the shiny server:
+
+run: `pixi run deploy`
+
+with pixi task:
+
+`deploy = "sudo rm -r /srv/shiny-server/power_at_objective;sudo cp -R /users/stud/s/sautlo01/metroloshiny/src/metroloshiny/power_at_objective /srv/shiny-server/power_at_objective/;sudo systemctl restart shiny-server"`
 
 
 # Google stuff

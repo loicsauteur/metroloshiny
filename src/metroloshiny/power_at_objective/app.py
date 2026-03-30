@@ -7,7 +7,10 @@ import matplotlib.pyplot as plt
 
 # Import data from shared.py
 from metroloshiny.utils.read_file import get_laser_power_objective_data
-from metroloshiny.utils.laser_power_utils import filter_by_column_value, get_light_source_kinds, keep_non_nan_rows, get_power_over_time_data
+from metroloshiny.utils.laser_power_utils import (
+    filter_by_column_value, get_light_source_kinds, keep_non_nan_rows,
+    get_power_over_time_data, parse_dates
+)
 
 from shiny.express import input, render, ui
 from shiny import reactive
@@ -35,6 +38,7 @@ with ui.navset_pill(id="tab"):
         line = reactive.value([])         # wavelengths
         power_prcts = reactive.value([])  # wavelengths power %
         dates = reactive.value([])
+        date_range = reactive.value([])   # min/max date
         _df = reactive.value(None)  # Place holder FIXME unused...
 
         # Update microscope choices based on site
@@ -141,9 +145,6 @@ with ui.navset_pill(id="tab"):
             df_filtered = keep_non_nan_rows(df_filtered, column_name=input.kind())
             
             # Skip updating (if line is None)
-            print("*******")
-            print(df_filtered.head())
-            print("*******")
             if input.line() is None:
                 return
             if input.line() != "All":
@@ -187,6 +188,41 @@ with ui.navset_pill(id="tab"):
             # Update the ui selection
             ui.update_select("date", choices=dates.get())
 
+        @reactive.effect
+        @reactive.event(input.power, input.line, input.kind, input.info, input.objective, input.microscope)
+        def update_date_range():
+            # Filter original df from start
+            df_filtered = filter_by_column_value(df, "Site", input.site())
+            df_filtered = filter_by_column_value(df_filtered, "Microscope", input.microscope())
+            df_filtered = filter_by_column_value(df_filtered, "Objective", input.objective())
+            df_filtered = filter_by_column_value(df_filtered, "Info", input.info())
+
+            # Skip updating (if kind is not a valid column name)
+            if input.kind() is None or input.kind() in  ["No data", "Both"]:
+                return
+            df_filtered = keep_non_nan_rows(df_filtered, column_name=input.kind())
+
+            # Skip updating (if line is None)
+            if input.line() is None:
+                return
+            if input.line() != "All":
+                df_filtered = filter_by_column_value(df_filtered, input.kind(), float(input.line()))
+                # The df now contains only the [LED or Laser] and [Power] columns + dates
+                # Drop all date columns with only NaN values
+                df_filtered = df_filtered.iloc[:, 2:].dropna(axis=1, how="all")
+            else:
+                # df constains still both slight source columns
+                df_filtered = df_filtered.iloc[:, 3:].dropna(axis=1, how="all")
+            # Parse the dates
+            d = parse_dates(list(df_filtered.columns))
+            if len(d) < 1:
+                # may happen temporarily...
+                return
+            date_range.set(d)
+            # Update the ui selection
+            ui.update_date_range("date_range", start=date_range.get()[0], end=date_range.get()[-1])
+
+
         # FIXME # Add reload data button
         # reload_btn = ui.input_action_button("action_button", "Reload data")
 
@@ -197,6 +233,14 @@ with ui.navset_pill(id="tab"):
         #     gsheet_, df_ = get_laser_power_objective_data(dev_local_file=False)
         #     _df.set(df_)
 
+        # Inptut selections for shiny cards
+        single_date_selection = ui.input_select("date", "Select a date", choices=[])
+        date_range_selection = ui.input_date_range(
+            "date_range", "Select a date range",
+            start=None, end=None,
+            format='yyyymmdd'
+        )
+
         with ui.layout_sidebar():
             with ui.sidebar():
                 ui.input_select("site", "Select the site", choices=list(sites))
@@ -206,10 +250,9 @@ with ui.navset_pill(id="tab"):
                 ui.input_select("kind", "Select light source kind", choices=[])
                 ui.input_select("line", "Select a wavelength [nm]", choices=[])
                 ui.input_select("power", "Select power [%]", choices=[])
-                ui.input_select("date", "Select a date", choices=[])
             
             # Power linearity per date ---------------------------------------
-            with ui.navset_card_underline():
+            with ui.navset_card_underline(header=[single_date_selection]):
 
                 with ui.nav_panel(title="Plot"):
                     # Generate table (filter df from scratch)
@@ -301,12 +344,12 @@ with ui.navset_pill(id="tab"):
                         return plt_df.get()
             
             # Power stability over time --------------------------------------
-            with ui.navset_card_underline():
+            with ui.navset_card_underline(header=[date_range_selection]):
                 with ui.nav_panel(title="Plot"):
                     # Generate table (filter df from scratch)
                     pst_df = reactive.value(None)
                     @reactive.effect
-                    @reactive.event(input.power, input.line, input.kind, input.info, input.objective, input.microscope)
+                    @reactive.event(input.date_range, input.power, input.line, input.kind, input.info, input.objective, input.microscope)
                     def get_power_stability_table():
                         # Filter (remove columns)
                         table = filter_by_column_value(df, "Site", input.site())
@@ -324,6 +367,20 @@ with ui.navset_pill(id="tab"):
                             table = filter_by_column_value(table, "Power [%]", float(input.power()), drop_column=False)
                         # Drop all nan columns
                         table = table.dropna(axis=1, how="all")
+                        # Filter columns by the selected date range TODO
+                        #print(table)
+                        dates_to_remove = []
+                        header_dates = [x[0:8] for x in table.columns[2:]]
+                        start_date = input.date_range()[0].strftime("%Y%m%d")
+                        end_date = input.date_range()[1].strftime("%Y%m%d")
+                        for date in header_dates:
+                            if int(date) < int(start_date) or int(date) > int(end_date):
+                                if date not in dates_to_remove:
+                                    dates_to_remove.append(date)
+                        # Remove date columns
+                        for date in dates_to_remove:
+                            cols_to_drop = [col for col in table.columns if col.startswith(date)]
+                            table = table.drop(columns=cols_to_drop)
                         pst_df.set(table)
 
                 
@@ -371,6 +428,9 @@ with ui.navset_pill(id="tab"):
                                 table,
                                 x="Date",
                                 y="mW",
+                                markers=True,
+                                style=table.columns[1],# enusure markers
+                                dashes=False,          # keep sloid lines
                                 hue=table.columns[1],  # group by "Line"
                                 palette='turbo',
                                 hue_norm=(380, 700),
@@ -382,18 +442,24 @@ with ui.navset_pill(id="tab"):
                         legend.set_loc('upper left')
                         # X-labels
                         plt.xticks(rotation=45, ha='right')  # rotate
-                        # Do not show all the ticks
-                        ticks = ax.get_xticks()  # FIXME could be improved...
-                        ax.set_xticks(ticks[:: int(len(ticks) ** 0.5)])
-
+                        # Do not show all the ticks (for more than 10)
+                        ticks = ax.get_xticks()
+                        if len(ticks) > 10:
+                            new_ticks = ticks[:: int(len(ticks) ** 0.5)]
+                            # Make sure the last date tick is shown
+                            if new_ticks[-1] != ticks[-1]:
+                                new_ticks.append(ticks[-1])
+                            ax.set_xticks(new_ticks)
+                        ax.set_xlabel("")
                         fig.tight_layout()
-                        # FIXME -> date selection range would be nice          
 
     
                 with ui.nav_panel("Table"):
                     @render.table
                     def power_stability_over_time_table():
-                        return pst_df.get()
+                        table = pst_df.get()
+                        # TODO filter unwanted dates out
+                        return table
 # _____________________________________________________________________________
 #
     # PSF
