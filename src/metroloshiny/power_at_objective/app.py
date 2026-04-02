@@ -7,7 +7,7 @@ import matplotlib.pyplot as plt
 
 # Import data from shared.py
 from metroloshiny.utils.read_file import get_laser_power_objective_data
-from metroloshiny.utils.laser_power_utils import (
+from metroloshiny.utils.dataframe_utils import (
     filter_by_column_value, get_light_source_kinds, keep_non_nan_rows,
     get_power_over_time_data, parse_dates
 )
@@ -410,7 +410,7 @@ with ui.navset_pill(id="tab"):
                             return
                         wavelength = None if input.line() == "All" else float(input.line())
                         prct = None if input.power() == "All" else float(input.power())
-                        table = get_power_over_time_data(table, line=wavelength, power_prct=prct, merge=True)
+                        table = get_power_over_time_data(table, line=wavelength, power_prct=prct)
                         if input.power() == "All":
                             # make sure to group per power (not line)
                             p = sns.lineplot(

@@ -150,12 +150,16 @@ with pixi task:
    - `Google Drive API`
    - `Google Sheets API`
 
+<!--
 ## Create a API key for a public google sheet
 1. In `APIs & Services` > `Credentials` choose `Create credentials` > `API key`
 2. Give it a name (e.g. API key metroloshiny)
 3. Optional: apply restrictions (I choose no restrictions)
+-->
 
-## --> Or create a service account:
+## Create a service account:
+
+See also [here](https://docs.gspread.org/en/latest/oauth2.html#for-bots-using-service-account).
 
 1. In `APIs & Services` > `Credentials` choose `Create credentials` > `Service account key`
 2. Fill out the form...

@@ -2,6 +2,7 @@ import pandas as pd
 from typing import Union, Optional
 
 
+@DeprecationWarning
 def get_linearity(df: pd.DataFrame, date: str, rename_cols: bool = False) -> pd.DataFrame:
     # FIXME unused
     df = df.pivot(index=df.columns[1], columns=df.columns[0], values=date)
@@ -10,8 +11,8 @@ def get_linearity(df: pd.DataFrame, date: str, rename_cols: bool = False) -> pd.
         df.columns = [str(x) + "nm" for x in df.columns]
     return df
 
-    
-
+   
+@DeprecationWarning
 def wavelength_to_color(w: Union[int, str]):
     # FIXME unused
     # Make sure to work with a number (remove 'nm')
@@ -60,10 +61,28 @@ def get_power_over_time_data(
         df: pd.DataFrame,
         line: Optional[int] = None,
         power_prct: Optional[int] = None,
-        merge: bool = True,
-        ) -> pd.DataFrame:
-    # basically, from original df, get the power of a single line at single % level over dates
-    
+) -> pd.DataFrame:
+    """
+    Create a table of power measurements over time.
+
+    Keeps only rows for specified wavelength (line), and or
+    power_percentage. Combines these column values into a new column.
+
+    The DataFrame will be "pivoted", giving a mW column with
+    measurements per date/line/power.
+
+    :param df: pd.DataFrame with columns = ["Line", "Power", "Date"]
+               only one date.
+    :param line: int of single line too keep.
+    :param power_prct: int of single power to keep.
+
+    :result: pd.DataFrame
+    """
+    # Sanity checks
+    if line is None and power_prct is None:
+        raise ValueError("Eiter line or power_prct must be specified!")
+    if len(df.columns) != 3:
+        raise RuntimeError("Provided DataFrame does not have 3 columns!")
     # Select only a specific laser line
     if line:
         df = df[df[df.columns[0]] == line]
@@ -79,19 +98,16 @@ def get_power_over_time_data(
     #df = df.drop(columns=df.columns[:2])
     
     # Reorder columns (last to first)
-    if merge:
-        cols = list(df)
-        cols.insert(0, cols.pop(cols.index(cols[-1])))
-        df = df.loc[:, cols]
+    cols = list(df)
+    cols.insert(0, cols.pop(cols.index(cols[-1])))
+    df = df.loc[:, cols]
 
-        # Pivot the table
-        df = df.melt(
-            id_vars=df.columns[:3],
-            var_name="Date",
-            value_name="mW"
-        )
-    else:
-        raise NotImplementedError("not yet implemented")
+    # Pivot the table
+    df = df.melt(
+        id_vars=df.columns[:3],
+        var_name="Date",
+        value_name="mW"
+    )
     return df
 
 

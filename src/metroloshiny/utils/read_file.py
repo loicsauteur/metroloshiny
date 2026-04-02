@@ -2,8 +2,10 @@ import pandas as pd
 import os
 import math
 import gspread
+from typing import Optional, Union
 
-import numpy as np
+# Path of the private_data.csv file on the linux server
+__linux_private_data_path__ = "/users/stud/s/sautlo01/metroloshiny/data/private_data.csv"
 
 @DeprecationWarning
 def read_xlsx(file: str):
@@ -108,7 +110,7 @@ def get_private_data(key: str, data_path: str = None) -> str:
             import platform
             print(f'<{data_path}> does not exist. platform.system =', platform.system())
             if platform.system() == 'Linux':
-                data_path = "/users/stud/s/sautlo01/metroloshiny/data/private_data.csv"
+                data_path = __linux_private_data_path__
     # Ensure the file exists
     if not os.path.exists(data_path):
         raise FileExistsError(f'File does not exist: {data_path}')
@@ -126,27 +128,25 @@ def get_private_data(key: str, data_path: str = None) -> str:
 def load_gspread(
         gsheet_url: str,
         sheet_name: str,
-        data_path: str = None,
         path_service_account: str = None,
-        api_key: str = None
-) -> gspread.worksheet:
+        whole_document: bool = False
+) -> Union[gspread.Worksheet, gspread.Spreadsheet]:
     """
     Load a worksheet from a google sheet document.
+    Nees a service account, see here: https://docs.gspread.org/en/latest/oauth2.html#for-bots-using-service-account
+    Optionally, allows getting the full document instad of just a sheet.
 
     :param gsheet_url: str url to the google sheet.
     :param sheet_name: str name of the google worksheet to load.
-    :param data_path: deprecated, currently not in use...
     :param path_service_account: str path to google-service-account JSON file.
                                  Can be None if the JSON is installed in the
                                  intended folder:
                                 `~/.config/gspread/service_account.json`
-    :param api_key: deprecated, currently not in use
-    :return: gspread.worksheet
-    """
-    # Currently the api key is not used (only for viewing public gsheets)
-    if api_key is None:
-        api_key = get_private_data("Google API Key", data_path=data_path)
+    :param whole_document: boolean, whether to return the whole document
+                           or just a sheet.
 
+    :return: gspread.Worksheet or gspread.Spreadsheet
+    """
     if path_service_account is None:
         gc = gspread.service_account()
     else:
@@ -157,8 +157,37 @@ def load_gspread(
     sh = gc.open_by_url(gsheet_url)
     #sh = gc.open_by_key(sheet_key)
     
+    if whole_document:
+        return sh
+
     #print("worksheet names:", sh.worksheets())
     return sh.worksheet(sheet_name)
+
+def get_gspread(
+        data_path: Optional[str] = None,
+        dev_local_file: Optional[str] = None
+    ) -> gspread.Spreadsheet:
+    """
+    Get a whole gspread document.
+    Uses information provided in private_data.csv.
+
+    :param data_path: str path to csv file with key-value to access sheet.
+    :param dev_local_file: str, for testing using a local excel file (path).
+
+    :return: gspread.Spreadsheet
+    """
+    if dev_local_file is not None:
+        return pd.read_excel(dev_local_file)
+    url = get_private_data("Sheet URL", data_path=data_path)
+    path_sa = get_private_data("PathToServiceAccountJSON", data_path=data_path)
+    doc = load_gspread(
+        gsheet_url=url,
+        sheet_name="",
+        path_service_account=path_sa,
+        whole_document=True
+    )
+    return doc
+    
 
 def get_laser_power_objective_data(
         data_path: str = None,
@@ -169,6 +198,7 @@ def get_laser_power_objective_data(
 
     :param data_path: str path to csv file with key-value to access sheet.
     :param dev_local_file: boolean to load from excel instead of google (hard-coded).
+    
     :return: gspread.worksheet (or None for dev_local_file = True).
     :return: pd.DataFrame
     """
@@ -225,25 +255,17 @@ def ensure_numeric_data(
         df[col] = converted
     return df
 
+def check_upload_password(pwd: str, data_path: Optional[str] = None) -> bool:
+    """
+    Check if password for data upload matches.
+
+    :param pwd: str input password
+    :param data_path: str path to private_data.csv
+                      containing the key/value for "Upload password"
+
+    :return: boolean
+    """
+    return pwd == get_private_data("Upload password", data_path=data_path)
 
 if __name__ == "__main__":
-    # Testing xlsx loading ########
-    #print(file, "exists =", os.path.exists(file))
-    #df_ = read_xlsx(file)
-    #p = list(df_[df_.columns[0]])
-    
-    #print(df_)
-    #p = np.unique(np.asarray(p))
-    
-    #print(df_.loc[df_["Line [nm]"].isin("405")])
-
-    #df_ = df_.loc[df_[df_.columns[0]] == 405]
-    #df_.columns = list(df_.columns)
-    #print(df_)
-
-    #print(df_.loc[df_[df_.columns[0]] == 405])
-
-    #sheet, df = get_laser_power_objective_data()
-    #print(df.head())
-    _, df = get_laser_power_objective_data(dev_local_file=False)
-    #ensure_numeric_data(df, 8)
+    pass

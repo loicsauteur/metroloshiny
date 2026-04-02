@@ -5,7 +5,7 @@ import numpy as np
 # Import data from shared.py
 from shared import df as penguins
 from metroloshiny.utils.read_file import read_xlsx
-from metroloshiny.utils.laser_power_utils import get_power_over_time_data # FIXME unused: get_linearity, wavelength_to_color
+from metroloshiny.utils.dataframe_utils import get_power_over_time_data # FIXME unused: get_linearity, wavelength_to_color
 
 from shiny.express import input, render, ui
 from shiny import reactive

@@ -2,7 +2,7 @@ import os
 import numpy as np
 import pandas as pd
 
-from metroloshiny.utils.laser_power_utils import filter_by_column_value, parse_dates
+from metroloshiny.utils.dataframe_utils import filter_by_column_value, parse_dates
 
 
 def test_filter_by_column_value():
@@ -57,4 +57,4 @@ def is_valid_yyyymmdd(date: str) -> bool:
 
 
 if __name__ == "__main__":
-    test_parse_dates()
+    pass
