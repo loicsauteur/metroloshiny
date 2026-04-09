@@ -1,6 +1,6 @@
 [project]
 authors = [{name = "Loïc Sauteur", email = "loic.sauteur@unibas.ch"}]
-dependencies = []
+dependencies = ["tables>=3.11.1,<4"] # for OMERO tables (needed?)
 name = "metroloshiny"
 requires-python = ">= 3.11"
 version = "0.1.0"

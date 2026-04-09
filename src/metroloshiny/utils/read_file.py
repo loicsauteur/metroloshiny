@@ -123,7 +123,7 @@ def get_private_data(key: str, data_path: str = None) -> str:
     except KeyError as e:
         raise KeyError(f'Could not find key <{key}> in file: {data_path}')
     # Return a string
-    return str(value)
+    return str(value).strip()
 
 def load_gspread(
         gsheet_url: str,

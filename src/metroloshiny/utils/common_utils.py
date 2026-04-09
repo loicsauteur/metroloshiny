@@ -24,3 +24,23 @@ def is_input_select_in_list(l: list, id: str) -> bool:
         if get_ui_id(i) == id:
             return True
     return False
+
+
+def theoretical_FHMW(em: int, na: float, ri: float, k: float = 2.0):
+    """
+    Calculate theoretical lateral and axial FHMW.
+
+    FHMWlat = 0.51 * lambda / NA
+    FHMWax = 2 * n * lambda / NA^2
+
+    :param em: Emission wavelength in nm (int).
+    :param na: NA of the objective.
+    :param ri: Refractive index of objective.
+    :param k: Constant for axial FHMW. Default = 2.0 (widefield),
+              set to 1.4 for confocal.
+    
+    :return: tuple (FHMW lateral, FHMW axial) in nm.
+    """
+    lat = 0.51 * em / na
+    ax = k * ri * em / (na * na)
+    return lat, ax
