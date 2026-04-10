@@ -4,6 +4,7 @@ from shiny import reactive
 from shiny.express import input, render, ui
 
 from metroloshiny.utils.dataframe_utils import filter_by_column_value
+from metroloshiny.utils.omero_utils import omero_operation, render_dict
 from metroloshiny.utils.read_file import get_gspread
 
 g_spreadsheet = get_gspread(dev_local_file="./data/metroloshiny_data.xlsx")
@@ -28,10 +29,14 @@ objective_selector = ui.input_select(
 )
 info_selector = ui.input_select("info", "Filter by info column", choices=[])
 new_mic_name = ui.input_text(
-    "new_mic_name", "Enter a name for a new Microscope entry", "Enter name..."
+    "new_mic_name",
+    "Enter a name for a new Microscope entry",
+    "Enter name for new microscope...",
 )
 new_obj_name = ui.input_text(
-    "new_obj_name", "Enter a name for a new Objective", "Enter name..."
+    "new_obj_name",
+    "Enter a name for a new Objective",
+    "Enter name for new objective...",
 )
 new_info_name = ui.input_text(
     "new_info_name", "Enter additional information", "Enter info..."
@@ -44,7 +49,18 @@ kind_selector = ui.input_select("kind", "Select light source kind", choices=[])
 line_selector = ui.input_select("line", "Select a wavelength [nm]", choices=[])
 power_selector = ui.input_select("power", "Select power [%]", choices=[])
 
+# PSF upload ui items
+omero_type_selector = ui.input_select(
+    "omero_datatype", "Select OMERO type", choices=["Dataset", "Image"]
+)
+omero_id_selector = ui.input_text(
+    "omero_id", "OMERO ID", "Enter OMERO ID...2861227 or 2832822"
+)
+check_psf_values = ui.input_action_button("check_psf_values", "Check OMERO")
+upload_psf_button = ui.input_action_button("upload_psf", "Upload the data!")
 
+
+# Build the GUI
 with ui.nav_panel(title="Data Upload"):
     # Sidebar
     with ui.layout_sidebar():
@@ -72,16 +88,71 @@ with ui.nav_panel(title="Data Upload"):
                 #     return card_selectors
         with ui.navset_card_underline():
             with ui.nav_panel("Upload info"):
-
-                @render.text
+                # @render.text
+                @render.ui
                 def upload_info():
+                    """Create ui depending on Metrology category."""
                     # PSF
                     if input.category() == category_list[1]:
-                        return "Omero info to come..."
+                        return (
+                            omero_type_selector,
+                            omero_id_selector,
+                            check_psf_values,
+                        )
+                    # Power at objective
                     elif input.category() == category_list[0]:
                         return "Power upload stuff to come..."
                     else:
                         return "should never be seen"
+
+                @render.ui
+                @reactive.event(input.check_psf_values)
+                def check_omero_input_psf():
+                    """Get PSF data from OMERO."""
+                    cur_omero_dataset = input.omero_datatype()
+                    cur_omero_id = None
+                    try:
+                        cur_omero_id = int(input.omero_id())
+                    except ValueError as err:
+                        print("Could not parse OMERO ID", err)
+                        return f"Error: Could not parse OMERO ID = {input.omero_id()}"
+
+                    try:
+                        data = omero_operation(
+                            operation=None,
+                            omero_type=cur_omero_dataset,
+                            omero_id=cur_omero_id,
+                            metric_id="FWHM",
+                        )
+                    except Exception as err:
+                        return f"Error: {err}"
+                    # TODO handle data
+                    render_dict(data)
+                    # IDea here: need to check which channels have FWHM data
+                    # crate inputs for DAPI/GFP/ect. with selection for the channels
+                    # return them here
+                    import random  # FIXME temp test
+
+                    c1 = random.randint(0, 11)
+                    c2 = random.randint(0, 11)
+                    input_dapi = ui.input_select(
+                        "ch_dapi", "DAPI channel", choices=[c1, c2]
+                    )
+                    return input_dapi, upload_psf_button
+
+                @render.text
+                @reactive.event(input.upload_psf)
+                def upload_omero_psf():
+                    c1 = None
+                    try:
+                        c1 = int(input.ch_dapi())
+                    except ValueError as err:
+                        return f"Error: {err}"
+
+                    if c1 == 5:
+                        return "it succeeded!"
+                    else:
+                        return "was not 5 => fail!"
 
         # @render.ui
         # def dynamic_card():

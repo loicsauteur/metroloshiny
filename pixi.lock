@@ -2635,7 +2635,7 @@ packages:
 - pypi: ./
   name: metroloshiny
   version: 0.1.0
-  sha256: 6aadaeecd0b39850261608f44e715253cab355fdc5513a8385d23f86bd5a0647
+  sha256: 67c2b528d9b79b6ce8b7d55c5f03c8ced6156eee77a541f973433619796181d9
   requires_dist:
   - tables>=3.11.1,<4
   requires_python: '>=3.11'

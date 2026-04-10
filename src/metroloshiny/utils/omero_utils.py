@@ -1,6 +1,6 @@
 """Utils for getting OMERO data."""
 
-from typing import Optional
+from typing import Any, Callable, Optional
 
 from omero.gateway import (
     BlitzGateway,
@@ -9,6 +9,74 @@ from omero.gateway import (
 )
 
 from metroloshiny.utils.read_file import get_private_data
+
+
+def omero_operation(
+    operation: Callable[[str, int, str], Any],
+    omero_type: str,
+    omero_id: int,
+    metric_id: str,
+    username: Optional[str] = None,
+    passwd: Optional[str] = None,
+    host: Optional[str] = None,
+    port: Optional[int] = None,
+    path_private_data: Optional[str] = None,
+) -> Optional[dict]:
+    """
+    Get data from OMERO.
+
+    :param operation: callable function that takes 3 arguments:
+                str = datatype, int = id, str = additional info
+    :param omero_type: str for Dataset or Image
+    :param omero_id: int OMERO ID
+    :param metric_id: metric to look for in OMERO.
+    :param username: str OMERO user name.
+                If None, will get it from private_data.csv
+    :param passwd: str OMERO user password.
+                If None, will get it from private_data.csv
+    :param host: str OMERO host.
+                If None, will get it from private_data.csv
+    :param port: str OMERO port.
+                If None, will get it from private_data.csv
+    :param path_private_data: str path to private_data.csv.
+                If None takes default path "./data/private_data.csv"
+
+    :return: FIXME to do
+    """
+    # Get the connection details from file
+    username, passwd, host, port = get_cred(
+        path_private_data, username, passwd, host, port
+    )
+    data_dict = None
+
+    # Connect to OMERO
+    try:
+        conn = BlitzGateway(
+            username=username, passwd=passwd, host=host, port=port, secure=True
+        )
+        conn.connect()
+        # Perform operation on OMERO
+        # Get any key-value or OMERO.tables for the OMERO object of interest
+        kv_pairs, tables = get_tables_and_kv_paris(
+            conn=conn, datatype=omero_type, id=omero_id
+        )
+        # Get the kv_pari or OMERO.table containing the metric of interst
+        data_dict = find_metrics(
+            conn=conn,
+            datatype=omero_type,
+            kv_paris=kv_pairs,
+            tables=tables,
+            metric=metric_id,
+        )
+
+    finally:
+        conn.c.closeSession()
+    # Process the data
+    if data_dict is None:
+        return None
+    return data_dict  # FIXME current return...
+
+    # Return something
 
 
 def connect_test(
@@ -89,13 +157,63 @@ def get_cred(
     return username, passwd, host, port
 
 
+def omero_key_value_to_dict(kv_pair: list[list]) -> dict:
+    """
+    Convert a OMERO key-value pair list to a dictionary.
+
+    Throws a RuntimeError if keys are not unique.
+    :param kv_pair: list OMERO key-value pair
+
+    :return: dict
+    """
+    dict_out = {}
+    for k, v in kv_pair:
+        if k in dict_out.keys():
+            raise RuntimeError(f"Key not unique in key-value pairs: {k}")
+        dict_out[k] = v
+    return dict_out
+
+
+def omero_table_to_dict(
+    ann: FileAnnotationWrapper, conn: BlitzGateway
+) -> dict:
+    """
+    Get an OMERO.table as a dictionary.
+
+    Throws a RuntimeError if there are non-unique headers.
+    :param ann: FileAnnotationWrapper
+    :param conn: BlitzGatewaay
+
+    :return: dict
+    """
+    res = conn.c.sf.sharedResources()
+    try:
+        table = res.openTable(ann.getFile()._obj)
+    except Exception as err:
+        raise RuntimeError(
+            f"Could not open table. "
+            f"Input type was {ann.getFile().getMimetype()}"
+        ) from err
+    n_headers = len(table.getHeaders())
+    n_rows = table.getNumberOfRows()
+    data = table.read(range(n_headers), start=0, stop=n_rows)
+    dict_out = {}
+    for col in data.columns:
+        if col.name in dict_out.keys():
+            raise RuntimeError(
+                f"OMERO table contains headers with same name: {col.name}"
+            )
+        dict_out[col.name] = col.values
+    return dict_out
+
+
 def find_metrics(
     conn: BlitzGateway,
     datatype: str,
     kv_paris: list,
     tables: list,
     metric: str,
-):
+) -> dict:
     """
     Check if the searched metric is in any kv_pair or OMERO.table.
 
@@ -106,7 +224,7 @@ def find_metrics(
     :param tables: list of OMERO.table annotations
     :param metric: str Metric to find.
 
-    :return: Either the kev-value pairs list[tuple], or OMERO.table Annotation
+    :return: dict
     """
     # Check key-value pairs for metric of interest
     kv_item = None
@@ -114,7 +232,7 @@ def find_metrics(
         # loop over the tuples of length 2,
         for k, _v in kv:
             # Check if the first item (key) contains the metric
-            if metric in k:
+            if metric in k and "Profile_length_for_FWHM" not in k:
                 kv_item = kv
                 break
 
@@ -138,14 +256,11 @@ def find_metrics(
                     break
     # If found in both, return the table
     if kv_item is not None and table_item is not None:
-        print("Found in kv and tables, returning table")
-        return table_item
+        return omero_table_to_dict(table_item, conn=conn)
     if kv_item is not None:
-        print("Found only in kv")
-        return kv_item
+        return omero_key_value_to_dict(kv_item)
     if table_item is not None:
-        print("Found only in table")
-        return table_item
+        return omero_table_to_dict(table_item, conn=conn)
     if kv_item is None and table_item is None:
         raise RuntimeError(
             f"Could not find <{metric}> in key-value "
@@ -168,7 +283,7 @@ def get_tables_and_kv_paris(
     :return: tuple (list[key-value pairs], list[annotation of OMERO.table])
     """
     if datatype not in ["Dataset", "Project", "Image"]:
-        raise KeyError(f"<{datatype}> not a valid OMERO datatype")
+        raise RuntimeError(f"<{datatype}> not a valid OMERO datatype")
     # Get the OMERO object
     item = conn.getObject(datatype, id)
     if item is None:
@@ -198,46 +313,6 @@ def get_tables_and_kv_paris(
             f"No key-value pairs or OMERO.tables found for {datatype} {id}"
         )
     return kv_pairs, tables
-
-
-def omero_key_value_to_dict(conn: BlitzGateway):
-    """
-    Test function.
-
-    Deprectaed!
-    """
-    image = conn.getObject("Image", 2832822)
-    kv_paris = []
-    # Find key value paris in the annotations
-    for ann in image.listAnnotations():
-        if isinstance(ann, MapAnnotationWrapper):
-            kv_paris.append(ann)
-            # for k, v in ann.getValue():  # list of (key, value) tuples
-            #     print(f"{k}: {v}")
-            # print("***")
-            # print(type(ann.getValue()))
-            # print(ann.getValue())
-        # if ann.OMERO_TYPE == "MapAnnotationI":
-        #     kv_pairs = ann.getValue()  # list of (key, value) tuples
-        #     for k, v in kv_pairs:
-        #         print(k, ":", v)
-        else:
-            print("---Found omero type:", ann.OMERO_TYPE)
-
-    if len(kv_paris) == 0:
-        print("No key-value pairs found for ...")  # FIXME
-    elif len(kv_paris) > 1:
-        raise NotImplementedError(
-            f"Multiple key-value pairs found for image... -> "
-            f"{len(kv_paris)} key-value pair objects!"
-        )  # FIXME
-    # Convert key-value to a dict
-    dict_out = {}
-    for k, v in kv_paris[0].getValue():
-        if k in dict_out.keys():
-            raise RuntimeError(f"Key not unique in key-value pairs: {k}")
-        dict_out[k] = v
-    return dict_out
 
 
 def find_omero_table(conn: BlitzGateway):
@@ -284,40 +359,6 @@ def find_omero_table(conn: BlitzGateway):
     return omero_table_to_dict(tables[0], conn=conn)
 
 
-def omero_table_to_dict(
-    ann: FileAnnotationWrapper, conn: BlitzGateway
-) -> dict:
-    """
-    Get an OMERO.table as a dictionary.
-
-    Deprectaed!
-    Throws a RuntimeError if there are non-unique headers.
-    :param ann: FileAnnotationWrapper
-    :param conn: BlitzGatewaay
-
-    :return: dict
-    """
-    res = conn.c.sf.sharedResources()
-    try:
-        table = res.openTable(ann.getFile()._obj)
-    except Exception as err:
-        raise RuntimeError(
-            f"Could not open table. "
-            f"Input type was {ann.getFile().getMimetype()}"
-        ) from err
-    n_headers = len(table.getHeaders())
-    n_rows = table.getNumberOfRows()
-    data = table.read(range(n_headers), start=0, stop=n_rows)
-    dict_out = {}
-    for col in data.columns:
-        if col.name in dict_out.keys():
-            raise RuntimeError(
-                f"OMERO table contains headers with same name: {col.name}"
-            )
-        dict_out[col.name] = col.values
-    return dict_out
-
-
 def render_dict(d: dict):
     """
     Print a dictionary for CLI viewing.
@@ -334,7 +375,14 @@ def render_dict(d: dict):
 
 
 if __name__ == "__main__":
-    connect_test()
+    out = omero_operation(
+        operation=None,
+        omero_type="Image",
+        omero_id=2832822,
+        metric_id="FWHM",
+    )
+    render_dict(out)
+
     """
     from sara (dataset with second last image containing a table)
     Dataset ID: 79006
