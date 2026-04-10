@@ -22,17 +22,19 @@ default = { solve-group = "default" }
 dev = { features = ["dev"], solve-group = "default"}
 
 [tool.pixi.feature.dev.tasks]
-fmt = { cmd="ruff format hooks" }
-lint = { cmd="ruff check hooks --fix" }
-types = { cmd="ty check hooks" }
+fmt = { cmd="ruff format ." }
+lint = { cmd="ruff check . --fix" }
+types = { cmd="ty check ." }
+black = { cmd="black ."}
 test = { cmd="pytest" }
-all = { depends-on = ["fmt", "lint", "types", "test"] }
+all = { depends-on = ["fmt", "lint", "types", "black", "test"] }
 
 [tool.pixi.feature.dev.dependencies]
 pytest = ">=8.3"
 pytest-cov = ">=6.0"
 ruff = ">=0.11"
 pre-commit = ">=4.2"
+black = ">=26.3.1,<27"
 
 [tool.pixi.feature.dev.pypi-dependencies]
 ty = "*"
@@ -58,9 +60,13 @@ beautifulsoup4 = ">=4.14.3,<5"
 zeroc-ice = "3.6.5.*"
 omero-py = "5.21.2.*"
 
+[tool.black]
+line-length = 79
+target-version = ["py39", "py310", "py311"]
+
 [tool.ruff]
 extend-exclude = ["\\{\\{cookiecutter.package_name\\}\\}"]
-line-length = 100
+line-length = 79
 
 [tool.ruff.lint]
 select = [
@@ -90,15 +96,27 @@ ignore = [
     "PLR0914", # Too many locals
     "PLR0915", # Too many statements
     "PLR1702", # Too many nested-blocks
+    "PLR2004", # Magic value used in comparison
+    "E741", # Ambiguous variable name, e.g.: `l`
+    "PLC0415", # `import` should be at the top-level of a file
+    "E501", # line too long. let black handle this
+    "E203", # white spaces, let black handle it.
 ]
 
 [tool.ruff.lint.per-file-ignores]
 "__init__.py" = ["F401", "F403"]
+"**/app.py" = ["D100", "D103"] # Ignore missing docstring for app.py files
 
 [tool.ruff.lint.pydocstyle]
 convention = "numpy"
 
-[tool.pytest.ini_options]
-testpaths = ["hooks"]
-addopts = "--doctest-modules"
-doctest_optionflags = "NORMALIZE_WHITESPACE"
+[tool.ty.rules]
+# See here: https://docs.astral.sh/ty/rules/#rule-levels
+invalid-argument-type = "warn" # shiny reactive values setting causes this
+not-subscriptable = "warn" #
+unresolved-attribute = "warn" # thrown by omero API
+
+#[tool.pytest.ini_options]
+#testpaths = ["hooks"]
+#addopts = "--doctest-modules"
+#doctest_optionflags = "NORMALIZE_WHITESPACE"

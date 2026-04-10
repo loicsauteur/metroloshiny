@@ -3,6 +3,7 @@ repos:
 - repo: https://github.com/pre-commit/pre-commit-hooks
   rev: v6.0.0
   hooks:
+    - id: check-docstring-first
     - id: check-yaml
     - id: check-toml
       exclude: "{{cookiecutter.package_name}}/pyproject.toml"
@@ -11,6 +12,14 @@ repos:
 
 - repo: local
   hooks:
+  - id: black
+    name: black
+    stages: [pre-commit, pre-push]
+    language: system
+    entry: pixi run black
+    types: [python]
+    pass_filenames: false
+
   - id: ruff
     name: ruff-format
     stages: [pre-commit, pre-push]
