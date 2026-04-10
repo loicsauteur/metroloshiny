@@ -65,7 +65,6 @@ line-length = 79
 target-version = ["py39", "py310", "py311"]
 
 [tool.ruff]
-extend-exclude = ["\\{\\{cookiecutter.package_name\\}\\}"]
 line-length = 79
 
 [tool.ruff.lint]
