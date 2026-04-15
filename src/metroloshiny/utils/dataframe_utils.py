@@ -88,9 +88,10 @@ def get_power_over_time_data(
     """
     # Sanity checks
     if line is None and power_prct is None:
-        raise ValueError("Eiter line or power_prct must be specified!")
-    if len(df.columns) != 3:
-        raise RuntimeError("Provided DataFrame does not have 3 columns!")
+        raise ValueError("Either line or power_prct must be specified!")
+    # if len(df.columns) == 3:
+    #    print(df.head())
+    #    raise RuntimeError("Provided DataFrame does not have 3 columns!")
     # Select only a specific laser line
     if line:
         df = df[df[df.columns[0]] == line]
@@ -118,7 +119,10 @@ def get_power_over_time_data(
 
 
 def filter_by_column_value(
-    df: pd.DataFrame, column_name: str, value: str, drop_column: bool = True
+    df: pd.DataFrame,
+    column_name: str,
+    value: Union[str, float],
+    drop_column: bool = True,
 ) -> pd.DataFrame:
     """
     Filter a dataframe for rows according to column entry.
@@ -127,7 +131,7 @@ def filter_by_column_value(
 
     :param df: pd.DataFrame.
     :param column_name: str name of the column.
-    :param value: str column entries to keeps rows.
+    :param value: str or float column entries to keeps rows.
     :param drop_column: boolean, wether to keep the column or remove it.
 
     :return: pd.DataFrame (new)

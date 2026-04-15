@@ -16,6 +16,11 @@ from metroloshiny.utils.dataframe_utils import (
 # Import data from shared.py
 from metroloshiny.utils.read_file import get_laser_power_objective_data
 
+# Load Data
+gsheet, df = get_laser_power_objective_data(
+    dev_local_file=False
+)  # FIXME temp tests on local file
+
 # Create UI
 ui.page_opts(title="Metrology")
 
@@ -24,11 +29,6 @@ ui.page_opts(title="Metrology")
 # Create a tab layout (for metrology kinds)
 with ui.navset_pill(id="tab"):
     with ui.nav_panel("Laser Power at Objective"):
-        # Load Data
-        gsheet, df = get_laser_power_objective_data(
-            dev_local_file=False
-        )  # FIXME temp tests on local file
-
         # Choices of sites (Hebel vs Matt)
         sites = np.unique(np.asarray(df["Site"]))
 
@@ -155,7 +155,7 @@ with ui.navset_pill(id="tab"):
             # Update the ui selection
             ui.update_select("line", choices=line.get())
 
-        # Update power choices based on wavelength
+        # Update power choices based on wavelength  --------------------------
         @reactive.effect
         @reactive.event(
             input.line,
@@ -189,7 +189,7 @@ with ui.navset_pill(id="tab"):
                 return
             if input.line() != "All":
                 df_filtered = filter_by_column_value(
-                    df_filtered, input.kind(), input.line()
+                    df_filtered, input.kind(), float(input.line())
                 )
             _df.set(df_filtered)
             # Get a list of available powers
@@ -235,7 +235,7 @@ with ui.navset_pill(id="tab"):
                 return
             if input.line() != "All":
                 df_filtered = filter_by_column_value(
-                    df_filtered, input.kind(), input.line()
+                    df_filtered, input.kind(), float(input.line())
                 )
                 # The df now contains only the [LED or Laser] and
                 #   [Power] columns + dates
@@ -282,7 +282,7 @@ with ui.navset_pill(id="tab"):
                 return
             if input.line() != "All":
                 df_filtered = filter_by_column_value(
-                    df_filtered, input.kind(), input.line()
+                    df_filtered, input.kind(), float(input.line())
                 )
                 # The df now contains only the [LED or Laser] and
                 #   [Power] columns + dates
@@ -381,7 +381,7 @@ with ui.navset_pill(id="tab"):
                             table = filter_by_column_value(
                                 table,
                                 input.kind(),
-                                input.line(),
+                                float(input.line()),
                                 drop_column=False,
                             )
 
@@ -512,7 +512,7 @@ with ui.navset_pill(id="tab"):
                             table = filter_by_column_value(
                                 table,
                                 input.kind(),
-                                input.line(),
+                                float(input.line()),
                                 drop_column=False,
                             )
                         # Filter by power
@@ -523,7 +523,7 @@ with ui.navset_pill(id="tab"):
                             table = filter_by_column_value(
                                 table,
                                 "Power [%]",
-                                input.power(),
+                                float(input.power()),
                                 drop_column=False,
                             )
                         # Drop all nan columns
