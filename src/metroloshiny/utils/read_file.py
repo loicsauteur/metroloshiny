@@ -186,7 +186,6 @@ def load_gspread(
 
     # Open the sheet with URL
     sh = gc.open_by_url(gsheet_url)
-    # sh = gc.open_by_key(sheet_key)
 
     if whole_document:
         return sh
@@ -196,13 +195,16 @@ def load_gspread(
 
 
 def get_gspread(
-    data_path: Optional[str] = None, dev_local_file: Optional[str] = None
+    sheet_name: Optional[str] = None,
+    data_path: Optional[str] = None,
+    dev_local_file: Optional[str] = None,
 ) -> Union[gspread.Spreadsheet, gspread.Worksheet, pd.DataFrame]:
     """
     Get a whole gspread document.
 
     Uses information provided in private_data.csv.
 
+    :param sheet_name: str name of the google sheet.
     :param data_path: str path to csv file with key-value to access sheet.
     :param dev_local_file: str, for testing using a local excel file (path).
 
@@ -214,9 +216,9 @@ def get_gspread(
     path_sa = get_private_data("PathToServiceAccountJSON", data_path=data_path)
     doc = load_gspread(
         gsheet_url=url,
-        sheet_name="",
+        sheet_name="" if sheet_name is None else sheet_name,
         path_service_account=path_sa,
-        whole_document=True,
+        whole_document=True if sheet_name is None else False,
     )
     return doc
 

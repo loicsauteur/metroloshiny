@@ -1,5 +1,7 @@
 """Utils for common usage."""
 
+import datetime
+
 from bs4 import BeautifulSoup
 
 
@@ -54,3 +56,14 @@ def theoretical_fwhm(em: int, na: float, ri: float, k: float = 2.0):
     lat = 0.51 * em / na
     ax = k * ri * em / (na * na)
     return lat, ax
+
+
+def get_today() -> str:
+    """
+    Get today's date in formate YYYYMMDD.
+
+    :return: str
+    """
+    today = datetime.date.today()
+    today = today.strftime("%Y%m%d")
+    return today

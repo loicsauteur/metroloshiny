@@ -12,7 +12,7 @@ from metroloshiny.utils.read_file import get_private_data
 
 
 def omero_operation(
-    operation: Callable[[str, int, str], Any],
+    operation: Optional[Callable[[str, int, str], Any]],
     omero_type: str,
     omero_id: int,
     metric_id: str,
