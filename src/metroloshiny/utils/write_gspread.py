@@ -73,7 +73,6 @@ def identify_entry_coords(
     if df.empty:
         return 2, -1, True
     headers = [str(x) for x in df.columns]
-    print(headers)
 
     # Pre-check for line & power
     if (line is None) != (line_header is None) != (power is None):
@@ -119,7 +118,8 @@ def identify_entry_coords(
     rows = df.index[df["Microscope"] == microscope].tolist()
     if len(rows) == 0:
         # Microscope not in the sheet yet, can be put to the end
-        return n_total_rows + 1, col_target, True
+        # FYI: total rows + header + new row
+        return n_total_rows + 2, col_target, True
 
     # Get a list of indices where the objective matches     ------------------
     _rows = df.index[df["Objective"] == objctive].tolist()
@@ -128,7 +128,7 @@ def identify_entry_coords(
     )  # Get the intersection of the two lists
     if len(rows) == 0:
         # Objective for entry not in sheet, can be put to the end
-        return n_total_rows + 1, col_target, True
+        return n_total_rows + 2, col_target, True
 
     # Get a list of indices where the info matches     -----------------------
     _rows = df.index[df["Info"] == info].tolist()
@@ -137,9 +137,7 @@ def identify_entry_coords(
     )  # Get the intersection of the two lists
     if len(rows) == 0:
         # Info for entry not in sheet, can be put to the end
-        return n_total_rows + 1, col_target, True
-
-    print("getting to the optional entry checks")
+        return n_total_rows + 2, col_target, True
 
     # Optional entry checks         ------------------------------------------
     # Channel
@@ -150,7 +148,7 @@ def identify_entry_coords(
         )  # Get the intersection of the two lists
         if len(rows) == 0:
             # Objective for entry not in sheet, can be put to the end
-            return n_total_rows + 1, col_target, True
+            return n_total_rows + 2, col_target, True
 
     # FWHM
     if fwhm is not None:
@@ -160,7 +158,7 @@ def identify_entry_coords(
         )  # Get the intersection of the two lists
         if len(rows) == 0:
             # Objective for entry not in sheet, can be put to the end
-            return n_total_rows + 1, col_target, True
+            return n_total_rows + 2, col_target, True
 
     # Line and power
     if line_header is not None:
@@ -174,8 +172,8 @@ def identify_entry_coords(
             set(rows) & set(_rows)
         )  # Get the intersection of the two lists
         if len(rows) == 0:
-            # Objective for entry not in sheet, can be put to the end
-            return n_total_rows + 1, col_target, True
+            # Line/power for entry not in sheet, can be put to the end
+            return n_total_rows + 2, col_target, True
 
     # There should only be one row entry
     if len(rows) != 1:
@@ -184,7 +182,13 @@ def identify_entry_coords(
         )
     # Is the row at the end?
     if rows[0] + 1 == n_total_rows:
-        return n_total_rows + 1, col_target, True
+        print(
+            "will add to (end of function/last row):",
+            n_total_rows + 2,
+            col_target,
+            True,
+        )
+        return n_total_rows + 2, col_target, True
     # Correct to 1-based sheet index (including header row)
     return rows[0] + 2, col_target, False
 
@@ -231,7 +235,7 @@ def make_sheet_entry(
         "horizontalAlignment": "RIGHT",
         "textFormat": {
             "foregroundColor": {"red": 0.0, "green": 0.0, "blue": 0.0},
-            "bold": True,  # Does not work...
+            "bold": False,  # Does not work...
         },
     }
     updated_cell_format = updated_date_cell_format.copy()
@@ -280,8 +284,6 @@ def make_sheet_entry(
             "Could not enter date to sheet. "
             + f"Contains <{date_cell.value}>, expected <{date}>"
         )
-
-    print("Data should be entered at row/col/END?", row, col, end_of_sheet)
 
     # Enter value       ------------------------------------------------------
     if not end_of_sheet:

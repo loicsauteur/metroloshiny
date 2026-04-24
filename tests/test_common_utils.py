@@ -22,11 +22,25 @@ def test_get_ui_id():
 
 
 def test_is_input_select_in_list():
-    """Test is_input_select_in list_function."""
+    """Test is_input_select_in_list function."""
     input_list = create_input_list()
     assert cu.is_input_select_in_list(input_list, "input_selector")
     assert cu.is_input_select_in_list(input_list, "input_text")
     assert not cu.is_input_select_in_list(input_list, "something")
+
+
+def test_check_duplicate_dict_values():
+    """Test check_duplicate_dict_values function."""
+    a = {"DAPI": "C1", "GFP": "None", "Cy3": "C2", "Cy5": "None"}
+    b = {"DAPI": "C1", "GFP": "None", "Cy3": "C1", "Cy5": "None"}
+    good = cu.check_duplicate_dict_values(a)
+    bad1 = cu.check_duplicate_dict_values(a, exclude=None)
+    bad2 = cu.check_duplicate_dict_values(b)
+
+    assert good is None
+    assert isinstance(bad1, dict)
+    assert isinstance(bad2, dict)
+    assert next(iter(bad2.keys())) == "C1"
 
 
 if __name__ == "__main__":
