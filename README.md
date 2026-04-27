@@ -10,7 +10,6 @@
    3. Shiny Server configuration
    4. Getting metroloshiny
       1. config private_data.csv
-      2. specfiying the path to the private_data.csv
    4. Deploying the Shiny app(s)
       1. Deployment automation with pixi
 
@@ -31,7 +30,11 @@ The document requires specific sheet names and the column names should not be mo
 
 An example can be found in `example_files/metroloshiny_data_example.xlsx`. I.e. copy it to your google drive.
 
-## Google service account
+Make sure that all sheets already contain at least one entry.
+
+The frist sheet entry for a new "site" should be done manually within the sheet.
+
+## Google service account <a name="google-service-account></a> # FIXME link test
 
 To retrieve (and write) data to the google sheet, metroloshiny requires you to create a service account.
 
@@ -59,7 +62,7 @@ See also [here](https://docs.gspread.org/en/latest/oauth2.html#for-bots-using-se
 2. Fill out the form...
 3. Under `Credentials` > Service Accounts, press `Manage service accounts`
 4. Press on ⋮ near recently created service account and select “Manage keys” and then click on “ADD KEY > Create new key”.
-5. Select JSON key type and press “Create” -> downloads a json file. Also remember teh service email address
+5. Select JSON key type and press “Create” -> downloads a json file. Also remember the service email address
 6. Share the google sheet with the service email address created above
 7. **Optional:** Move the downloaded file to `~/.config/gspread/service_account.json`. Windows users should put this file to `%APPDATA%\gspread\service_account.json`.
 8. I suggest you put the `service_account.json` somewhere you will remember, you will also need the file on the Linux server.
@@ -141,37 +144,27 @@ You may have to open the port  on the linux server, i.e. allow the port with:
 
 `sudo ufw allow 3838`
 
-#  -----------------------------         Continue here  ----------------------
-
-## Shiny Server configuration
-## Getting metroloshiny
-### config private_data.csv
-### specfiying the path to the private_data.csv
-## Deploying the Shiny app(s)
-### Deployment automation with pixi
-
-
-
-
-
-
-
 ## Shiny Server configuration
 
 Edit the file `/etc/shiny-server/shiny-server.conf` (root privileges are required). Add a line with python `<path-to-python-or-venv>`.
 
-20260327: changed to: `/path/to/.pixi/envs/default/bin/python3`
+NB: the python environment will be set up as described in the next section.
 
-In addition it should `run_as` my username (not `shiny`, which did not work, maybe also as `ubuntu` might work...)
+In addition it may/should `run_as` my username (`shiny`, did not work for me, maybe also as `ubuntu` might work...).
 
-Example `shiny-server.conf`:
-```
+<!--
 # Use specific python to run shiny apps
 python /users/stud/s/sautlo01/shiny_test/.pixi/envs/default/bin/python;
+-->
 
-# Instruct Shiny Server to run applications as the user "shiny"
+Example `shiny-server.conf`:
+```bash
+# Use specific python to run shiny apps
+python /users/path/to/repo/.pixi/envs/default/bin/python;
+
+# Instruct Shiny Server to run applications as the user "shiny", or better your user name
 #run_as shiny;
-run_as sautlo01;
+run_as userName;
 
 # Define a server that listens on port 3838
 server {
@@ -193,46 +186,88 @@ server {
 }
 ```
 
-Which uses python from this `shiny_test` pixi env.
+## Getting metroloshiny
 
-## Deploy a shiny app (copy app to server folder)
+Copy the repo:
 
-A Shiny app `app.py` must be located in the shiny-server folder. I.e. Clear out the contents of `/srv/shiny-server/` and replace it with your own app(s).
+`git clone https://github.com/loicsauteur/metroloshiny.git`
 
+Install [pixi](https://pixi.prefix.dev/latest/installation/)
+
+Install the pixi `default` environments:
+
+```bash
+cd metroloshiny
+pixi install
+```
+
+### Configure private_data.csv
+
+You can find an example `example_files/private_data_example.csv`.
+
+This file is needed for metroloshiny. It contains information to access e.g. the google sheets, or OMERO.
+This information is stored in this file as comma-separated key value pairs.
+
+- GoogleServiceEmail: service email address created in the [Google service account](#google-service-account) # FIXME link test
+- PathToServiceAccountJSON: full path to your `service_account.json` (**you need to save a copy somewhere on your server**)
+- Sheet ID: Google sheet ID
+- Sheet URL: URL to the google sheet
+- Upload password: A password you define, used for uploading data from the metroloshiny app to your google sheet
+
+OMERO entries are optional, in case you want to retrive data saved on OMERO.
+
+- OMERO HOST: OMERO web-address
+- OMERO PORT: OMERO port
+- OMERO USER: OMERO user name (e.g. user locally created for your OMERO group)
+- OMERO PASSWORD: OMERO password for user
+
+In addition, you need to adjust the code in `src/metroloshiny/utils/read_fily.py`, line 10-13:
+
+```python
+# Path of the private_data.csv file on the linux server
+__linux_private_data_path__ = (
+    "/absolute/path/to/private_data.csv"
+)
+```
+THIS NEEDS TO BE FIXED FROM MY SIDE... MAYBE I CAN:
+- copy the file somewhere else? i.e. in which directory is python started?
+
+## Deploying the Shiny app(s)
+
+
+As described in the [official documentation](https://shiny.posit.co/py/get-started/deploy-on-prem.html#place-application-files): A Shiny app `app.py` must be located in the shiny-server folder. I.e. Clear out the contents of `/srv/shiny-server/` and replace it with your own app(s).
+
+>>>> FIXME will i still need the start page??
+
+<!--
 - If you’re only hosting a single app, you can put the `app.py` (and the rest of the app’s files) directly in `/srv/shiny-server/`, and it will be served from http://hostname:3838/.
 - If you have multiple apps, copy each app into a subdirectory; for example, `/srv/shiny-server/foo/app.py` would be served from http://hostname:3838/foo/. In this case, you can put static assets into the root `/srv/shiny-server/` directory, like an `index.html` file.
 
 E.g. to copy a folder (with all it's content, parameter `-R` for recursive; if destination does not exist it will be created) use:
+-->
 
-`cp -R path/to/source path/to/destination/`
+E.g. copy the one of the metroloshiny apps to the `/srv/shiny-server`:
 
-E.g. (sudo may be required):
-
-`cp -R /users/stud/s/sautlo01/shiny_test/basic-navigation /srv/shiny-server/basic-test/`
-`cp -R /users/stud/s/sautlo01/metroloshiny/power_at_objective /srv/shiny-server/power_at_objective/`
+`cp -R /path/to/metroloshiny/power_at_objective /srv/shiny-server/power_at_objective/`
 
 **In case the destination exisits already, remove that folder before copying the new version**
 
 e.g.: `sudo rm -r /srv/shiny-server/power_at_objective/`
 
-**--> todo: add pixi tasks for automatic copying the app folder to the correct location <---**
-
-Make sure to not forget the `/` at the end of the destination path
-
-**Don't forget to restart the Shiny Server**
-
-### Shiny Server restart
+Finally, **restart the shiny-server**:
 
 `sudo systemctl restart shiny-server`
 
-`sudo systemctl start shiny-server`
+### Deployment automation with pixi
 
-`sudo systemctl stop shiny-server`
-
-### Use pixi task to delete previous folder, copy new folder and restart the shiny server:
+For testing code modification it can be useful to create a pixi task:
 
 run: `pixi run deploy`
 
-with pixi task:
+Please adjust your task accordingly:
 
 `deploy = "sudo rm -r /srv/shiny-server/power_at_objective;sudo cp -R /users/stud/s/sautlo01/metroloshiny/src/metroloshiny/power_at_objective /srv/shiny-server/power_at_objective/;sudo systemctl restart shiny-server"`
+
+In case you changed the dependencies, update also your python environment:
+
+`pixi install`

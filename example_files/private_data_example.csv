@@ -1,8 +1,7 @@
 Key,Value
-Google API Key,xxx***xxx
 GoogleServiceEmail,something@something-project.iam.gserviceaccount.com
-PathToServiceAccountJSON,./data/local_service_account.json
-Sheet ID,someID
+PathToServiceAccountJSON,/full/path/to/local_service_account.json
+Sheet ID,google_sheet_document_ID
 Sheet URL,https://docs.google.com/spreadsheets/d/someID/edit?gid=0#gid=0
 Upload password,password
 OMERO HOST,omero.idr.com

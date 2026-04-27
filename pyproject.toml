@@ -43,7 +43,7 @@ ty = "*"
 #test = ["pytest"]
 
 [tool.pixi.tasks]
-deploy = "sudo rm -r /srv/shiny-server/power_at_objective;sudo cp -R /users/stud/s/sautlo01/metroloshiny/src/metroloshiny/power_at_objective /srv/shiny-server/power_at_objective/;sudo systemctl restart shiny-server"
+deploy = "sudo rm -r /srv/shiny-server/power_at_objective;sudo cp -R /users/stud/s/sautlo01/metroloshiny/src/metroloshiny/power_at_objective /srv/shiny-server/power_at_objective/;sudo rm -r /srv/shiny-server/data_upload;sudo cp -R /users/stud/s/sautlo01/metroloshiny/src/metroloshiny/data_upload /srv/shiny-server/data_upload/;sudo systemctl restart shiny-server"
 
 [tool.pixi.dependencies]
 pytest = ">=9.0.2,<10"

@@ -12,6 +12,10 @@ __linux_private_data_path__ = (
     "/users/stud/s/sautlo01/metroloshiny/data/private_data.csv"
 )
 
+# FIXME temp test prints for server
+print("Current working directory:", os.getcwd())
+print("read_file __file__:", __file__)
+
 
 def read_xlsx(file: str):
     """
