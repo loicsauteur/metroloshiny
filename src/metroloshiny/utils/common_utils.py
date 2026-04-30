@@ -102,8 +102,8 @@ def check_duplicate_dict_values(
     """
     Check if a dictionary contains duplicate values.
 
-    Used for checking if a channel identifier (C1 - values)
-    was selected for multiple channel names (DAPI/GFP - keys)
+    Used for checking if a channel identifier (C1 = values)
+    was selected for multiple channel names (DAPI/GFP = keys)
 
     :param d: dict with single str for keys and values.
     :param exclude: Optional str, to exclude a specific value item.

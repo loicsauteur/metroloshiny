@@ -5,6 +5,7 @@ import pandas as pd
 from shiny import reactive
 from shiny.express import input, render, ui
 
+from metroloshiny.data_objects.PSFData import PSFData
 from metroloshiny.utils.common_utils import check_duplicate_dict_values
 from metroloshiny.utils.dataframe_utils import filter_by_column_value
 from metroloshiny.utils.omero_utils import omero_operation, render_dict
@@ -407,7 +408,11 @@ def validate_omero_input(
 
     # Get the specific metrics
     if metric == "FWHM":
-        return validate_psf_data(data)
+        try:
+            data = PSFData(data)
+            return data.get_fwhm_data()
+        except Exception as err:
+            return str(err)
 
     else:
         # FIXME needs implementation to validate other metric categories
@@ -417,6 +422,8 @@ def validate_omero_input(
 def validate_psf_data(data_dict: dict) -> dict:
     """
     Parse the OMERO FWHM data to a dict per channel.
+
+    FIXME: Deprecated
 
     :param data_dict: dictionary as returned from the omero_operation function
 

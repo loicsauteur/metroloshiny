@@ -41,7 +41,8 @@ def omero_operation(
     :param path_private_data: str path to private_data.csv.
                 If None takes default path "./data/private_data.csv"
 
-    :return: FIXME to do
+    :return: dict with data, with keys (contining the metric string),
+        or None if no matches were found.
     """
     # Get the connection details from file
     username, passwd, host, port = get_cred(
@@ -76,8 +77,6 @@ def omero_operation(
         return None
     return data_dict  # FIXME current return...
 
-    # Return something
-
 
 def connect_test(
     username: Optional[str] = None,
@@ -108,14 +107,15 @@ def connect_test(
         kv, tables = get_tables_and_kv_paris(
             conn, datatype=datatype, id=79006
         )  # id=2861226)
-        the_thing = find_metrics(
+        # the_thing = find_metrics(
+        find_metrics(
             conn=conn,
             datatype=datatype,
             kv_paris=kv,
             tables=tables,
             metric="FWHM",
         )
-        return the_thing
+        # return the_thing
 
     finally:
         conn.c.closeSession()
@@ -220,9 +220,12 @@ def find_metrics(
     :param conn: BlitzGateway,
     :param datatype: str OMERO object datatype
     :param kv_paris: list of (loaded) OMERO key value pairs
-                     (list of key-value tuples)
+        (list of key-value tuples)
     :param tables: list of OMERO.table annotations
     :param metric: str Metric to find.
+
+    :raises RuntimeError: if the metric is not found in Omero.tables
+        or key-value pairs.
 
     :return: dict
     """

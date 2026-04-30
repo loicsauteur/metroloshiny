@@ -15,6 +15,9 @@ __linux_private_data_path__ = (
 # FIXME temp test prints for server
 print("Current working directory:", os.getcwd())
 print("read_file __file__:", __file__)
+# I get following output on the server:
+# Current working directory: /srv/shiny-server/data_upload
+# read_file __file__: /users/stud/s/sautlo01/metroloshiny/src/metroloshiny/utils/read_file.py
 
 
 def read_xlsx(file: str):

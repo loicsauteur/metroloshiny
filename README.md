@@ -1,8 +1,8 @@
 # Table of Contents
-1. [Overview](#Overview)
+1. [Overview](#Overview) <!--This works!-->
 2. Prerequisites
    1. Google sheet
-   2. Google service account
+   2. [Google service account](#Google-service-account)
 3. Running locally
 4. Installation on Linux server
    1. Shiny Server installation
@@ -34,7 +34,7 @@ Make sure that all sheets already contain at least one entry.
 
 The frist sheet entry for a new "site" should be done manually within the sheet.
 
-## Google service account <a name="google-service-account></a> # FIXME link test
+## Google service account
 
 To retrieve (and write) data to the google sheet, metroloshiny requires you to create a service account.
 
@@ -208,7 +208,7 @@ You can find an example `example_files/private_data_example.csv`.
 This file is needed for metroloshiny. It contains information to access e.g. the google sheets, or OMERO.
 This information is stored in this file as comma-separated key value pairs.
 
-- GoogleServiceEmail: service email address created in the [Google service account](#google-service-account) # FIXME link test
+- GoogleServiceEmail: service email address created in the [Google service account](#Google-service-account)
 - PathToServiceAccountJSON: full path to your `service_account.json` (**you need to save a copy somewhere on your server**)
 - Sheet ID: Google sheet ID
 - Sheet URL: URL to the google sheet
@@ -231,6 +231,9 @@ __linux_private_data_path__ = (
 ```
 THIS NEEDS TO BE FIXED FROM MY SIDE... MAYBE I CAN:
 - copy the file somewhere else? i.e. in which directory is python started?
+- Current working directory: /srv/shiny-server/data_upload
+- read_file __file__: /users/stud/s/sautlo01/metroloshiny/src/metroloshiny/utils/read_file.py
+   - > Could use the latter to get the relative path to the metroloshiny repo
 
 ## Deploying the Shiny app(s)
 
@@ -271,3 +274,8 @@ Please adjust your task accordingly:
 In case you changed the dependencies, update also your python environment:
 
 `pixi install`
+
+<!--
+On the server I have the problem that the pixi lock made chagnes and I can thus not pull new commits...
+`git resotre pixi.lock`
+-->
