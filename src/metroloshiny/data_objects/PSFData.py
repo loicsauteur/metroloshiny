@@ -1,6 +1,7 @@
 """Class for PSF data."""
 
 import warnings
+from typing import Optional
 
 from metroloshiny.utils.common_utils import get_today
 
@@ -33,9 +34,17 @@ class PSFData:
         self._parse_data_()
         self._set_final_fwhm_data_()
 
+    # Getters / Setters     --------------------------------------------------
+
     def get_fwhm_data(self) -> dict[str, dict[str, float]]:
         """Getter for the FWHM data."""
         return self.fwhm_data
+
+    def get_acquisition_date(self) -> Optional[str]:
+        """Getter for the acquisition date."""
+        return self.acquisition_date
+
+    # Functions      ---------------------------------------------------------
 
     def _set_final_fwhm_data_(
         self, min_fwhm: int = 150, compare: bool = False

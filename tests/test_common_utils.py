@@ -43,8 +43,33 @@ def test_check_duplicate_dict_values():
     assert next(iter(bad2.keys())) == "C1"
 
 
+def test_invert_nested_dict():
+    """Test invert_nested_dict function."""
+    d = {"C1": {"FWHM-X": 911.0, "FWHM-Y": 852.0, "FWHM-Z": 1260.0}}
+    res = cu.invert_nested_dict(d)
+    assert len(res) == 3, "Wrong number of keys."
+    for vals in res.values():
+        assert len(vals) == 2, "Wrong number of path elements,"
+    for value, path in res.items():
+        val = dict(d)
+        for p in path:
+            val = val.get(p)
+        msg = f"Value {val} does not match expected value {value}."
+        assert val == value, msg
+
+
+def test_check_if_sequence():
+    """Test check_if_sequence function."""
+    good = ["A1", "A2", "A3", "A4"]
+    semi_good = ["A1", "A2", "B3", "Z4"]
+    bad = ["A1", "A3", "B4", "B5"]
+    assert cu.check_if_sequence(good)
+    assert cu.check_if_sequence(semi_good)
+    assert not cu.check_if_sequence(bad)
+
+
 if __name__ == "__main__":
-    pass
+    test_check_if_sequence()
     # test_get_ui_id()
     # test_is_input_select_in_list()
     # print("success")

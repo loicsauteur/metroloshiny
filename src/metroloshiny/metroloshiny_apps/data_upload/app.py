@@ -8,9 +8,9 @@ from shiny.express import input, render, ui
 from metroloshiny.data_objects.PSFData import PSFData
 from metroloshiny.utils.common_utils import check_duplicate_dict_values
 from metroloshiny.utils.dataframe_utils import filter_by_column_value
-from metroloshiny.utils.omero_utils import omero_operation, render_dict
+from metroloshiny.utils.omero_utils import omero_operation
 from metroloshiny.utils.read_file import check_upload_password, get_gspread
-from metroloshiny.utils.write_gspread import make_sheet_entry
+from metroloshiny.utils.write_gspread import make_sheet_entries
 
 # FIXME need to update the site selection when cat changes... this is currently not dynamic...
 
@@ -137,7 +137,6 @@ with ui.nav_panel(title="Data Upload"):
                 @render.ui
                 @reactive.event(card_selectors)
                 def dynamic_selectors():
-                    print("updated dynamic card selecotrs")
                     return card_selectors.get()
 
                 # Add selectors
@@ -221,11 +220,11 @@ with ui.nav_panel(title="Data Upload"):
                     if isinstance(data, str):
                         return data
 
-                    render_dict(data)
-
                     # Create subsequent ui items depending on the updload data type
                     if _metric == "FWHM":
-                        ui_elements = list(update_confrim_psf_selection(data))
+                        ui_elements = list(
+                            update_confrim_psf_selection(data.get_fwhm_data())
+                        )
                         # Set the reactive value for the upload data
                         upload_data.set(data)
                         # Add upload FWHM button
@@ -236,7 +235,7 @@ with ui.nav_panel(title="Data Upload"):
                             f"The metric {_metric} in not implemented yet!"
                         )
 
-                # Helper reactive value to rest ui elements
+                # Helper reactive value to rest ui elements (counts button presses)
                 upload_psf_btn_presses = reactive.value(None)
 
                 @render.text
@@ -256,7 +255,7 @@ with ui.nav_panel(title="Data Upload"):
                         input.upload_psf_button()
                         <= upload_psf_btn_presses.get()
                     ):
-                        # <= important,prevents accitendal function trigger by sidebar elements
+                        # <= important: prevents accitendal function trigger by sidebar elements
                         return ""
 
                     upload_psf_btn_presses.set(input.upload_psf_button())
@@ -310,22 +309,25 @@ with ui.nav_panel(title="Data Upload"):
                         item = next(iter(duplicates.items()))
                         return f"Error: {item[0]} cannot be specified for multiple channels: {item[1]}"
 
-                    # Start the upload
+                    # Change the ch_id in the data dict to the selected channel_names
+                    parsed_data = {}
+                    for ch_name, sel in selectors.items():
+                        if sel != "None":
+                            parsed_data[ch_name] = data.get_fwhm_data().get(
+                                sel
+                            )
+
+                    # Start the PSF upload
                     try:
-                        for ch, ch_id in selectors.items():
-                            if ch_id != "None":
-                                _data = data.get(ch_id)
-                                for label, value in _data.items():
-                                    make_sheet_entry(
-                                        sheet=sheet_reference.get(),
-                                        value=value,
-                                        site=site,
-                                        microscope=microscope,
-                                        objctive=objective,
-                                        info=info,
-                                        channel=ch,
-                                        fwhm=label,
-                                    )
+                        make_sheet_entries(
+                            sheet=sheet_reference.get(),
+                            site=site,
+                            microscope=microscope,
+                            objective=objective,
+                            info=info,
+                            date=data.get_acquisition_date(),
+                            fwhm_data=parsed_data,
+                        )
                     except Exception as err:
                         return "Error: " + str(err)
 
@@ -378,7 +380,7 @@ def update_confrim_psf_selection(channel_dict: dict) -> tuple:
 
 def validate_omero_input(
     omero_type: str, omero_id: Union[str, int], metric: str
-) -> Union[str, dict]:
+) -> Union[str, Union[PSFData]]:
     """
     Validate the OMERO input selection.
 
@@ -410,7 +412,7 @@ def validate_omero_input(
     if metric == "FWHM":
         try:
             data = PSFData(data)
-            return data.get_fwhm_data()
+            return data
         except Exception as err:
             return str(err)
 
@@ -466,7 +468,6 @@ def validate_psf_data(data_dict: dict) -> dict:
 @reactive.event(input.category)
 def update_on_cat_choice():
     """Update dataframe (sheet selection) and card selectors."""
-    print("updating card selectors...")
     if input.category() == category_list[0]:
         card_selectors.set([])
     # Power at objective
@@ -486,7 +487,6 @@ def update_on_cat_choice():
         )
         if isinstance(g_spreadsheet, pd.DataFrame):
             # For local file testing
-            print("dataframe already loaded from excel")
             dataframe.set(g_spreadsheet)
         else:
             sheet = g_spreadsheet.worksheet(
@@ -509,7 +509,6 @@ def update_on_cat_choice():
         )
         if isinstance(g_spreadsheet, pd.DataFrame):
             # For local file testing
-            print("dataframe already loaded from excel")
             dataframe.set(g_spreadsheet)
         else:
             sheet = g_spreadsheet.worksheet("psf_measurements")
@@ -531,7 +530,6 @@ def update_microscope_selections():
     # Update microscope choices
     mics = list(np.unique(np.asarray(df_filtered["Microscope"])))
     mics.append("* New microscope *")
-    print("microcsopes:", mics)
     microscope_choices.set(mics)
     ui.update_select("microscope", choices=microscope_choices.get())
 

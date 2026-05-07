@@ -1,8 +1,11 @@
 """Utils for DataFrame manipulation."""
 
+import warnings
 from typing import Optional, Union
 
 import pandas as pd
+
+from metroloshiny.utils.common_utils import invert_nested_dict
 
 
 @DeprecationWarning
@@ -187,22 +190,96 @@ def parse_dates(dates: list[str]) -> list[str]:
     return new_dates
 
 
+def filter_by_nested_dict(
+    df: pd.DataFrame, nested_dict: dict, headers: list[str]
+) -> dict:
+    """
+    Get indexes of the dataframe for values in a nested_dict.
+
+    Used to idientify the rows where to put data into a table.
+    The nested_dict contains keys to idientify specific row values,
+    e.g. "C1" and "FWHM-Y", and the last level of the nested dict
+    contains the value for entering into the talbe.
+
+    The result is a dictionary with {index:value}.
+    Indices are 0-based and excluding the header row.
+    If an entry form the nested dict cannot be matched into the table,
+    the index will be negative (decreasing by unmatched counts).
+
+    :param df: pd.DataFrame
+    :param nested_dict: e.g. {
+            "C1" : {'FWHM-X': 911.0, 'FWHM-Y': 852.0, 'FWHM-Z': 1260.0}
+        }
+    :param headers: list for matching the df columns with
+        the nested_dict keys.
+    :return: dict {pd.DataFrame index : value of nested_dict}
+    """
+    # Enuser there is no duplicate entries
+    try:
+        _df = df.duplicated(subset=headers, keep=False)
+        if _df.any():
+            duplicates = df.loc[_df, headers]
+            raise ValueError(
+                f"Duplicate entries in the dataframe:\n{duplicates}"
+            )
+    except KeyError as err:
+        raise KeyError(
+            f"Selected headers do not matcht the table headers: {err}"
+        ) from err
+
+    # Create invered nested dict = {value: path of keys}
+    inverted_dict = invert_nested_dict(nested_dict)
+
+    # Create the result dict = {index: value}
+    result = {}
+    neg_idx = 0
+
+    for value, key_list in inverted_dict.items():
+        if len(headers) != len(key_list):
+            raise RuntimeError(
+                f"Number of specified headers ({len(headers)}) "
+                f"does not match the number of row items {len(key_list)} "
+                f"for the value."
+            )
+        _df = df.copy()
+        for i in range(len(headers)):
+            with warnings.catch_warnings():
+                warnings.filterwarnings(
+                    "ignore",
+                    message="Boolean Series key will be reindexed to match DataFrame index",
+                )
+                _df = _df[df[headers[i]] == key_list[i]]
+        index_list = _df.index.to_list()
+        # print("index_list =", index_list)
+        if len(index_list) == 0:
+            neg_idx = neg_idx - 1
+            result[neg_idx] = value
+        elif len(index_list) > 1:
+            raise RuntimeError(
+                f"I expected here a dataframe with only one entry but got:\n{_df}"
+            )
+        else:
+            result[index_list[0]] = value
+    return result
+
+
 if __name__ == "__main__":
-    # from metroloshiny.utils.read_file import read_xlsx
-    from metroloshiny.utils.read_file import get_laser_power_objective_data
+    # # from metroloshiny.utils.read_file import read_xlsx
+    # from metroloshiny.utils.read_file import get_laser_power_objective_data
 
-    # raw_df = read_xlsx()
-    # print(get_power_over_time_data(raw_df, 405, 100))
-    # df = get_linearity(raw_df, str(20240109))
+    # # raw_df = read_xlsx()
+    # # print(get_power_over_time_data(raw_df, 405, 100))
+    # # df = get_linearity(raw_df, str(20240109))
 
-    # new tests
-    _, df = get_laser_power_objective_data(dev_local_file=True)
-    mic = "Ti CSU-W1"
-    # mic = "Ti2 Righty"
-    df = filter_by_column_value(df, "Site", "Hebelstrasse")
-    df = filter_by_column_value(df, "Microscope", mic)
-    df = filter_by_column_value(df, "Objective", "20x/0,75")
-    # skipping info sorting for testing
-    print(df)
-    df = keep_non_nan_rows(df, "LED Line [nm]")
-    print(df)
+    # # new tests
+    # _, df = get_laser_power_objective_data(dev_local_file=True)
+    # mic = "Ti CSU-W1"
+    # # mic = "Ti2 Righty"
+    # df = filter_by_column_value(df, "Site", "Hebelstrasse")
+    # df = filter_by_column_value(df, "Microscope", mic)
+    # df = filter_by_column_value(df, "Objective", "20x/0,75")
+    # # skipping info sorting for testing
+    # print(df)
+    # df = keep_non_nan_rows(df, "LED Line [nm]")
+    # print(df)
+    pass

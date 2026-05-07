@@ -8,16 +8,7 @@ import gspread
 import pandas as pd
 
 # Path of the private_data.csv file on the linux server
-__linux_private_data_path__ = (
-    "/users/stud/s/sautlo01/metroloshiny/data/private_data.csv"
-)
-
-# FIXME temp test prints for server
-print("Current working directory:", os.getcwd())
-print("read_file __file__:", __file__)
-# I get following output on the server:
-# Current working directory: /srv/shiny-server/data_upload
-# read_file __file__: /users/stud/s/sautlo01/metroloshiny/src/metroloshiny/utils/read_file.py
+__linux_private_data_path__ = "/absolute/path/to/private_data.csv"
 
 
 def read_xlsx(file: str):
@@ -122,11 +113,15 @@ def get_private_data(key: str, data_path: Optional[str] = None) -> str:
     """
     Load 'private data' saved from a csv file.
 
-    Todo: provide example..
+    TODO: provide example file...
+    If data_path is not provided, will check:
+        - "./data/private_data.csv"
+        - same path relative to this file
+        - if neither of these 2 paths exist, will check the
+          path defined in __linux_private_data_path__ (global variable)
 
     :param key: str key to look for value
-    :param data_path: str path to the csv file, if not provided will look for:
-                      "./data/private_data.csv"
+    :param data_path: str path to the csv file
     :return: str value for the key
     """
     # To read 'private' data (csv with key value pairs)
@@ -136,15 +131,21 @@ def get_private_data(key: str, data_path: Optional[str] = None) -> str:
     if data_path is None:
         data_path = "./data/private_data.csv"
         if not os.path.exists(data_path):
-            # Check if is running on the server and set the path absolute path
             import platform
+            from pathlib import Path
 
-            print(
-                f"<{data_path}> does not exist. platform.system =",
-                platform.system(),
+            # Check path relative to this file
+            data_path = str(
+                Path(Path(__file__).parents[3], "data/private_data.csv")
             )
-            if platform.system() == "Linux":
+            if os.path.exists(data_path):
+                print("found file relative to this file")
+
+            if not os.path.exists(data_path) and platform.system() == "Linux":
+                # Check if is running on the server and set
+                # the path absolute path
                 data_path = __linux_private_data_path__
+
     # Ensure the file exists
     if not os.path.exists(data_path):
         raise FileExistsError(f"File does not exist: {data_path}")

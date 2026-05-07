@@ -1,12 +1,18 @@
 """Utils for writing google sheets."""
 
-from typing import Optional, Union
+from typing import Any, Optional
 
 import gspread as gs
 import pandas as pd
 
-from metroloshiny.utils.common_utils import get_today
+from metroloshiny.utils.common_utils import (
+    check_if_sequence,
+    invert_nested_dict,
+)
+from metroloshiny.utils.dataframe_utils import filter_by_nested_dict
+from metroloshiny.utils.read_file import ensure_numeric_data
 
+# Google spreadsheet names
 __gspread_names__ = {
     "Power": "laser_power_objective_measurements",
     "PSF": "psf_measurements",
@@ -38,355 +44,231 @@ __gspread_h2a__ = {
     "Power [%]": "G",  # Power
 }
 
-
-def identify_entry_coords(
-    df: pd.DataFrame,
-    microscope: str,
-    objctive: str,
-    info: str,
-    date: Optional[str] = None,
-    channel: Optional[str] = None,
-    fwhm: Optional[str] = None,
-    line_header: Optional[str] = None,
-    line: Optional[str] = None,
-    power: Optional[str] = None,
-) -> tuple[int, int, bool]:
-    """
-    Get worksheet coordinates for entering data.
-
-    :param microscope: str
-    :param objctive: str
-    :param info: str
-    :param date: Optional[str] in YYYYmmdd,
-    :param channel: Optional[str] for PSF sheet
-    :param fwhm: Optional[str] for PSF sheet
-    :param line_header: Optional[str] for power sheet
-    :param line: Optional[str] for power sheet
-    :param power: Optional[str] for power sheet
-    FIXME: more sheets = more parameters
-
-    :return: 1-based roww
-    :return: 1-based column (may be -1 if empty sheet)
-    :return: boolean, true for at the end of the sheet (row/bottom)
-    """
-    # Sanity check (not entries in sheet)
-    if df.empty:
-        return 2, -1, True
-    headers = [str(x) for x in df.columns]
-
-    # Pre-check for line & power
-    if (line is None) != (line_header is None) != (power is None):
-        raise RuntimeError(
-            "The line_hader, line(-item) and power must be specified!"
-        )
-
-    # Sanity checks, make sure optional perameter's columns exist
-    if channel is not None and "Channel" not in headers:
-        raise RuntimeError(
-            "Expected a Channel column in sheet but there was not."
-        )
-    if fwhm is not None and "FWHM" not in headers:
-        raise RuntimeError(
-            "Expected a FWHM column in sheet but there was not."
-        )
-    if line_header is not None:
-        if line_header not in headers:
-            raise RuntimeError(
-                f"Expected a <{line_header}> column in the sheet bet there was not."
-            )
-        if "Power [%]" not in headers:
-            raise RuntimeError(
-                "Expected a <Power [%]> column in the sheet but there was not."
-            )
-
-    if date is None:
-        date = get_today()
-
-    # Check in which column to add the date
-    if date not in headers:
-        col_target = len(headers) + 1
-    else:
-        col_target = headers.index(date) + 1
-
-    # Identify the rows, where to add data
-    n_total_rows = df.shape[0]  # excluding the header row
-    if n_total_rows == 0:
-        # Not entries in sheet yet
-        return 2, col_target, True
-
-    # Get a list of indices where the microscope matches    ------------------
-    rows = df.index[df["Microscope"] == microscope].tolist()
-    if len(rows) == 0:
-        # Microscope not in the sheet yet, can be put to the end
-        # FYI: total rows + header + new row
-        return n_total_rows + 2, col_target, True
-
-    # Get a list of indices where the objective matches     ------------------
-    _rows = df.index[df["Objective"] == objctive].tolist()
-    rows = list(
-        set(rows) & set(_rows)
-    )  # Get the intersection of the two lists
-    if len(rows) == 0:
-        # Objective for entry not in sheet, can be put to the end
-        return n_total_rows + 2, col_target, True
-
-    # Get a list of indices where the info matches     -----------------------
-    _rows = df.index[df["Info"] == info].tolist()
-    rows = list(
-        set(rows) & set(_rows)
-    )  # Get the intersection of the two lists
-    if len(rows) == 0:
-        # Info for entry not in sheet, can be put to the end
-        return n_total_rows + 2, col_target, True
-
-    # Optional entry checks         ------------------------------------------
-    # Channel
-    if channel is not None:
-        _rows = df.index[df["Channel"] == channel].tolist()
-        rows = list(
-            set(rows) & set(_rows)
-        )  # Get the intersection of the two lists
-        if len(rows) == 0:
-            # Objective for entry not in sheet, can be put to the end
-            return n_total_rows + 2, col_target, True
-
-    # FWHM
-    if fwhm is not None:
-        _rows = df.index[df["FWHM"] == fwhm].tolist()
-        rows = list(
-            set(rows) & set(_rows)
-        )  # Get the intersection of the two lists
-        if len(rows) == 0:
-            # Objective for entry not in sheet, can be put to the end
-            return n_total_rows + 2, col_target, True
-
-    # Line and power
-    if line_header is not None:
-        # Info: line & power values are not str but float (for equal check)
-        _rows = df.index[df[line_header] == float(line)].tolist()
-        rows = list(
-            set(rows) & set(_rows)
-        )  # Get the intersection of the two lists
-        _rows = df.index[df["Power [%]"] == float(power)].tolist()
-        rows = list(
-            set(rows) & set(_rows)
-        )  # Get the intersection of the two lists
-        if len(rows) == 0:
-            # Line/power for entry not in sheet, can be put to the end
-            return n_total_rows + 2, col_target, True
-
-    # There should only be one row entry
-    if len(rows) != 1:
-        raise RuntimeError(
-            "Found multiple rows for data entry. Should be only one."
-        )
-    # Is the row at the end?
-    if rows[0] + 1 == n_total_rows:
-        print(
-            "will add to (end of function/last row):",
-            n_total_rows + 2,
-            col_target,
-            True,
-        )
-        return n_total_rows + 2, col_target, True
-    # Correct to 1-based sheet index (including header row)
-    return rows[0] + 2, col_target, False
+# Cell formatting dictionaries
+_updated_date_cell_format_ = {  # For date entries
+    "backgroundColor": {"red": 1.0, "green": 1.0, "blue": 0.0},  # Yellow
+    "horizontalAlignment": "RIGHT",
+    "textFormat": {
+        "foregroundColor": {"red": 0.0, "green": 0.0, "blue": 0.0},  # Black
+        "bold": False,  # Does not work...
+    },
+}
+_updated_cell_format_ = _updated_date_cell_format_.copy()  # For all entries
+_updated_cell_format_["horizontalAlignment"] = "LEFT"
+# updated_cell_format["textFormat"]["bold"] = False # Not working...
 
 
-def make_sheet_entry(
+def make_sheet_entries(
     sheet: gs.Worksheet,
-    value: Union[float, str],
     site: str,
     microscope: str,
-    objctive: str,
+    objective: str,
     info: str,
     date: Optional[str] = None,
-    channel: Optional[str] = None,
-    fwhm: Optional[str] = None,
-    line_header: Optional[str] = None,
-    line: Optional[str] = None,
-    power: Optional[str] = None,
-) -> str:
-    """
-    Make an entry to the google sheet.
-
-    Marks updated cells in the google sheet with a
-    yellow background.
-
-    raises mostly RuntimeErrors if something is wrong.
-
-    :param site: str
-    :param microscope: str
-    :param objctive: str
-    :param info: str
-    :param date: Optional[str] in YYYYmmdd,
-    :param channel: Optional[str] for PSF sheet
-    :param fwhm: Optional[str] for PSF sheet
-    :param line_header: Optional[str] for power sheet
-    :param line: Optional[str] for power sheet
-    :param power: Optional[str] for power sheet
-    FIXME: more sheets = more parameters
-
-    :return: str = f"Sucessfully entered <{value}> into cell: {cur_cell_address}"
-    """
-    # Define the cell formating for updated cells
-    updated_date_cell_format = {
-        "backgroundColor": {"red": 1.0, "green": 1.0, "blue": 0.0},
-        "horizontalAlignment": "RIGHT",
-        "textFormat": {
-            "foregroundColor": {"red": 0.0, "green": 0.0, "blue": 0.0},
-            "bold": False,  # Does not work...
-        },
-    }
-    updated_cell_format = updated_date_cell_format.copy()
-    updated_cell_format["horizontalAlignment"] = "LEFT"
-    # updated_cell_format["textFormat"]["bold"] = False # Not working...
-
-    # Get the date if it is None
-    if date is None:
-        date = get_today()
-
-    # Convert the sheet to a dataframe
-    df = pd.DataFrame(sheet.get_all_records())
-
-    # Identify where to put the data (1-based indices)
-    row, col, end_of_sheet = identify_entry_coords(
-        df=df,
-        microscope=microscope,
-        objctive=objctive,
-        info=info,
-        date=date,
-        channel=channel,
-        fwhm=fwhm,
-        line_header=line_header,
-        line=line,
-        power=power,
-    )
-
-    # if sheet empty (col == -1), identify correct column
-    if col == -1:
-        headers = sheet.row_values(1)
-        if date not in headers:
-            col = len(headers) + 1
-        else:
-            col = headers.index(date) + 1
-    # Enter date in sheet
-    date_cell = sheet.cell(row=1, col=col)
-    if date_cell.value is None:
-        update_value_format(
-            sheet=sheet,
-            label=date_cell.address,
-            value=str(date),
-            format=updated_date_cell_format,
-        )
-    elif str(date_cell) == date_cell.value:
-        raise RuntimeError(
-            "Could not enter date to sheet. "
-            + f"Contains <{date_cell.value}>, expected <{date}>"
-        )
-
-    # Enter value       ------------------------------------------------------
-    if not end_of_sheet:
-        # Only need to enter the value
-        value_cell = sheet.cell(row=row, col=col)
-        if value_cell.value is not None:
-            raise RuntimeError(
-                "The cell to enter the new value is not empty! "
-                + f"Existing value = {value_cell.value}. "
-                + f"Value to be entered = {value}."
-            )
-        update_value_format(
-            sheet=sheet,
-            label=value_cell.address,
-            value=value,
-            format=updated_cell_format,
-        )
-        sheet.update_acell(label=value_cell.address, value=value)
-        sheet.format(ranges=value_cell.address, format=updated_cell_format)
-    else:
-        # New entry at the end of the sheet
-        # Enter the common row entries
-        constant_range = f"A{row}:D{row}"
-        sheet.update(
-            values=[[site, microscope, objctive, info]],
-            range_name=constant_range,
-        )
-        sheet.format(ranges=constant_range, format=updated_cell_format)
-
-        # Enter the sheet specific row entries      --------------------------
-        if channel is not None:
-            cur_cell_address = f"{__gspread_h2a__.get('Channel')}{row}"
-            update_value_format(
-                sheet=sheet,
-                label=cur_cell_address,
-                value=channel,
-                format=updated_cell_format,
-            )
-
-        if fwhm is not None:
-            cur_cell_address = f"{__gspread_h2a__.get('FWHM')}{row}"
-            update_value_format(
-                sheet=sheet,
-                label=cur_cell_address,
-                value=fwhm,
-                format=updated_cell_format,
-            )
-
-        if line_header is not None:
-            # Checks for line stuff already
-            # done in identify_entry_coords function
-            cur_cell_address = f"{__gspread_h2a__.get(line_header)}{row}"
-            update_value_format(
-                sheet=sheet,
-                label=cur_cell_address,
-                value=line,
-                format=updated_cell_format,
-            )
-            cur_cell_address = f"{__gspread_h2a__.get('Power [%]')}{row}"
-            update_value_format(
-                sheet=sheet,
-                label=cur_cell_address,
-                value=power,
-                format=updated_cell_format,
-            )
-
-        # Finally enter also the value
-        cur_cell_address = sheet.cell(row=row, col=col).address
-        update_value_format(
-            sheet=sheet,
-            label=cur_cell_address,
-            value=value,
-            format=updated_cell_format,
-        )
-    return f"Sucessfully entered <{value}> into cell: {cur_cell_address}"
-
-
-def update_value_format(
-    sheet: gs.Worksheet,
-    label: str,
-    value: Union[float, str],
-    format: dict,
+    fwhm_data: Optional[dict] = None,
+    power_data: Optional[Any] = None,  # FIXME to be defined & implemented
+    # channel: Optional[str] = None, # FIXME currently unused
+    # fwhm: Optional[str] = None, # FIXME currently unused
+    line_header: Optional[str] = None,  # FIXME currently unused
+    line: Optional[str] = None,  # FIXME currently unused
+    power: Optional[str] = None,  # FIXME currently unused
 ):
     """
-    Update a gspread sheet with value and cell format.
+    Make google sheet entries.
 
-    :param sheet: gspread Worksheet
-    :param label: A1 notation for the gspread cell, e.g. A1 (no ranges)
-    :param value: Value to enter
-    :param format: dict for the cell foramt
+    Marks the cells with a yellow background.
+    Inputs are handled on the metrology data kind.
+    Any (but not multiple) fo the data parameres must be provided, i.e.
+    fwhm_data or power_data or ... FIXME more to come
+
+    :param sheet: gs.Worksheet
+    :param site: str site name
+    :param microscope: str microscope name
+    :param objective: str objective name
+    :param info: str info column text
+    :param date: Optional[str] YYYYmmdd. Default None -> gets Today
+    :param fwhm_data: Optional[dict[dict]], FWHM data to be entered, e.g.:
+        {"DAPI" : {'FWHM-X': 911.0, 'FWHM-Y': 852.0, 'FWHM-Z': 1260.0}, ... }
+    :param power_data: Optional[Any] = None,  # FIXME to be defined
+
+    :return: no return
     """
-    sheet.update_acell(label=label, value=value)
-    sheet.format(ranges=label, format=format)
+    # Sanity checks FIXME add more if more implemented
+    if fwhm_data is None and power_data is None:
+        raise RuntimeError("Cannot make entry without FWHM or Power data!")
+
+    # Init stuff
+    df = None  # dataframe of the sheet
+    address_dict = None  # dict mapping cell addresses to values
+    data_to_use = None  # will point to fwhm_data or power_data or ...
+
+    # Check fwhm data
+    if fwhm_data is not None:
+        for ch, values in fwhm_data.items():
+            # FIXME remove the conditional startwith C??
+            if not ch.startswith("C") and ch not in [
+                "DAPI",
+                "GFP",
+                "Cy3",
+                "Cy5",
+            ]:
+                raise RuntimeError(
+                    f"FWHM data channel name <{ch}> not supported"
+                )
+            for f in values.keys():
+                if not f.startswith("FWHM-"):
+                    raise RuntimeError(
+                        f"FWHM label <{f}> for channel <{ch}> not supported."
+                    )
+        # Convert the sheet to pandas
+        df = pd.DataFrame(sheet.get_all_records())
+        df = ensure_numeric_data(df, first_column=6)
+        # List the column headers for identifying the sheet rows
+        data_headers = ["Channel", "FWHM"]
+        data_to_use = fwhm_data
+
+    # TODO same check for other data dicts
+    if power_data is not None:
+        data_to_use = power_data
+        data_headers = ["Line x", "Power"]  # FIXME to be done
+        raise NotImplementedError(
+            "Data upload for Power measurements not yet implemented!"
+        )
+
+    # Identify column & the cell address for the date   ----------------------
+    headers = [str(x) for x in df.columns]
+    if date not in headers:
+        col = len(df.columns) + 1
+    else:
+        col = headers.index(date) + 1
+
+    date_cell = sheet.cell(row=1, col=col)
+    col = date_cell.address.replace(str(1), "")
+
+    # Check where to put the entries    --------------------------------------
+    new_entry = False  # To remember to add full new rows
+    address_dict = {}
+    # Filter the dictionary by the common columns
+    _df = df[
+        (df["Site"] == site)
+        & (df["Microscope"] == microscope)
+        & (df["Objective"] == objective)
+        & (df["Info"] == info)
+    ]
+    # Get a dict {df-row-index : value}
+    entry_dict = filter_by_nested_dict(_df, data_to_use, data_headers)
+    indices = list(entry_dict.keys())
+    # All indicies are negative: all entries to the end of the sheet
+    if any(val < 0 for val in indices):
+        new_entry = True
+    # All indicies are positvie: entries go to exisiting rows
+    elif any(val > 0 for val in indices):
+        # Create the address (offset row to 1-based index + header row)
+        for k, v in entry_dict.items():
+            address_dict[f"{col}{k + 2}"] = v
+    else:
+        raise RuntimeError(
+            "The sheet does not seem to be ordered properly: "
+            "some row entries exisit while others don't."
+        )
+
+    # Adding entries            ----------------------------------------------
+    # Add entries to the exisiting rows
+    if not new_entry:
+        # Check if the addresses are continous
+        if not check_if_sequence(address_dict.keys()):
+            raise NotImplementedError(
+                "Values to be written are not continous."
+                f"Data to be entered in cells: {address_dict.keys()}"
+            )
+        # Check if the cells for values are empty!
+        cell_addresses = list(address_dict.keys())
+        start_cell = cell_addresses[0]
+        end_cell = cell_addresses[-1]
+        cells = sheet.get(f"{start_cell}:{end_cell}")
+        if len(cells) != 0:
+            filled_cells = []
+            for i in range(len(cells)):
+                if len(cells[i]) != 0:
+                    filled_cells.append(cell_addresses[i])
+            raise RuntimeError(
+                f"Following cells already contain values: {filled_cells}"
+            )
+        # Enter the cell values
+        value_block = []
+        for v in address_dict.values():
+            value_block.append([v])
+
+        sheet.update(range_name=f"{start_cell}:{end_cell}", values=value_block)
+        sheet.format(
+            ranges=f"{start_cell}:{end_cell}", format=_updated_cell_format_
+        )
+
+    # Create new entries at the bottom of the sheet
+    else:
+        inverted_dict = invert_nested_dict(data_to_use)
+        new_block = []  # Block for the first columns
+        value_block = []  # Block for the values in the date column
+        for value, path in inverted_dict.items():
+            new_line = [site, microscope, objective, info]
+            for p in path:
+                new_line.append(p)
+            new_block.append(new_line)
+            value_block.append([value])
+        start_row = len(df) + 2
+        end_row = start_row + len(inverted_dict) - 1
+        # Get column letter of the last column
+        last_col_letter = chr(ord("@") + len(new_block[0]))
+        # Write the common info block
+        block_range = f"A{start_row}:{last_col_letter}{end_row}"
+        sheet.update(range_name=block_range, values=new_block)
+        sheet.format(ranges=block_range, format=_updated_cell_format_)
+        # Write the values
+        val_range = f"{col}{start_row}:{col}{end_row}"
+        sheet.update(range_name=val_range, values=value_block)
+        sheet.format(ranges=val_range, format=_updated_cell_format_)
+
+    # Finally also add the date to the sheet if not there
+    if date_cell.value is None:
+        sheet.update_acell(label=date_cell.address, value=date)
+        sheet.format(
+            ranges=date_cell.address, format=_updated_date_cell_format_
+        )
 
 
 if __name__ == "__main__":
-    # sheet = get_gspread(sheet_name=__gspread_names__.get("PSF"))
-    # #sheet = get_gspread(sheet_name="testing")
-
-    # df = pd.DataFrame(sheet.get_all_records())
-    # df = ensure_numeric_data(df, first_column=4) # 4 for power, 6 for psf
-
-    # make_sheet_entry(
-    #     sheet=sheet, value=123.4, site="Hebelstrasse", microscope="BSL2", objctive="11x/0.3", info="fake"
-    # )
     pass
+    # sheet = get_gspread(sheet_name=__gspread_names__.get("PSF"))
+    # # #sheet = get_gspread(sheet_name="testing")
+
+    # # FIXME need to change the keys to e.g. DAPI...
+    # data1 = {
+    #     "C1" : {'FWHM-X': 911.0, 'FWHM-Y': 852.0, 'FWHM-Z': 1260.0},
+    #     "C2" : {'FWHM-X': 651.0, 'FWHM-Y': 643.0, 'FWHM-Z': 860.0},
+    #     "C3" : {'FWHM-X': 823.0, 'FWHM-Y': 876.0, 'FWHM-Z': 1020.0},
+    #     "C4" : {'FWHM-X': 898.0, 'FWHM-Y': 954.0, 'FWHM-Z': 1142.0},
+    # }
+    # data = {
+    #     "DAPI" : {'FWHM-X': 911.0, 'FWHM-Y': 852.0, 'FWHM-Z': 1260.0},
+    #     "GFP" : {'FWHM-X': 651.0, 'FWHM-Y': 643.0, 'FWHM-Z': 860.0},
+    #     "Cy3" : {'FWHM-X': 823.0, 'FWHM-Y': 876.0, 'FWHM-Z': 1020.0},
+    #     "Cy5" : {'FWHM-X': 898.0, 'FWHM-Y': 954.0, 'FWHM-Z': 1142.0},
+    # }
+
+    # make_sheet_entries(
+    #     sheet=sheet,
+    #     site="TestSite",
+    #     microscope="TestMic",
+    #     objective="TestObj",
+    #     info="TestInfo",
+    #     date="19991212",
+    #     fwhm_data=data
+    # )
+    # print(">>>>done!")
+
+    # # df = pd.DataFrame(sheet.get_all_records())
+    # # df = ensure_numeric_data(df, first_column=4) # 4 for power, 6 for psf
+
+    # # make_sheet_entry(
+    # #     sheet=sheet, value=123.4, site="Hebelstrasse", microscope="BSL2", objctive="11x/0.3", info="fake"
+    # # )

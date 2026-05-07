@@ -208,6 +208,9 @@ You can find an example `example_files/private_data_example.csv`.
 This file is needed for metroloshiny. It contains information to access e.g. the google sheets, or OMERO.
 This information is stored in this file as comma-separated key value pairs.
 
+The file should be located as follows:
+`/path/to/metroloshiny/data/private_data.csv`
+
 - GoogleServiceEmail: service email address created in the [Google service account](#Google-service-account)
 - PathToServiceAccountJSON: full path to your `service_account.json` (**you need to save a copy somewhere on your server**)
 - Sheet ID: Google sheet ID
@@ -221,7 +224,7 @@ OMERO entries are optional, in case you want to retrive data saved on OMERO.
 - OMERO USER: OMERO user name (e.g. user locally created for your OMERO group)
 - OMERO PASSWORD: OMERO password for user
 
-In addition, you need to adjust the code in `src/metroloshiny/utils/read_fily.py`, line 10-13:
+If the default location `path/to/metroloshiny/data/private_data.csv` is not suitable for running on your server, you have to specify the path within the code in `src/metroloshiny/utils/read_fily.py`, line 10-13:
 
 ```python
 # Path of the private_data.csv file on the linux server
