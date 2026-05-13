@@ -83,7 +83,7 @@ def get_power_over_time_data(
     measurements per date/line/power.
 
     :param df: pd.DataFrame with columns = ["Line", "Power", "Date"]
-               only one date.
+               multiple date columns.
     :param line: int of single line too keep.
     :param power_prct: int of single power to keep.
 
@@ -261,6 +261,45 @@ def filter_by_nested_dict(
         else:
             result[index_list[0]] = value
     return result
+
+
+def filter_by_date_range(
+    df: pd.DataFrame, min: str, max: str, start_col: int = 2
+) -> pd.DataFrame:
+    """
+    Filter dataframe date columns by date range.
+
+    :param df: pd.Dataframe
+    :param min: str first date to include in format YYYYmmdd
+    :param max: str last date to include in format YYYYmmdd
+    :param start_col: int, 0-based index of the frist date column
+
+    :return: filtered pd.DataFrame
+    """
+    date_headers = [d[:8] for d in df.columns[start_col:]]
+    # Create a list of date colums to be removed
+    dates_to_remove = []
+    try:
+        min_ = int(min)
+        max_ = int(max)
+    except ValueError as err:
+        raise ValueError(
+            f"Could not convert date range to numbers: <{min}> to <{max}>"
+        ) from err
+    for date in date_headers:
+        try:
+            d = int(date)
+        except ValueError as err:
+            raise ValueError(
+                f"Could not convert the table date to a number: {date}"
+            ) from err
+        if d < min_ or d > max_:
+            dates_to_remove.append(d)
+    # Remove the date colums
+    for date in dates_to_remove:
+        cols_to_drop = [col for col in df.columns if col.startswith(str(date))]
+        df = df.drop(columns=cols_to_drop)
+    return df
 
 
 if __name__ == "__main__":

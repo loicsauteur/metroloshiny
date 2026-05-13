@@ -1,12 +1,12 @@
 import matplotlib.pyplot as plt
 import numpy as np
-import pandas as pd
 import seaborn as sns
 from shiny import reactive
 from shiny.express import input, render, ui
 
 from metroloshiny.utils.dataframe_utils import (
     filter_by_column_value,
+    filter_by_date_range,
     get_light_source_kinds,
     get_power_over_time_data,
     keep_non_nan_rows,
@@ -14,10 +14,24 @@ from metroloshiny.utils.dataframe_utils import (
 )
 
 # Import data from shared.py
-from metroloshiny.utils.read_file import get_laser_power_objective_data
+from metroloshiny.utils.read_file import (
+    get_laser_power_objective_data,
+    get_sheet,
+    load_doc,
+)
 
 # Load Data
-gsheet, df = get_laser_power_objective_data(
+use_dev_local_file = False
+sheet_doc = load_doc(dev_local_file=use_dev_local_file)
+wsheet_power, df = get_sheet(
+    sheet_doc, "Power", dev_local_file=use_dev_local_file
+)
+wsheet_psf, df_psf = get_sheet(
+    sheet_doc, "PSF", dev_local_file=use_dev_local_file
+)
+
+
+gworks_sheet, df = get_laser_power_objective_data(
     dev_local_file=False
 )  # FIXME temp tests on local file
 
@@ -415,11 +429,21 @@ with ui.navset_pill(id="tab"):
 
                     @render.plot
                     def power_linearity_per_date():
+                        fig, ax = plt.subplots()
                         # Get the current table
                         table = plt_df.get()
                         # Sanity check
                         if table is None:
-                            return
+                            # Show empty plot
+                            ax.text(
+                                0.5,
+                                0.5,
+                                "No data to visualsise!",
+                                ha="center",
+                                va="center",
+                            )
+                            ax.set_axis_off()
+                            return fig
                         # Work on a copy of the table, otherwise
                         #   the reactive value is changed
                         table = table.copy()
@@ -441,7 +465,6 @@ with ui.navset_pill(id="tab"):
                         )
 
                         # Create plot
-                        fig, ax = plt.subplots()
                         sns.lineplot(
                             data=table,
                             markers=True,
@@ -466,7 +489,7 @@ with ui.navset_pill(id="tab"):
 
                 with ui.nav_panel("Table"):
 
-                    @render.table
+                    @render.data_frame
                     def power_linearity_table():
                         return plt_df.get()
 
@@ -528,26 +551,12 @@ with ui.navset_pill(id="tab"):
                             )
                         # Drop all nan columns
                         table = table.dropna(axis=1, how="all")
-                        # Filter columns by the selected date range TODO
-                        # print(table)
-                        dates_to_remove = []
-                        header_dates = [x[0:8] for x in table.columns[2:]]
+                        # Filter columns by the selected date range
                         start_date = input.date_range()[0].strftime("%Y%m%d")
                         end_date = input.date_range()[1].strftime("%Y%m%d")
-                        for date in header_dates:
-                            if int(date) < int(start_date) or int(date) > int(
-                                end_date
-                            ):
-                                if date not in dates_to_remove:
-                                    dates_to_remove.append(date)
-                        # Remove date columns
-                        for date in dates_to_remove:
-                            cols_to_drop = [
-                                col
-                                for col in table.columns
-                                if col.startswith(date)
-                            ]
-                            table = table.drop(columns=cols_to_drop)
+                        table = filter_by_date_range(
+                            table, start_date, end_date
+                        )
                         pst_df.set(table)
 
                     @render.text
@@ -568,15 +577,21 @@ with ui.navset_pill(id="tab"):
                             )
                             ax.set_axis_off()
                             return fig
-                        if pst_df.get() is None:
-                            return
-                        if input.power() is None or input.line() is None:
-                            return
+                        # Show no plot if no data
+                        if None in [input.power(), input.line(), pst_df.get()]:
+                            # Show empty plot
+                            ax.text(
+                                0.5,
+                                0.5,
+                                "No data to visualsise!",
+                                ha="center",
+                                va="center",
+                            )
+                            ax.set_axis_off()
+                            return fig
+
                         # Otherwise create plot
                         table = pst_df.get().copy()
-                        table = pd.DataFrame(
-                            table
-                        )  # FIXME - temp for datatype...
                         if table.empty:
                             return
                         wavelength = (
@@ -636,7 +651,7 @@ with ui.navset_pill(id="tab"):
 
                 with ui.nav_panel("Table"):
 
-                    @render.table
+                    @render.data_frame
                     def power_stability_over_time_table():
                         table = pst_df.get()
                         # TODO filter unwanted dates out
@@ -645,62 +660,14 @@ with ui.navset_pill(id="tab"):
     # ________________________________________________________________________
     #
     # PSF
-    with ui.nav_panel("PSF"):
-        with ui.layout_sidebar():
-            with ui.sidebar():
-                pass
+    # with ui.nav_panel("PSF"):
+    #     with ui.layout_sidebar():
+    #         with ui.sidebar():
+    #             pass
 
-            # Power linearity per date ---------------------------------------
-            with ui.navset_card_underline():
-                with ui.nav_panel(title="Plot"):
-                    pass
-                with ui.nav_panel(title="Table"):
-                    pass
-
-
-# with ui.navset_pill(id="tab"):
-#     # Laser power at objective
-#     with ui.nav_panel("Laser Power at Objective"):
-#         # TODO Data loading and variables should come here...
-
-#         with ui.layout_sidebar():
-#             with ui.sidebar():
-#                 ui.input_select("site", "Select the site",
-#                                   choices=list(sites))
-#                 ui.input_select("microscope", "Select a microscope",
-#                                   choices=[])
-#                 ui.input_select("objective", "Select an objective",
-#                                   choices=[])
-#                 ui.input_select("info", "Filter by info column", choices=[])
-#                 ui.input_select("kind", "Select light source kind",
-#                                   choices=[])
-#                 ui.input_select("line", "Select a wavelength [nm]",
-#                                   choices=[])
-#                 ui.input_select("power", "Select power [%]", choices=[])
-#                 ui.input_select("date", "Select a date", choices=[])
-
-#         @render.text
-#         def text1():
-#             return "hee"
-#         @render.text
-#         def text2():
-#             return "hoo"
-
-#         @render.plot
-#         def power_linearity_per_date():
-#             # Create
-#             print("***********")
-#             #print(_df.get())
-#             print("***********")
-
-#         @render.table
-#         def power_linearity_per_date_table():
-#             pass
-
-
-#     # Next tab...
-#     with ui.nav_panel("Other tab"):
-
-#         with ui.layout_sidebar():
-#             with ui.sidebar():
-#                 ui.input_slider("test", "test slider", 0, 10, 5)
+    #         # Power linearity per date ---------------------------------------
+    #         with ui.navset_card_underline():
+    #             with ui.nav_panel(title="Plot"):
+    #                 pass
+    #             with ui.nav_panel(title="Table"):
+    #                 pass

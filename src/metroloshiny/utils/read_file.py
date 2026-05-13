@@ -10,6 +10,12 @@ import pandas as pd
 # Path of the private_data.csv file on the linux server
 __linux_private_data_path__ = "/absolute/path/to/private_data.csv"
 
+# Worksheet names
+__sheet_names__ = {
+    "Power": "laser_power_objective_measurements",
+    "PSF": "psf_measurements",
+}
+
 
 def read_xlsx(file: str):
     """
@@ -163,6 +169,82 @@ def get_private_data(key: str, data_path: Optional[str] = None) -> str:
     return str(value).strip()
 
 
+def load_doc(
+    gsheet_url: Optional[str] = None,
+    path_servce_account: Optional[str] = None,
+    data_path: Optional[str] = None,
+    dev_local_file: bool = False,
+) -> Optional[gspread.Spreadsheet]:
+    """
+    Get the google spreadsheet document.
+
+    Nees a service account, see here: https://docs.gspread.org/en/latest/oauth2.html#for-bots-using-service-account
+
+    :param gsheet_url: optional, str url to the google sheet.
+        Default = None -> gets the url from private data.
+    :param path_service_account: optional, str path to google-service-account JSON file.
+        Default = None -> gets the JSON file path from private data.
+        If "", will use the 'default' location of the JSON file:
+        `~/.config/gspread/service_account.json`
+    :param data_path: optional, str path to the private_data.csv.
+        Default = None -> uses default path.
+    :param dev_local_file: bool. Default = False, if True returns None.
+
+    :return: Spreadsheet
+    """
+    if dev_local_file:
+        return None
+    if path_servce_account == "":
+        gc = gspread.service_account()
+    elif path_servce_account is None:
+        gc = gspread.service_account(
+            get_private_data("PathToServiceAccountJSON", data_path=data_path)
+        )
+    else:
+        gc = gspread.service_account(path_servce_account)
+
+    if gsheet_url is None:
+        gsheet_url = get_private_data("Sheet URL", data_path=data_path)
+    return gc.open_by_url(gsheet_url)
+
+
+def get_sheet(
+    doc: Optional[gspread.Spreadsheet], kind: str, dev_local_file: bool = False
+) -> tuple[Optional[gspread.Worksheet], pd.DataFrame]:
+    """
+    Get a specific Worksheet from a google spreadsheet document.
+
+    :param doc: gspread.Spreadsheet
+    :param kind: str, key to get the name from __sheet_names__
+    :param dev_local_file: bool, to use local excel file.
+        Default False. If true, returns (None, pd.DataFrame)
+
+    :return: gspread.Worksheet, pd.DataFrame
+    """
+    # Check if the kind is implmented
+    if kind not in __sheet_names__.keys():
+        raise NotImplementedError(f"{kind} is not implemented.")
+    # Get the data from the excel sheet
+    sheet = None
+    if dev_local_file:
+        df = pd.read_excel(
+            "./example_files/metroloshiny_data_example.xlsx",
+            sheet_name=__sheet_names__.get(kind),
+        )
+    else:
+        # Load the sheet and convert it to a dataframe
+        sheet = doc.worksheet(__sheet_names__.get(kind))
+        df = pd.DataFrame(sheet.get_all_records())
+    # Ensure numeric data
+    if kind == "Power":
+        df = ensure_numeric_data(df, first_column=4)
+    elif kind == "PSF":
+        df = ensure_numeric_data(df, first_column=6)
+    else:
+        raise NotImplementedError
+    return sheet, df
+
+
 def load_gspread(
     gsheet_url: str,
     sheet_name: str,
@@ -233,7 +315,9 @@ def get_gspread(
 
 def get_laser_power_objective_data(
     data_path: Optional[str] = None, dev_local_file: bool = False
-):
+) -> tuple[
+    Optional[Union[gspread.Worksheet, gspread.Spreadsheet]], pd.DataFrame
+]:
     """
     Load google spread sheet & return it + DataFrame of it.
 
@@ -242,7 +326,7 @@ def get_laser_power_objective_data(
                            google (hard-coded).
 
     :return: gspread.worksheet (or None for dev_local_file = True).
-    :return: pd.DataFrame
+    :return: gspread.Worksheet, pd.DataFrame
     """
     # For testing on local file
     if dev_local_file:

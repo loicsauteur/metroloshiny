@@ -40,25 +40,116 @@ def is_input_select_in_list(l: list, id: str) -> bool:
     return False
 
 
-def theo_fwhm(
-    em: int, na: float, ri: float, k: float = 2.0
-) -> tuple[float, float]:
+def theo_fwhm_2photon(ex: int, na: float, ri: float) -> tuple[float, float]:
     """
-    Calculate theoretical lateral and axial FWHM.
+    Calculate theoretical lateral and axial FWHM for point scanning confocals.
 
-    FHMWlat = 0.61 * em / NA
-    FHMWax = 2 * ri * em / NA^2
+    Using Zipfel, W.R. et al, Nonlinear magic: multiphoton microscopy
+    in the biosciences Nat Biotechnol. 2003 Nov;21(11):1369-77
+    doi = https://doi.org/10.1038/nbt899
+    -> also used/referenced by MetroloJ_QC v1.3.1.1 Oct 21. 2024, but formula
+    seems to vary...
 
-    :param em: Emission wavelength in nm (int).
+    FHMWlat NA<=0.7 = 0.320 * ex / (2^0.5 * NA)
+    FHMWlat NA>0.7  = 0.325 * ex / (2^0.5 * NA^0.91)
+    FHMWax          = 0.532 * ex / (2^0.5 (n - (n^2 - NA^2)^0.5) )
+    *ex wavelength is multiplied by 2 because of 2-photons.
+
+    :param ex: Excitation wavelength in nm (int).
+        For calculation using the emission wavelength
+        40nm are added to the excitation wavelength.
     :param na: NA of the objective.
     :param ri: Refractive index of objective.
-    :param k: Constant for axial FHMW. Default = 2.0 (widefield),
-              set to 1.4 for confocal.
 
     :return: tuple (FHMW lateral, FHMW axial) in nm.
     """
-    lat = 0.61 * em / na
-    ax = k * ri * em / (na * na)
+    if na <= 0.7:
+        lat = 0.32 * ex * 2 / (2**0.5 * na)
+    else:
+        lat = 0.325 * ex * 2 / (2**0.5 * na**0.91)
+    ax = 0.532 * ex * 2 / (2**0.5 * (ri - (ri * ri - na * na) ** 0.5))
+    return lat, ax
+
+
+def theo_fwhm_spinning(ex: int, na: float, ri: float) -> tuple[float, float]:
+    """
+    Calculate theoretical lateral and axial FWHM for point scanning confocals.
+
+    Using the MetroloJ_QC v1.3.1.1 Oct 21. 2024:
+    https://github.com/MontpellierRessourcesImagerie/MetroloJ_QC/blob/Current_version/manual.pdf
+    Which references:
+    Toomre, D. and Pawley J.B. Disk-Scanning Confocal Microscopy.
+    in Handbook Of Biological Confocal Microscopy 2006 221-238 (Springer)
+
+    FHMWlat = 0.51 * em / NA
+    FHMWax  = em / (ri - (ri^2 - NA^2)^0.5)
+
+    :param ex: Excitation wavelength in nm (int).
+        For calculation using the emission wavelength
+        40nm are added to the excitation wavelength.
+    :param na: NA of the objective.
+    :param ri: Refractive index of objective.
+
+    :return: tuple (FHMW lateral, FHMW axial) in nm.
+    """
+    em = ex + 40
+    lat = 0.51 * em / na
+    ax = em / (ri - (ri * ri - na * na) ** 0.5)
+    return lat, ax
+
+
+def theo_fwhm_pointscanner(
+    ex: int, na: float, ri: float
+) -> tuple[float, float]:
+    """
+    Calculate theoretical lateral and axial FWHM for point scanning confocals.
+
+    Using the MetroloJ_QC v1.3.1.1 Oct 21. 2024:
+    https://github.com/MontpellierRessourcesImagerie/MetroloJ_QC/blob/Current_version/manual.pdf
+    Which references:
+    Wilhelm, S. Confocal Laser Scanning Microscopy. 2011 (Carl Zeiss ed),
+    Amos, B. et al, Confocal Microscopy.
+    in Handbook of Comprehensive Biophysics 2012 3-23 (Elsevier).
+
+    FHMWlat = 0.51 * ex / NA
+    FHMWax  = 0.88 * ex / (ri - (ri^2 - NA^2)^0.5)
+
+    :param ex: Excitation wavelength in nm (int).
+        For calculation using the emission wavelength
+        40nm are added to the excitation wavelength.
+    :param na: NA of the objective.
+    :param ri: Refractive index of objective.
+
+    :return: tuple (FHMW lateral, FHMW axial) in nm.
+    """
+    lat = 0.51 * ex / na
+    ax = 0.88 * ex / (ri - (ri * ri - na * na) ** 0.5)
+    return lat, ax
+
+
+def theo_fwhm_widefield(ex: int, na: float, ri: float) -> tuple[float, float]:
+    """
+    Calculate theoretical lateral and axial FWHM for widefield system.
+
+    Using the MetroloJ_QC v1.3.1.1 Oct 21. 2024:
+    https://github.com/MontpellierRessourcesImagerie/MetroloJ_QC/blob/Current_version/manual.pdf
+    Which references:
+    Wilhelm, S. Confocal Laser Scanning Microscopy 2011 (Carl Zeiss ed.).
+
+    FHMWlat = 0.51 * em / NA
+    FHMWax  = 1.77 * ri * em / NA^2
+
+    :param ex: Excitation wavelength in nm (int).
+        For calculation using the emission wavelength
+        40nm are added to the excitation wavelength.
+    :param na: NA of the objective.
+    :param ri: Refractive index of objective.
+
+    :return: tuple (FHMW lateral, FHMW axial) in nm.
+    """
+    em = ex + 40
+    lat = 0.51 * em / na
+    ax = 1.77 * ri * em / (na * na)
     return lat, ax
 
 
@@ -66,13 +157,14 @@ def theo_fwhm_quarep(ex: int, na: float, ri: float) -> tuple[float, float]:
     """
     Calculate theoretical lateral and axial FWHM with QUAREP formula.
 
-    Using the formulas found in the QUAREP PSF protocols.io:
-    https://dx.doi.org/10.17504/protocols.io.bp2l61ww1vqe/v1
+    Using the formulas found in the QUAREP PSF protocols.io (v1, page 12):
+    https://quarep.org/wp-content/uploads/Monitoring-the-point-spread-function-for-quality-for-quality-control-of-confocal-microscopes.pdf
+    Which are the formulas from MetroloJ_QC for confocal point scanners.
 
     FHMWlat = 0.51 * ex / NA
     FHMWax = 0.88 * ex / (ri -(ri^2 - NA^2)^1/2)
 
-    :param em: Emission wavelength in nm (int).
+    :param ex: Excitation wavelength in nm (int).
     :param na: NA of the objective.
     :param ri: Refractive index of objective.
     :param k: Constant for axial FHMW. Default = 2.0 (widefield),

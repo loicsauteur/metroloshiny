@@ -28,9 +28,6 @@ category_to_metric = {
     "PSF": "FWHM",
 }
 
-ui.page_opts(title="Metrology Upload")
-
-
 # Reactive stuff here
 card_selectors = reactive.value([])
 microscope_choices = reactive.value([])
@@ -97,6 +94,7 @@ upload_psf_button = ui.input_action_button(
 
 
 # Build the GUI
+ui.page_opts(title="Metrology Upload")
 with ui.nav_panel(title="Data Upload"):
     # Sidebar
     with ui.layout_sidebar():
