@@ -52,9 +52,9 @@ with ui.nav_panel(title="PSF Metrology"):
             ui.input_select("objective", "Select an objective", choices=[])
             ui.input_select("info", "Filter by info column", choices=[])
 
-        # Plot card     ------------------------------------------------------
-        with ui.navset_card_underline(title="PSF over time"):
-            with ui.nav_panel(title="Plot"):
+        # Selection card     ------------------------------------------------------
+        with ui.navset_card_underline(title="Plotting options"):
+            with ui.nav_panel(title=""):
                 # Add checkboxes & other as columns
                 with ui.layout_column_wrap(
                     width=1 / 3, min_height="150px", max_height="2000px"
@@ -140,6 +140,8 @@ with ui.nav_panel(title="PSF Metrology"):
                     )
                     return date_range_selection
 
+        with ui.navset_card_underline(title="PSF over time"):
+            with ui.nav_panel(title="Plot"):
                 # Render the plot
                 @render.plot
                 def plot_psf_over_time():
@@ -319,7 +321,7 @@ def update_theoretical_values():
         if not isinstance(i, float):
             theoretical_fwhm.set((0, 0))
             return
-    theoretical_fwhm.set(theo)
+    theoretical_fwhm.set((round(theo[0], 2), round(theo[1], 2)))
 
 
 @reactive.effect()
