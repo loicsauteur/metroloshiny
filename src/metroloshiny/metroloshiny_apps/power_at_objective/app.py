@@ -1,9 +1,11 @@
 import matplotlib.pyplot as plt
 import numpy as np
+import pandas as pd
 import seaborn as sns
 from shiny import reactive
 from shiny.express import input, render, ui
 
+# FIXME: rewrite the app??
 from metroloshiny.utils.dataframe_utils import (
     filter_by_column_value,
     filter_by_date_range,
@@ -26,9 +28,9 @@ sheet_doc = load_doc(dev_local_file=use_dev_local_file)
 wsheet_power, df = get_sheet(
     sheet_doc, "Power", dev_local_file=use_dev_local_file
 )
-wsheet_psf, df_psf = get_sheet(
-    sheet_doc, "PSF", dev_local_file=use_dev_local_file
-)
+# wsheet_psf, df_psf = get_sheet(
+#     sheet_doc, "PSF", dev_local_file=use_dev_local_file
+# )
 
 
 gworks_sheet, df = get_laser_power_objective_data(
@@ -36,7 +38,7 @@ gworks_sheet, df = get_laser_power_objective_data(
 )  # FIXME temp tests on local file
 
 # Create UI
-ui.page_opts(title="Metrology")
+ui.page_opts(title="Metrology: Power at the objective")
 
 # ui.nav_spacer()  # Push the navbar items to the right
 
@@ -206,9 +208,10 @@ with ui.navset_pill(id="tab"):
                     df_filtered, input.kind(), float(input.line())
                 )
             _df.set(df_filtered)
-            # Get a list of available powers
-            p = np.unique(np.asarray(df_filtered["Power [%]"]))
-            p = list(p)
+            # Get a list of available powers (make sure it is all strings)
+            p = [
+                str(x) for x in np.unique(np.asarray(df_filtered["Power [%]"]))
+            ]
             p.append("All")
             power_prcts.set(p)
             # Update ui selection
@@ -578,7 +581,10 @@ with ui.navset_pill(id="tab"):
                             ax.set_axis_off()
                             return fig
                         # Show no plot if no data
-                        if None in [input.power(), input.line(), pst_df.get()]:
+                        if None in [
+                            input.power(),
+                            input.line(),
+                        ] or not isinstance(pst_df.get(), pd.DataFrame):
                             # Show empty plot
                             ax.text(
                                 0.5,

@@ -1,11 +1,14 @@
 """Tests for dataframe utils."""
 
 import os
+from datetime import datetime
 
 import pandas as pd
 import pytest
 
 from metroloshiny.utils.dataframe_utils import (
+    convert_date_column,
+    convert_power_column,
     filter_by_column_value,
     filter_by_nested_dict,
     parse_dates,
@@ -147,5 +150,33 @@ def test_filter_by_nested_dict():
         res = filter_by_nested_dict(df, nested_dict, ["Channel", "Wrong"])
 
 
+def test_convert_date_column():
+    """Test convert_date_columns function."""
+    path = "./example_files/example_thorlabs_powermeter_linearity-DAPI.csv"
+    df = pd.read_csv(path, sep=";", header=12)
+    df_conv = convert_date_column(df)
+    for i in range(len(df)):
+        ori = datetime.strptime(df.iloc[i, 1].strip(), "%m/%d/%Y")
+        conv = datetime.strptime(df_conv.iloc[i, 1].strip(), "%Y%m%d")
+        assert ori == conv
+
+
+def test_convert_power_column():
+    """Test convert_power_column function."""
+    path = "./example_files/example_thorlabs_powermeter_linearity-DAPI.csv"
+    df = pd.read_csv(path, sep=";", header=12)
+    df_conv = convert_power_column(df)
+
+    # Get the index of the "Power ..." col
+    power_col = [i for i in list(df.columns) if i.startswith("Power")]
+    power_col = df.columns.get_loc(power_col[0])
+
+    for i in range(len(df)):
+        ori = float(df.iloc[i, power_col].replace(",", "."))
+        conv = df_conv.iloc[i, power_col].astype(float)
+        ori = round(ori * 1000, 6)
+        assert ori == conv, f"<{ori}> * 1000 (={ori * 1000}) != <{conv}>"
+
+
 if __name__ == "__main__":
-    test_filter_by_nested_dict()
+    pass

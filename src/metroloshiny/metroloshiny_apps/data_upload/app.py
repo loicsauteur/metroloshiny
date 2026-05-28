@@ -1,68 +1,61 @@
-from typing import Union
+from typing import TYPE_CHECKING, Optional
 
 import numpy as np
 import pandas as pd
 from shiny import reactive
 from shiny.express import input, render, ui
 
+if TYPE_CHECKING:
+    from shiny.types import FileInfo
+
 from metroloshiny.data_objects.PSFData import PSFData
-from metroloshiny.utils.common_utils import check_duplicate_dict_values
-from metroloshiny.utils.dataframe_utils import filter_by_column_value
+from metroloshiny.utils.common_utils import (
+    check_duplicate_dict_values,
+    invert_nested_dict,
+)
+from metroloshiny.utils.dataframe_utils import (
+    convert_date_column,
+    convert_power_column,
+    filter_by_column_value,
+)
 from metroloshiny.utils.omero_utils import omero_operation
-from metroloshiny.utils.read_file import check_upload_password, get_gspread
+from metroloshiny.utils.read_file import (
+    check_upload_password,
+    get_sheet,
+    load_doc,
+)
 from metroloshiny.utils.write_gspread import make_sheet_entries
 
-# FIXME need to update the site selection when cat changes... this is currently not dynamic...
+# Load Data
+use_dev_local_file = False
+sheet_doc = load_doc(dev_local_file=use_dev_local_file)
+# wsheet_psf, df = get_sheet(sheet_doc, "PSF", dev_local_file=use_dev_local_file)
 
-g_spreadsheet = (
-    get_gspread()
-)  # dev_local_file="./data/metroloshiny_data.xlsx")
-dataframe = reactive.value(None)
+# Reactive values       ------------------------------------------------------
 sheet_reference = reactive.value(None)
-sites_list = ["Hebelstrasse", "Mattenstrasse"]
-category_list = ["Please choose", "Power at objective", "PSF"]
-# Dictionary to map category to OMERO metric "key-word"
-category_to_metric = {
-    "Please choose": "not implemented",
-    "Power at objective": "not implemented",
-    "PSF": "FWHM",
-}
+dataframe = reactive.value(None)
+category_list = ["Power", "PSF"]
 
-# Reactive stuff here
-card_selectors = reactive.value([])
-microscope_choices = reactive.value([])
-
-# Optional selections
-# Common selectors
-microscope_selector = ui.input_select(
-    "microscope", "Select a microscope", choices=[]
-)
-objective_selector = ui.input_select(
-    "objective", "Select an objective", choices=[]
-)
-info_selector = ui.input_select("info", "Filter by info column", choices=[])
+# Entry selection UI elements       ------------------------------------------
+microscope = ui.input_select("microscope", "Select a microscope", choices=[])
+objective = ui.input_select("objective", "Select an objective", choices=[])
+info = ui.input_select("info", "Filter by info column", choices=[])
+microscope_list = reactive.value([])
+objective_list = reactive.value([])
+info_list = reactive.value([])
 new_mic_name = ui.input_text(
     "new_mic_name",
-    "Enter a name for a new Microscope entry",
+    "* New microscope *",
     "Enter name for new microscope...",
 )
 new_obj_name = ui.input_text(
     "new_obj_name",
-    "Enter a name for a new Objective",
+    "* New objective *",
     "Enter name for new objective...",
 )
-new_info_name = ui.input_text(
-    "new_info_name", "Enter additional information", "Enter info..."
-)
-# date_selector for measurement date (set to today! parse in proper format)
+new_info_name = ui.input_text("new_info_name", "* New Info *", "Enter info...")
 
-# Power at objective selecotrs
-# FIXME probably not all needed
-kind_selector = ui.input_select("kind", "Select light source kind", choices=[])
-line_selector = ui.input_select("line", "Select a wavelength [nm]", choices=[])
-power_selector = ui.input_select("power", "Select power [%]", choices=[])
-
-# OMERO data retrive ui items
+# OMERO data retrieve UI items      ------------------------------------------
 omero_type_selector = ui.input_select(
     "omero_type_selector",
     "Select OMERO type",
@@ -73,27 +66,25 @@ omero_id_selector = ui.input_text(
     "omero_id_selector", "OMERO ID", "Enter OMERO ID...2861227 or 2832822"
 )
 check_omero_data = ui.input_action_button("check_omero_data", "Check OMERO")
-
-# PSF channel selection (provided for 4)
-psf_dapi_selector = ui.input_select(
-    "psf_dapi_selector", "Please confirm the DAPI channel", choices=[]
-)
-psf_gfp_selector = ui.input_select(
-    "psf_gfp_selector", "Please confirm the GFP channel", choices=[]
-)
-psf_cy3_selector = ui.input_select(
-    "psf_cy3_selector", "Please confirm the Cy3 channel", choices=[]
-)
-psf_cy5_selector = ui.input_select(
-    "psf_cy5_selector", "Please confirm the Cy5 channel", choices=[]
+upload_omero_button = ui.input_action_button(
+    "upload_omero_button", "Upload the data!"
 )
 
-upload_psf_button = ui.input_action_button(
-    "upload_psf_button", "Upload the data!"
+# CSV data upload UI items          ------------------------------------------
+csv_light_selector = ui.input_select(
+    "csv_light_selector",
+    "Select the light source kind",
+    choices=["Please choose", "Laser", "LED"],
+    selected="Please choose",
+)
+csv_file_selector = ui.input_file(
+    "csv_file_selector", "Choose a .csv file", multiple=False, accept=[".csv"]
+)
+upload_power_button = ui.input_action_button(
+    "upload_power_button", "Upload the data!"
 )
 
-
-# Build the GUI
+# Build the GUI     items       ----------------------------------------------
 ui.page_opts(title="Metrology Upload")
 with ui.nav_panel(title="Data Upload"):
     # Sidebar
@@ -106,10 +97,7 @@ with ui.nav_panel(title="Data Upload"):
                 choices=category_list,
                 # selected="PSF",
             )
-            ui.input_select("site", "Select a site", choices=sites_list)
-            ui.input_select(
-                "upload_type", "Select data source", choices=["OMERO", "CSV"]
-            )
+            ui.input_select("site", "Select a site", choices=[])
             ui.input_password("upload_pwd", "Password for upload")
 
             @render.text
@@ -131,499 +119,722 @@ with ui.nav_panel(title="Data Upload"):
         # Microscope entry  --------------------------------------------------
         with ui.navset_card_underline():
             with ui.nav_panel(title="Microscope entry"):
+                with ui.layout_column_wrap(
+                    width=1 / 2, min_height="150px", max_height="1000px"
+                ):
+                    # Render the entry selection in 2 columns
+                    # Column 1 for drop-down selection
+                    @render.ui
+                    def mic_col_1():
+                        return microscope, objective, info
 
-                @render.ui
-                @reactive.event(card_selectors)
-                def dynamic_selectors():
-                    return card_selectors.get()
-
-                # Add selectors
-                # card_selectors
-                # @render.ui
-                # def dynamic_selectors():
-                #     return card_selectors
+                    # Column 2 for "new" text entries
+                    @render.ui
+                    def mic_col_2():
+                        return new_mic_name, new_obj_name, new_info_name
 
         # Upload Info   ------------------------------------------------------
         with ui.navset_card_underline():
-            with ui.nav_panel("Upload info"):
-                # FIXME maybe better to have either CSV data or OMERO data
+            # Upload from OMERO     ------------------------------------------
+            with ui.nav_panel(title="Upload from OMERO"):
 
                 @render.ui
-                @reactive.event(input.upload_type, input.category)
-                def render_upload_info():
-                    """
-                    Populate the upload info based on data source selection.
-
-                    Also resets when category is changed.
-                    """
-                    if input.upload_type() == "OMERO":
-                        return (
-                            omero_type_selector,
-                            omero_id_selector,
-                            check_omero_data,
+                @reactive.event(input.category)
+                def render_omero_upload():
+                    """Show OMERO input selectors only on PSF category."""
+                    if input.category() != "PSF":
+                        ui.notification_show(
+                            f"{input.category()} upload from OMERO not implemented!",
+                            type="warning",
                         )
-                    elif input.upload_type() == "CSV":
-                        return "Not Implemented: CSV upload data fields"
-                    else:
-                        return
+                        return f"{input.category()} upload from OMERO not implemented!"
+                    return omero_type_selector, omero_id_selector
 
-                # Helper reactive value to rest ui elements
-                check_omero_btn_presses = reactive.value(None)
-                # Reactive value that holds the upload data
-                upload_data = reactive.value(None)
+                # Show 2 tables: Data for upload and channel naming table
+                with ui.layout_column_wrap(width=1 / 2):
+                    with ui.card():
+                        ui.card_header("OMERO data")
+
+                        @render.data_frame
+                        @reactive.event(
+                            input.omero_type_selector,
+                            input.omero_id_selector,
+                            input.category,
+                        )
+                        def omero_data():
+                            # FIXME currently only for FWHM (cannot use params for reactive.calc)
+                            omero_data = parse_omero_fwhm()
+                            if input.category() != "PSF" or omero_data is None:
+                                return render.DataGrid(
+                                    pd.DataFrame(), editable=False
+                                )
+                            return render.DataGrid(omero_data, editable=False)
+
+                    with ui.card():
+                        ui.card_header("Provide channel names")
+
+                        @render.data_frame
+                        @reactive.event(omero_data.data)
+                        def omero_channel_names():
+                            data = omero_data.data()
+                            if data is None or data.empty:
+                                return render.DataGrid(pd.DataFrame())
+
+                            # Create new table with unique channel identifiers (e.g. C1)
+                            channels = list(
+                                np.unique(np.asarray(data["Channel"]))
+                            )
+                            channels = {
+                                "Channel": channels,
+                                "Enter channel name": [""] * len(channels),
+                            }
+                            channels = pd.DataFrame().from_dict(channels)
+                            return render.DataGrid(channels, editable=True)
+
+                # Show the upload button
+                @render.ui
+                def show_omero_upload_btn():
+                    return upload_omero_button
+
+            # Upload from CSV       ------------------------------------------
+            with ui.nav_panel(title="Upload from CSV"):
 
                 @render.ui
-                @reactive.event(input.check_omero_data, input.upload_type)
-                def check_omero_input():
-                    """Validate the OMERO input data."""
-                    # Button presses increase counter, if upload_type changes
-                    # the counter is not increased. Hence, returning empty string
-                    # resets the ui elements added by this function.
-                    if check_omero_btn_presses.get() is None:
-                        check_omero_btn_presses.set(input.check_omero_data())
-                        return ""
-
-                    if (
-                        input.check_omero_data()
-                        <= check_omero_btn_presses.get()
-                    ):
-                        return ""
-
-                    # Remember the button presses
-                    check_omero_btn_presses.set(input.check_omero_data())
-
-                    # Ensure category is selected
-                    if input.category() == category_list[0]:
-                        return "Please select a metrology category!"
-                    # Do not allow OMERO data for power measurements
-                    if input.category() == category_list[1]:
-                        return "Power measurements from OMERO not supported!"
-
-                    _metric = category_to_metric.get(input.category())
-                    if _metric == "not implemented":
-                        return f"Not implemented: Getting data from OMERO for {input.category()}"
-                    if _metric is None:
-                        raise RuntimeError(
-                            f"Could not find metric for: {input.category()}"
+                @reactive.event(input.category)
+                def csv_upload_selections():
+                    """Show LED/Laser selection only on Power category."""
+                    if input.category() != "Power":
+                        ui.notification_show(
+                            f"{input.category()} upload from CSV not implemented!",
+                            type="warning",
                         )
-
-                    # Check on OMERO
-                    data = validate_omero_input(
-                        omero_type=input.omero_type_selector(),
-                        omero_id=input.omero_id_selector(),
-                        metric=_metric,
-                    )
-
-                    # If errors data will be of type string
-                    if isinstance(data, str):
-                        return data
-
-                    # Create subsequent ui items depending on the updload data type
-                    if _metric == "FWHM":
-                        ui_elements = list(
-                            update_confrim_psf_selection(data.get_fwhm_data())
-                        )
-                        # Set the reactive value for the upload data
-                        upload_data.set(data)
-                        # Add upload FWHM button
-                        ui_elements.append(upload_psf_button)
-                        return ui_elements
-                    else:
-                        raise NotImplementedError(
-                            f"The metric {_metric} in not implemented yet!"
-                        )
-
-                # Helper reactive value to rest ui elements (counts button presses)
-                upload_psf_btn_presses = reactive.value(None)
+                        return f"{input.category()} upload from CSV not implemented!"
+                    # It seems impossible to reset the selected file (even if dialog does not show it)
+                    return csv_file_selector, csv_light_selector
 
                 @render.text
-                @reactive.event(
-                    input.upload_psf_button, input.upload_type, input.category
-                )
-                def uplaod_psf():
-                    """Upload data to the google sheet."""
-                    # Button presses increase counter, if event triggers function
-                    # the counter is not increased. Hence, returning empty string
-                    # resets the ui elements added by this function.
-                    if upload_psf_btn_presses.get() is None:
-                        upload_psf_btn_presses.set(input.upload_psf_button())
+                def show_csv_name():
+                    """
+                    Inform which csv file is being displayed.
+
+                    When selecting a file but switching categories, the file cannot be
+                    forgotten/reset. So it is for information...
+                    """
+                    if input.category() != "Power":
                         return ""
+                    name = (
+                        "None"
+                        if not input.csv_file_selector()
+                        else input.csv_file_selector()[0]["name"]
+                    )
+                    return f"Currently showing: {name}"
 
-                    if (
-                        input.upload_psf_button()
-                        <= upload_psf_btn_presses.get()
-                    ):
-                        # <= important: prevents accitendal function trigger by sidebar elements
-                        return ""
+                @render.data_frame
+                def render_csv():
+                    if input.category() != "Power":
+                        # I dont manage to rest the input_file selection
+                        # Hence just rest the talbe.
+                        return render.DataGrid(pd.DataFrame(), editable=False)
 
-                    upload_psf_btn_presses.set(input.upload_psf_button())
-
-                    # Checks before uplaod
-                    # No upload password
-                    if input.upload_pwd() == "":
-                        return "Error: Please provide the upload password!"
-                    # Wrong upload password
-                    if not check_upload_password(input.upload_pwd()):
-                        return "Error: wrong upload password!"
-
-                    # Get the Microscope entries (& "validate")
-                    microscope = input.microscope()
-                    if microscope.startswith("*"):
-                        microscope = input.new_mic_name()
-                        if microscope.startswith("Enter"):
-                            return "Error: Please enter a name for the new microscope!"
-                    # Get the objective
-                    objective = input.objective()
-                    if objective.startswith("*"):
-                        objective = input.new_obj_name()
-                        if objective.startswith("Enter"):
-                            return "Error: Please enter a name for the new objective!"
-                    # Get the Info
-                    info = input.info()
-                    if info.startswith("*"):
-                        info = input.new_info_name()
-                        if info.startswith("Enter"):
-                            return (
-                                "Error: Please enter a name for the new info!"
-                            )
-                    # Get the site
-                    site = input.site()
-
-                    # Prevent uplaod for working with local file
-                    if isinstance(g_spreadsheet, pd.DataFrame):
-                        return "Prevented upload because working with local-dev-file!"
-
-                    # Get the data to be uploaded
-                    data = upload_data.get()
-                    selectors = {
-                        "DAPI": input.psf_dapi_selector(),
-                        "GFP": input.psf_gfp_selector(),
-                        "Cy3": input.psf_cy3_selector(),
-                        "Cy5": input.psf_cy5_selector(),
-                    }
-                    # Ensure the channel id is not selected for multiple channels
-                    duplicates = check_duplicate_dict_values(selectors)
-                    if isinstance(duplicates, dict):
-                        item = next(iter(duplicates.items()))
-                        return f"Error: {item[0]} cannot be specified for multiple channels: {item[1]}"
-
-                    # Change the ch_id in the data dict to the selected channel_names
-                    parsed_data = {}
-                    for ch_name, sel in selectors.items():
-                        if sel != "None":
-                            parsed_data[ch_name] = data.get_fwhm_data().get(
-                                sel
-                            )
-
-                    # Start the PSF upload
-                    try:
-                        make_sheet_entries(
-                            sheet=sheet_reference.get(),
-                            site=site,
-                            microscope=microscope,
-                            objective=objective,
-                            info=info,
-                            date=data.get_acquisition_date(),
-                            fwhm_data=parsed_data,
+                    selected = input.csv_file_selector()
+                    if selected is not None:
+                        ui.update_select(
+                            "csv_file_selector",
                         )
-                    except Exception as err:
-                        return "Error: " + str(err)
 
-                    return "Data upload sucess!"
+                    return render.DataGrid(parse_csv_power(), editable=True)
+
+                # FIXME currently only the upload csv data for power measurements
+                @render.ui
+                def show_power_upload_btn():
+                    return upload_power_button
 
 
 # General functions     ------------------------------------------------------
 
 
-def update_confrim_psf_selection(channel_dict: dict) -> tuple:
+def check_new_microscope_entries():
     """
-    Update the PSF channel confirmation selection choices.
+    Check if new microscope entries were entered.
 
-    Choices are updated based on the channel_dict keys
+    Checks also if there are same or similar (no special characters,
+    lower case) entries already in the available choices.
 
-    :param: channel_dict: dict as returned by the validte_omero_input function.
-
-    :return: tuple of ui elements
+    :return: If entries good:
+        tuple(True, microscope name, objective name, info name)
+        Otherwise return: (False, None, None, None)
     """
-    chs = channel_dict.keys()
-    choices = list(chs).copy()
-    choices.append("None")
-    ui.update_select(
-        "psf_dapi_selector",
-        choices=choices,
-        selected="C1" if "C1" in choices else "None",
-    )
-    ui.update_select(
-        "psf_gfp_selector",
-        choices=choices,
-        selected="C2" if "C2" in choices else "None",
-    )
-    ui.update_select(
-        "psf_cy3_selector",
-        choices=choices,
-        selected="C3" if "C3" in choices else "None",
-    )
-    ui.update_select(
-        "psf_cy5_selector",
-        choices=choices,
-        selected="C4" if "C4" in choices else "None",
-    )
-    return (
-        psf_dapi_selector,
-        psf_gfp_selector,
-        psf_cy3_selector,
-        psf_cy5_selector,
-    )
+    mic = input.microscope()
+    obj = input.objective()
+    info = input.info()
+    mic_name = input.new_mic_name()
+    obj_name = input.new_obj_name()
+    info_name = input.new_info_name()
+
+    if mic.startswith("*"):
+        # Check if text was entered
+        if mic_name.startswith("Enter"):
+            ui.notification_show(
+                "Please enter a name for the new microscope!", type="error"
+            )
+            return False, None, None, None
+        # Check entry is not the same as in choices
+        for m in microscope_list.get():
+            # Remove special charactes an make it lower-case
+            list_entry = "".join(s.lower() for s in m if s.isalnum())
+            text_entry = "".join(s.lower() for s in mic_name if s.isalnum())
+            if list_entry == text_entry:
+                ui.notification_show(
+                    f"The entered microscope name <{mic_name}> is too "
+                    "similar existing entries. "
+                    "Please double-check and change it.",
+                    type="warning",
+                )
+                return False, None, None, None
+        mic = input.new_mic_name()
+
+    if obj.startswith("*"):
+        if obj_name.startswith("Enter"):
+            ui.notification_show(
+                "Please enter a name for the new objective!", type="error"
+            )
+            return False, None, None, None
+        # Check entry is not the same as in choices
+        for o in objective_list.get():
+            # Remove special charactes an make it lower-case
+            list_entry = "".join(s.lower() for s in o if s.isalnum())
+            text_entry = "".join(s.lower() for s in obj_name if s.isalnum())
+            if list_entry == text_entry:
+                ui.notification_show(
+                    f"The entered objective name <{obj_name}> is too "
+                    "similar existing entries. "
+                    "Please double-check and change it.",
+                    type="warning",
+                )
+                return False, None, None, None
+        obj = input.new_obj_name()
+
+    if info.startswith("*"):
+        if info_name.startswith("Enter"):
+            ui.notification_show(
+                "Please enter a name for the new info!", type="error"
+            )
+            return False, None, None, None
+        # Check entry is not the same as in choices
+        for i in info_list.get():
+            # Remove special charactes an make it lower-case
+            list_entry = "".join(s.lower() for s in i if s.isalnum())
+            text_entry = "".join(s.lower() for s in info_name if s.isalnum())
+            if list_entry == text_entry:
+                ui.notification_show(
+                    f"The entered objective name <{info_name}> is too "
+                    "similar existing entries. "
+                    "Please double-check and change it.",
+                    type="warning",
+                )
+                return False, None, None, None
+        info = input.new_info_name()
+
+    # Check if text was entered, but drop down was not set
+    if not mic_name.startswith("Enter") and not mic.startswith("*"):
+        ui.notification_show(
+            "You entered a name for the microscope but forgot to select a new entry from the drop-down choices.",
+            type="warning",
+        )
+        return False, None, None, None
+    if not obj_name.startswith("Enter") and not obj.startswith("*"):
+        ui.notification_show(
+            "You entered a name for the objective but forgot to select a new entry from the drop-down choices.",
+            type="warning",
+        )
+        return False, None, None, None
+    if not info_name.startswith("Enter") and not info.startswith("*"):
+        ui.notification_show(
+            "You entered a info but forgot to select a new entry from the drop-down choices.",
+            type="warning",
+        )
+        return False, None, None, None
+    return True, mic, obj, info
 
 
-def validate_omero_input(
-    omero_type: str, omero_id: Union[str, int], metric: str
-) -> Union[str, Union[PSFData]]:
+def check_channel_names_provided(df: pd.DataFrame) -> bool:
     """
-    Validate the OMERO input selection.
+    Check if channel names were entered in a shiny table.
 
-    Tries to retrieve the associated OMERO data (key-value or table.)
+    Also checks:
+        - if there are duplicate entries
+        - check if the names correspond to the
+          channel names of previous measurement entries
 
-    :param omero_type: str "Project", "Dataset" or "Image"
-    :param omero_id: str or int OMERO ID (str will be parsed to int)
-    :param metric: str metric keyword to search for in the OMERO object.
+    :param df: pd.DataFrame with 2 columns: 'Channel' & '..names entered'.
 
-    :return: str for errors or dict with data ??? or other FIXME ???
+    :return: bool, True if no empty str in cells.
     """
+    # Sanity check
+    if len(df.columns) != 2:
+        raise RuntimeError(
+            f"Expected a dataframe with 2 columns, got: {list(df.columns)}"
+        )
+    # Convert the columns into a dict {"C1": "name", ...}
+    ch_dict = {}
+    names = []
+    for _i, row in df.iterrows():
+        n = row[df.columns[-1]]
+        ch_dict[row["Channel"]] = n
+        names.append(n)
+
+    # Check for entries in all cells        #########################
+    for n in names:
+        if n is None or n == "":
+            ui.notification_show(
+                "Please <Provide channel names> for all the channels!",
+                type="error",
+            )
+            return False
+    # Check for duplicate names             #########################
+    ch_dict = check_duplicate_dict_values(ch_dict)
+    if ch_dict is not None:
+        ui.notification_show(
+            f"You entered the same channel name: {ch_dict}.", type="error"
+        )
+        return False
+
+    # Check with the data table itself      #########################
+    # Filter the DF
+    df = dataframe.get().copy()
+    # Filter dataframe
+    df = filter_by_column_value(df, "Site", input.site())
+    df = filter_by_column_value(df, "Microscope", input.microscope())
+    df = filter_by_column_value(df, "Objective", input.objective())
+    # Get the unique channel names
+    df_ch_names = list(np.unique(np.asarray(df["Channel"])))
+    # No df ch names = new entry
+    if len(df_ch_names) == 0:
+        return True
+    # Check for "wrong" entries: ch names not in df
+    wrong_names = []
+    for n in names:
+        if n not in df_ch_names:
+            wrong_names.append(n)
+    if len(wrong_names) != 0:
+        if len(names) > len(df_ch_names):
+            # FIXME implement this??
+            ui.notification_show(
+                "Not supported: There are new channels, "
+                "which have not been measured previously.",
+                type="error",
+            )
+        else:
+            ui.notification_show(
+                f"You entered channel names ({wrong_names}), which are unknown. "
+                f"Pleae use following ones: {df_ch_names}.",
+                type="error",
+            )
+        return False
+    return True
+
+
+def match_fwhm_channel_names(
+    ori_df: pd.DataFrame, name_df: pd.DataFrame
+) -> dict:
+    """
+    Create a dict for upload by matchin entered names to OMERO channels.
+
+    :param ori_df: pd.DataFrame, of the OMERO FWHM key values
+        with columns: "Channel", "FWHM", "*Acquistion_date_number*"
+    :param name_df: pd.DataFrame, of the manually entered channel names.
+        with columns: "Channel", "Enter channel name"
+
+    :returns: dict of dict, e.g.:
+        {"DAPI" : {'FWHM-X': 911.0, 'FWHM-Y': 852.0, 'FWHM-Z': 1260.0}, ... }
+    """
+    result_dict = {}
+    # should be: {"DAPI" : {'FWHM-X': 911.0, 'FWHM-Y': 852.0, 'FWHM-Z': 1260.0}, ... }
+
+    for _i, row in ori_df.iterrows():
+        ch = row["Channel"]  # e.g. C4
+        name = name_df.loc[name_df["Channel"] == ch, name_df.columns[-1]].iloc[
+            0
+        ]
+        if name in result_dict.keys():
+            result_dict[name][row["FWHM"]] = row[ori_df.columns[-1]]
+        else:
+            result_dict[name] = {row["FWHM"]: row[ori_df.columns[-1]]}
+    return result_dict
+
+
+def identify_csv(path: str) -> tuple[str, int, Optional[int]]:
+    """
+    Identify the csv file.
+
+    :param path: str, path to file
+
+    :return: tuple with:
+        str, csv delimiter (e.g. ";")
+        int, first line of data (for loading into DataFrame)
+        int, wavelength used for the measurement
+    """
+    delimiter = None
+    first_line = None
+    wavelength = None
+    with open(path, mode="r", encoding="utf-8") as file:
+        for i, line in enumerate(file):
+            # Find the file delimiter
+            if line.startswith("Delimiter Used"):
+                delimiter = line.split("'")[1]
+            # Find the first data line
+            if line.startswith("Samples"):
+                first_line = i
+            # Find the wavelength used
+            if line.startswith("Wavelength"):
+                wavelength = line.split(" ")[-2]
+                try:
+                    wavelength = int(wavelength)
+                except ValueError as err:
+                    raise RuntimeError(
+                        "Could not identify the used Wavelength from: "
+                        f"{line}, using <{' '.join(line.split(' ')[-2:])}>"
+                    ) from err
+
+    if delimiter is None or first_line is None:
+        raise RuntimeError("Could not parse the uplaoded csv file!")
+
+    # Correct the header position?? not sure why minus 2...
+    return delimiter, first_line - 2, wavelength
+
+
+# Reactive functions    ------------------------------------------------------
+
+# CSV upload        #######################################
+
+
+@render_csv.set_patch_fn
+def update_patch_csv_power(
+    *,
+    patch,
+):
+    """Allow only entries into the last column (csv upload table)."""
+    ori_data = render_csv.data()
+    row = patch["row_index"]
+    col = patch["column_index"]
+    new_value = patch["value"]
+    ori_value = ori_data.iloc[row, col]
+
+    # Make sure that only the last column is edited
+    if col != len(ori_data.columns) - 1:
+        ui.notification_show(
+            f"You can only edit values in the column: {ori_data.columns[-1]}",
+            type="warning",
+        )
+        # Convert the value to str, to avoid
+        # "TypeError: Object of type int64 is not JSON serializable"
+        return str(ori_value)
+
+    # Make sure the entry is an integer between 1-100
+    try:
+        new_value = int(new_value)
+        if new_value > 0 and new_value <= 100:
+            return new_value
+    except ValueError:
+        pass
+    # Inform about invalid entries
+    ui.notification_show(
+        f"Invalid entry: {new_value}\n"
+        "Please use integer [%] values between 1-100.",
+        type="error",
+    )
+    return
+
+
+@reactive.calc
+@reactive.event(input.csv_file_selector, input.category)
+def parse_csv_power():
+    """
+    Convert the uploaded csv to a DataFrame.
+
+    Currently hard-coded specifically for one type of laser power meausrement csv file.
+    """
+    # FIXME here: reset the csv_file_selector when switching between categories!
+
+    csv: Optional[list[FileInfo]] = input.csv_file_selector()
+    if csv is None:
+        return pd.DataFrame()
+
+    # Get the csv path (from the list of dicts in csv)
+    path = csv[0]["datapath"]
+
+    # FIXME should have this function throwing an error if csv not compatible
+    # FIXME     catch the error here to return an empty dataframe
+    delimiter, first_line, wavelength = identify_csv(path)
+
+    df = pd.read_csv(path, sep=delimiter, header=first_line)
+    # Remove "unnamed columns"
+    unnamed_cols = [x for x in df.columns if x.startswith("Unnamed")]
+    df = df.drop(columns=unnamed_cols)
+    # Remove the "Time..." column
+    cols = [x for x in df.columns if x.startswith("Time")]
+    df = df.drop(columns=cols)
+
+    # Convert the date to YYYYmmdd
+    df = convert_date_column(df)
+
+    # Convert power measurements to mW
+    df = convert_power_column(df)
+
+    # Add column for entries of power %
+    df[f"Enter the intensity (%) for {wavelength}nm"] = np.nan
+    return df
+
+
+@reactive.effect
+@reactive.event(input.upload_power_button)
+def upload_power_data():
+    """
+    Perform checks before uploading the csv (power) data.
+
+    FIXME: Currently only for Power measurements,
+           this button is currently also "specific" for this...
+    """
+    # Prevent upload for working with local file    #######
+    if sheet_reference.get() is None:
+        ui.notification_show(
+            "Can't uplaod data when working with local file", type="error"
+        )
+        return
+
+    # Check microscope entries      #######################
+    valid_entries, cur_mic, cur_obj, cur_info = check_new_microscope_entries()
+    if not valid_entries:
+        return
+
+    # Check if there is data for upload     ###############
+    data = render_csv.data_view()
+    if data is None or data.empty:
+        ui.notification_show("No data for upload yet!", type="warning")
+        return
+
+    # FIXME temp usage of unused variables
+    a = [cur_mic, cur_obj, cur_info]
+    a.sort()
+
+    # TODO: Check if all values have been provided
+
+    print("All good so far")
+
+
+# OMERO upload      #######################################
+@reactive.effect
+@reactive.event(input.upload_omero_button)
+def uplaod_omero_data():
+    """
+    Peform checks then upload omero data.
+
+    FIXME: Currently for FWHM.
+    """
+    # Prevent upload for working with local file    #######
+    if sheet_reference.get() is None:
+        ui.notification_show(
+            "Can't uplaod data when working with local file", type="error"
+        )
+        return
+
+    # Check microscope entries      #######################
+    valid_entries, cur_mic, cur_obj, cur_info = check_new_microscope_entries()
+    if not valid_entries:
+        return
+
+    # Check if there is data for upload     ###############
+    data = omero_data.data()
+    ch_names = omero_channel_names.data_view()  # get the user modified df
+    if data is None or data.empty:
+        ui.notification_show("No data for uplaod yet!", type="warning")
+        return
+
+    # Check if all channel names were provided correctly ##
+    if not check_channel_names_provided(ch_names):
+        return
+
+    # Check the upload password     #######################
+    if not check_upload_password(input.upload_pwd()):
+        ui.notification_show(
+            "Please provide the correct <Password for upload>!", type="error"
+        )
+        return
+
+    # Upload the data
+    # FIXME shift Reference-XYZ -> should it be 0 or nan? -> PSFdata object
+    #       how does it visualise once the visualisation is implemented?
+    try:
+        make_sheet_entries(
+            sheet=sheet_reference.get(),
+            site=input.site(),
+            microscope=cur_mic,
+            objective=cur_obj,
+            info=cur_info,
+            date=data.columns[-1],
+            fwhm_data=match_fwhm_channel_names(data, ch_names),
+        )
+        ui.notification_show("Successfully uploaded the data!", type="message")
+    except Exception as err:
+        ui.notification_show(
+            f"Could not upload the data:\n{err}", type="error"
+        )
+    # FIXME test notification
+    # ui.notification_show("default", type="default") # white
+    # ui.notification_show("error", type="error") # red
+    # ui.notification_show("message", type="message") # blue
+    # ui.notification_show("warning", type="warning") # yellow
+
+
+@omero_channel_names.set_patch_fn
+def update_patch_omero(
+    *,
+    patch,
+):
+    """Allow only changing of the last column (OMERO channe name entry)."""
+    data = omero_channel_names.data()
+    row = patch["row_index"]
+    col = patch["column_index"]
+    old_value = data.iloc[row, col]
+    new_value = patch["value"]
+
+    # Only last row can be edited!
+    if col != len(data.columns) - 1:
+        ui.notification_show(
+            f"You can only edit values in the column: {data.columns[-1]}",
+            type="warning",
+        )
+        return old_value
+    else:
+        return new_value
+
+
+@reactive.calc
+def parse_omero_fwhm():
+    """
+    Create a table from OMERO FWHM data.
+
+    reactive.calc function cannot take any parameters.
+
+    :return: None for errors (shown as notification), else pd.DataFrame
+    """
+    omero_id = input.omero_id_selector()
+    # If nothing entered yet, do not do anything
+    if omero_id.startswith("Enter OMERO ID") or omero_id == "":
+        return None
     # Parse OMERO ID
     try:
-        omero_id = int(omero_id)
+        omero_id = int(input.omero_id_selector())
     except ValueError:
-        return f"Error: Could not parse OMERO ID = <{omero_id}>"
+        ui.notification_show(
+            f"Could not parse OMERO ID: {omero_id}", type="error"
+        )
+        return None
     # Get the data from OMERO
     try:
         data = omero_operation(
             operation=None,
-            omero_type=omero_type,
+            omero_type=input.omero_type_selector(),
             omero_id=omero_id,
-            metric_id=metric,
+            metric_id="FWHM",
         )
     except Exception as err:
-        return f"Error: {err}"
-
-    # Get the specific metrics
-    if metric == "FWHM":
-        try:
-            data = PSFData(data)
-            return data
-        except Exception as err:
-            return str(err)
-
-    else:
-        # FIXME needs implementation to validate other metric categories
-        return f"NotImplementedError: {metric} is not yet implemented!"
-
-
-def validate_psf_data(data_dict: dict) -> dict:
-    """
-    Parse the OMERO FWHM data to a dict per channel.
-
-    FIXME: Deprecated
-
-    :param data_dict: dictionary as returned from the omero_operation function
-
-    :return: dict with keys = channel identifies (e.g. C1)
-        values = dict{FWHM-X:value, FWHM-Y:value, FWHM-Z:value}
-    """
-    results = {}
-    for key, value in data_dict.items():
-        if "FWHM" in key:
-            ch = key.split("_")[0]
-            if not ch.startswith("C"):
-                raise RuntimeError(
-                    f"Channel not could not be identified for {key}"
-                )
-            if ch not in results.keys():
-                results[ch] = {}
-            if "X" in key:
-                if "FWHM-X" in results[ch].keys():
-                    raise RuntimeError(
-                        f"Found multiple entries for {ch} 'Axial-X' FWHM."
-                    )
-                results[ch]["FWHM-X"] = value
-            if "Y" in key:
-                if "FWHM-Y" in results[ch].keys():
-                    raise RuntimeError(
-                        f"Found multiple entries for {ch} 'Axial-Y' FWHM."
-                    )
-                results[ch]["FWHM-Y"] = value
-            if "Z" in key:
-                if "FWHM-Z" in results[ch].keys():
-                    raise RuntimeError(
-                        f"Found multiple entries for {ch} 'Z' FWHM."
-                    )
-                results[ch]["FWHM-Z"] = value
-    return results
+        ui.notification_show(str(err), type="error")
+        return None
+    # Manage the PSF data
+    data = PSFData(data)
+    # Create a table for FWHM entries
+    psf_table = []
+    for k, v in invert_nested_dict(data.get_fwhm_data()).items():
+        entry = v.copy()
+        entry.append(k)
+        psf_table.append(entry)
+    psf_table = pd.DataFrame(
+        psf_table, columns=["Channel", "FWHM", data.get_acquisition_date()]
+    )
+    # Create tale for shift between channel entreis
+    if len(data.get_shift_data()) != 0:
+        shift_table_part = []
+        for k, v in invert_nested_dict(data.get_shift_data()).items():
+            entry = v.copy()
+            entry.append(k)
+            shift_table_part.append(entry)
+        shift_table_part = pd.DataFrame(
+            shift_table_part,
+            columns=["Channel", "FWHM", data.get_acquisition_date()],
+        )
+        psf_table = pd.concat([psf_table, shift_table_part])
+    return psf_table
 
 
-# Reactive functions    ------------------------------------------------------
+# Microscope selection      ###############################
 @reactive.effect
 @reactive.event(input.category)
-def update_on_cat_choice():
-    """Update dataframe (sheet selection) and card selectors."""
-    if input.category() == category_list[0]:
-        card_selectors.set([])
-    # Power at objective
-    elif input.category() == category_list[1]:
-        card_selectors.set(
-            [
-                microscope_selector,
-                new_mic_name,
-                objective_selector,
-                new_obj_name,
-                info_selector,
-                new_info_name,
-                kind_selector,
-                line_selector,
-                power_selector,
-            ]
-        )
-        if isinstance(g_spreadsheet, pd.DataFrame):
-            # For local file testing
-            dataframe.set(g_spreadsheet)
-        else:
-            sheet = g_spreadsheet.worksheet(
-                "laser_power_objective_measurements"
-            )
-            sheet_reference.set(sheet)
-            df = pd.DataFrame(sheet.get_all_records())
-            dataframe.set(df)
-    # PSF
-    elif input.category() == category_list[2]:
-        card_selectors.set(
-            [
-                microscope_selector,
-                new_mic_name,
-                objective_selector,
-                new_obj_name,
-                info_selector,
-                new_info_name,
-            ]
-        )
-        if isinstance(g_spreadsheet, pd.DataFrame):
-            # For local file testing
-            dataframe.set(g_spreadsheet)
-        else:
-            sheet = g_spreadsheet.worksheet("psf_measurements")
-            sheet_reference.set(sheet)
-            df = pd.DataFrame(sheet.get_all_records())
-            dataframe.set(df)
-    else:
-        raise RuntimeWarning("No category selected")
+def get_data():
+    """Get the worksheet data from the sheet."""
+    wsheet, df = get_sheet(
+        sheet_doc, input.category(), dev_local_file=use_dev_local_file
+    )
+    sheet_reference.set(wsheet)
+    dataframe.set(df)
 
 
 @reactive.effect
-@reactive.event(input.category, input.site)
-def update_microscope_selections():
-    if dataframe.get() is None:
+@reactive.event(dataframe)
+def get_sites():
+    """Update site selection when dataframe changes."""
+    df = dataframe.get().copy()
+    if df is None or df.empty:
+        print("df is none or empty")
         return
-    df_filtered = dataframe.get().copy()
-    # Common choices
-    df_filtered = filter_by_column_value(df_filtered, "Site", input.site())
-    # Update microscope choices
-    mics = list(np.unique(np.asarray(df_filtered["Microscope"])))
+    # Get unique sites and remove "" entries
+    sites_ = list(np.unique(np.asarray(df["Site"])))
+    sites = [s for s in sites_ if s != ""]
+    if len(sites) == 0:
+        raise RuntimeError("There are no site in the table!")
+    ui.update_select("site", choices=sites, selected=sites[0])
+
+
+@reactive.effect
+@reactive.event(dataframe, input.site)
+def update_mic_selection():
+    """Update microscope selection."""
+    df = dataframe.get().copy()
+    # Filter dataframe
+    df = filter_by_column_value(df, "Site", input.site())
+    # Update selection choices
+    mics = list(np.unique(np.asarray(df["Microscope"])))
     mics.append("* New microscope *")
-    microscope_choices.set(mics)
-    ui.update_select("microscope", choices=microscope_choices.get())
-
-    ## FIXME Maybe do not filter by "*new..."
+    microscope_list.set(mics)
+    ui.update_select("microscope", choices=microscope_list.get())
 
 
 @reactive.effect
-@reactive.event(input.site, input.microscope)
-def update_objective_selections():
-    if dataframe.get() is None:
-        return
-    df_filtered = dataframe.get().copy()
-    # Common choices
-    df_filtered = filter_by_column_value(df_filtered, "Site", input.site())
-    # Filter by microscope
-    df_filtered = filter_by_column_value(
-        df_filtered, "Microscope", input.microscope()
-    )
-    # Update objective choices
-    objectives = list(np.unique(np.asarray(df_filtered["Objective"])))
-    objectives.append("* New objective *")
-    ui.update_select("objective", choices=objectives)
+@reactive.event(dataframe, input.site, input.microscope)
+def update_objectives_selection():
+    """Update objective selection."""
+    df = dataframe.get().copy()
+    # Filter dataframe
+    df = filter_by_column_value(df, "Site", input.site())
+    df = filter_by_column_value(df, "Microscope", input.microscope())
+    # Update selection choices
+    objs = list(np.unique(np.asarray(df["Objective"])))
+    objs.append("* New objective *")
+    objective_list.set(objs)
+    ui.update_select("objective", choices=objective_list.get())
 
 
 @reactive.effect
-@reactive.event(input.site, input.microscope, input.objective)
-def update_info_selections():
-    if dataframe.get() is None:
-        return
-    df_filtered = dataframe.get().copy()
-    # Common choices
-    df_filtered = filter_by_column_value(df_filtered, "Site", input.site())
-    # Filter by microscope
-    df_filtered = filter_by_column_value(
-        df_filtered, "Microscope", input.microscope()
-    )
-    # DO NOT Filter by objective - to keep available options
-    # df_filtered = filter_by_column_value(
-    #      df_filtered, "Objective", input.objective()
-    # )
-    # Update info choices
-    infos = list(np.unique(np.asarray(df_filtered["Info"])))
+@reactive.event(dataframe, input.site, input.microscope, input.objective)
+def update_info_selection():
+    """Update info selection."""
+    df = dataframe.get().copy()
+    # Filter dataframe
+    df = filter_by_column_value(df, "Site", input.site())
+    df = filter_by_column_value(df, "Microscope", input.microscope())
+    df = filter_by_column_value(df, "Objective", input.objective())
+    # Update selection choices
+    infos = list(np.unique(np.asarray(df["Info"])))
     infos.append("* New info *")
-    ui.update_select("info", choices=infos)
-
-
-@reactive.effect
-@reactive.event(input.microscope)
-def test_add_name_field():
-    """
-    Make new microscope name field.
-
-    TODO only visible when "* New microscope *" selected.
-
-    FIXME probably not really possible to do it this way
-    """
-    # print("on input microscope the mic is:", input.microscope())
-    # # Add name field entry for new microscope entry
-    # if input.microscope() == "* New microscope *":
-    #     # Check if card_selectors does not yet contain it yet
-    #     if not is_input_select_in_list(card_selectors.get(), "new_mic_name"):
-    #         l = card_selectors.get()
-    #         l.insert(1, new_mic_name)
-    #         card_selectors.set(l)
-    #         print("****")
-    #         for i in card_selectors.get():
-    #             print(get_ui_id(i))
-    #         print("****")
-    #         #card_selectors.set(list(cur_list))
-    #         #ui.update_select(
-    #               "microscope", choices=microscope_choices.get()
-    #          )
-    # else:
-    #     # Make sure to remove it if an exisiting microscope is selected
-    #     if is_input_select_in_list(card_selectors.get(), "new_mic_name"):
-    #         card_selectors.get().pop(1)
-    #         card_selectors.set(card_selectors.get())
-    #         print("****")
-    #         for i in card_selectors.get():
-    #             print(get_ui_id(i))
-    #         print("****")
-    #         # card_selectors.set(list(cur_list))
-    #         # ui.update_select(
-    #               "microscope", choices=microscope_choices.get()
-    #           )
-
-    # if card_selectors.get() and is_input_select_in_list(
-    #      card_selectors.get(), "line"
-    #   ):
-    #         print("card_selectors contains the line selector")
-    # else:
-    #     print("card_selectors does NOT contain the line selector")
-
-    # if card_selectors.get() and any(
-    #           x.id == "line" for x in card_selectors.get()
-    #   ):
-    #     print("power because it contains the line_selector")
-    # else:
-    #     print("contains something else")
+    info_list.set(infos)
+    ui.update_select("info", choices=info_list.get())

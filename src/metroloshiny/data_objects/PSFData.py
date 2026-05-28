@@ -20,11 +20,11 @@ class PSFData:
         self.acquisition_date = None
         self.na = None
         self.objective = None  # Magnification
-        # Individual data keys = channels; values = dict
+        # Individual data: keys = channels; values = dict
         self.individual_data = {}
         # In case there is already averaged data
         self.average_data = {}
-        # FIXME shifts to reference channel also?
+        # Shifts to reference (averaged vals): keys = channels; values = dict
         self.shift_data = {}
         # The FINAL FWHM data dict[dict]
         self.fwhm_data = {}
@@ -39,6 +39,10 @@ class PSFData:
     def get_fwhm_data(self) -> dict[str, dict[str, float]]:
         """Getter for the FWHM data."""
         return self.fwhm_data
+
+    def get_shift_data(self) -> dict[str, dict[str, float]]:
+        """Getter for shift data."""
+        return self.shift_data
 
     def get_acquisition_date(self) -> Optional[str]:
         """Getter for the acquisition date."""
@@ -132,7 +136,7 @@ class PSFData:
                 sum = sum + val
         if count == 0:
             return 0.0
-        return float(round(float(sum) / count))
+        return float(round(float(sum) / count, 1))
 
     def _parse_data_(self):
         """Parse the data from OMERO."""
@@ -196,7 +200,52 @@ class PSFData:
                 if "_Z_" in k:
                     self.individual_data[ch]["FWHM-Z"].append(v)
 
-            # TODO check for shift data (in px)     --------------------------
+            # Check for shift data (in px)     --------------------------
+            # There is no shift averages in the key values
+            if "_shift_" in k:
+                ch = k.split("_")[0]
+                if ch not in self.shift_data.keys():
+                    self.shift_data[ch] = {
+                        "Shift-X": [],
+                        "Shift-Y": [],
+                        "Shift-Z": [],
+                    }
+                if "_X_" in k:
+                    self.shift_data[ch]["Shift-X"].append(v)
+                if "_Y_" in k:
+                    self.shift_data[ch]["Shift-Y"].append(v)
+                if "_Z_" in k:
+                    self.shift_data[ch]["Shift-Z"].append(v)
+
+        # If FWHM was run on only one channel, this will remain a empty dict
+        if len(self.shift_data) > 0:
+            # Average the shift values
+            for ch, shifts in self.shift_data.items():
+                for key, values in shifts.items():
+                    if len(values) < 1:
+                        raise RuntimeError(
+                            "OMERO PSF shift data is missing for: "
+                            f"{ch} - {key}"
+                        )
+                    self.shift_data[ch][key] = self._average_values_(
+                        values=values,
+                        min_fwhm=-2000,
+                    )
+            # Include the reference channel for the shifts
+            ref_ch = []
+            for ch in self.individual_data.keys():
+                if ch not in self.shift_data.keys():
+                    ref_ch.append(ch)
+            if len(ref_ch) != 1:
+                raise RuntimeError(
+                    "Pixel shift reference channel "
+                    f"could not be identified: {ref_ch}"
+                )
+            self.shift_data[ref_ch[0]] = {
+                "Shift-X": "Reference-X",
+                "Shift-Y": "Reference-Y",
+                "Shift-Z": "Reference-Z",
+            }
 
         # Set the number of channels
         n_av_chs = len(self.average_data.keys())

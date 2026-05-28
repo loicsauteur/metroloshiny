@@ -42,7 +42,7 @@ theoretical_fwhm = reactive.value(
 
 
 # Create UI         ----------------------------------------------------------
-ui.page_opts(title="Metrology")
+ui.page_opts(title="Metrology: PSF")
 with ui.nav_panel(title="PSF Metrology"):
     # Sidebar          -------------------------------------------------------
     with ui.layout_sidebar():

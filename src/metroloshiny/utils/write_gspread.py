@@ -116,7 +116,8 @@ def make_sheet_entries(
                     f"FWHM data channel name <{ch}> not supported"
                 )
             for f in values.keys():
-                if not f.startswith("FWHM-"):
+                # Allow only entries for FWHM and Shift
+                if not f.startswith(("FWHM-", "Shift-")):
                     raise RuntimeError(
                         f"FWHM label <{f}> for channel <{ch}> not supported."
                     )
@@ -159,17 +160,30 @@ def make_sheet_entries(
     entry_dict = filter_by_nested_dict(_df, data_to_use, data_headers)
     indices = list(entry_dict.keys())
     # All indicies are negative: all entries to the end of the sheet
-    if any(val < 0 for val in indices):
+    if all(val < 0 for val in indices):
         new_entry = True
     # All indicies are positvie: entries go to exisiting rows
-    elif any(val > 0 for val in indices):
-        # Create the address (offset row to 1-based index + header row)
-        for k, v in entry_dict.items():
-            address_dict[f"{col}{k + 2}"] = v
+    elif all(val >= 0 for val in indices):
+        # Create the sorted address (offset row to 1-based index + header row)
+        rows = list(entry_dict.keys())
+        rows.sort()
+        for row in rows:
+            address_dict[f"{col}{row + 2}"] = entry_dict.get(row)
     else:
+        # Get a list of the missing entries
+        inverded_dict = invert_nested_dict(data_to_use)
+        missing_entries = [
+            inverded_dict[k]
+            for k in [entry_dict.get(i) for i in indices if i < 0]
+        ]
+        # print("missing entries:", missing_entries)
+        # msg = "- "
+        # msg = msg + "\n- ".join([" -> ".join(x) for x in missing_entries])
         raise RuntimeError(
-            "The sheet does not seem to be ordered properly: "
-            "some row entries exisit while others don't."
+            "The sheet does not seem to be ordered properly (alphabetically):"
+            " some row entries exisit while others don't.\nThis requires "
+            "manual addition of the missing rows into the the google sheet.\n"
+            f"\n{missing_entries}"
         )
 
     # Adding entries            ----------------------------------------------
@@ -178,7 +192,7 @@ def make_sheet_entries(
         # Check if the addresses are continous
         if not check_if_sequence(address_dict.keys()):
             raise NotImplementedError(
-                "Values to be written are not continous."
+                "Values to be written are not continuous. "
                 f"Data to be entered in cells: {address_dict.keys()}"
             )
         # Check if the cells for values are empty!
@@ -206,11 +220,22 @@ def make_sheet_entries(
 
     # Create new entries at the bottom of the sheet
     else:
-        inverted_dict = invert_nested_dict(data_to_use)
+        inverted_dict = invert_nested_dict(
+            # Ensure the dictionary is sorted
+            # {
+            #     k: v
+            #     for k, v in sorted(
+            #         data_to_use.items(), key=lambda item: item[0]
+            #     )
+            # }
+            # FIXME: not tested if the  version blow works as the one above
+            dict(sorted(data_to_use))
+        )
         new_block = []  # Block for the first columns
         value_block = []  # Block for the values in the date column
         for value, path in inverted_dict.items():
             new_line = [site, microscope, objective, info]
+            # Append further column entries (e.g. 'DAPI', 'FWHM-X')
             for p in path:
                 new_line.append(p)
             new_block.append(new_line)

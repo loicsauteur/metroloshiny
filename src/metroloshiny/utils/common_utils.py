@@ -222,6 +222,9 @@ def invert_nested_dict(nested_dict: dict) -> dict:
     :param nested_dict: e.g. {
             "C1" : {'FWHM-X': 911.0, 'FWHM-Y': 852.0, 'FWHM-Z': 1260.0}
         }
+
+    :raises KeyError if the final value happens to occure more than once.
+
     :return: dict e.g. {
             911.0:  ['C1', 'FWHM-X']
             852.0:  ['C1', 'FWHM-Y']
@@ -236,6 +239,11 @@ def invert_nested_dict(nested_dict: dict) -> dict:
             for k, v in current.items():
                 walk(v, (*path, k))
         else:
+            if current in inverted.keys():
+                raise KeyError(
+                    "Failed to invert the nested dict, because the value "
+                    f"{current} happens to occure multiple times..."
+                )
             inverted[current].append(path)
 
     walk(nested_dict, ())

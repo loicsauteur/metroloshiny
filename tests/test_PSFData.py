@@ -250,6 +250,17 @@ omero_2ch_singl_roi_kv = {
     "OBJECTIVE_NA": "0",
     "ACQUISITION_DATE_NUMBER": "20260424",
 }
+omero_1ch_single_roi_kv = {
+    "C1_FWHM_Axial_X_ROI_1018-1080": 401,
+    "C1_FWHM_Axial_Y_ROI_1018-1080": 402,
+    "C1_FWHM_Axial_avg_ROI_1018-1080": 401,
+    "C1_FWHM_Z_ROI_1018-1080": 1412,
+    "ACQUISITION_DATE": "2026-02-13",
+    "MICROSCOPE": "mainteannceTest",
+    "OBJECTIVE_MAGNIFICATION": "0x",
+    "OBJECTIVE_NA": "0",
+    "ACQUISITION_DATE_NUMBER": "20260213",
+}
 
 
 def test_psfdata():
@@ -258,12 +269,14 @@ def test_psfdata():
     ch2_full = PSFData(omero_2ch_multi_roi_full_kv)
     ch2_no_avg = PSFData(omero_2ch_multi_roi_no_avg_kv)
     ch2_single = PSFData(omero_2ch_singl_roi_kv)
+    ch1_single = PSFData(omero_1ch_single_roi_kv)
 
     # Check corrct number of channesl
     assert ch4_full.n_channels == 4
     assert ch2_full.n_channels == 2
     assert ch2_no_avg.n_channels == 2
     assert ch2_single.n_channels == 2
+    assert ch1_single.n_channels == 1
 
     # Make sure that final data dict have single float values
     val = ch4_full.fwhm_data["C2"].get("FWHM-Y")
@@ -274,6 +287,13 @@ def test_psfdata():
     assert isinstance(val, float), f"Shout be float but was {type(val)}"
     val = ch2_single.fwhm_data["C2"].get("FWHM-Y")
     assert isinstance(val, float), f"Shout be float but was {type(val)}"
+
+    # Check shift data
+    assert len(ch4_full.get_shift_data()) == ch4_full.n_channels
+    assert len(ch2_full.get_shift_data()) == ch2_full.n_channels
+    assert len(ch2_no_avg.get_shift_data()) == ch2_no_avg.n_channels
+    assert len(ch2_single.get_shift_data()) == ch2_single.n_channels
+    assert len(ch1_single.get_shift_data()) == 0
 
 
 if __name__ == "__main__":

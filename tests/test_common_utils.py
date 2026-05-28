@@ -1,5 +1,6 @@
 """Test for common utils.py."""
 
+import pytest
 from shiny.express import ui
 
 import metroloshiny.utils.common_utils as cu
@@ -57,6 +58,20 @@ def test_invert_nested_dict():
         msg = f"Value {val} does not match expected value {value}."
         assert val == value, msg
 
+    # Test problematcit nested dict
+    d = {
+        "C2": {"Shift-X": -1.2, "Shift-Y": -2.2, "Shift-Z": 6.2},
+        "C3": {"Shift-X": 0.8, "Shift-Y": -3.2, "Shift-Z": 4.0},
+        "C4": {"Shift-X": -0.8, "Shift-Y": -4.8, "Shift-Z": 4.8},
+        "C1": {
+            "Shift-X": "Reference",
+            "Shift-Y": "Reference",
+            "Shift-Z": "Reference",
+        },
+    }
+    with pytest.raises(KeyError, match=r"Failed to invert the nested dict*"):
+        res = cu.invert_nested_dict(d)
+
 
 def test_check_if_sequence():
     """Test check_if_sequence function."""
@@ -69,7 +84,8 @@ def test_check_if_sequence():
 
 
 if __name__ == "__main__":
-    test_check_if_sequence()
+    test_invert_nested_dict()
+    # test_check_if_sequence()
     # test_get_ui_id()
     # test_is_input_select_in_list()
     # print("success")

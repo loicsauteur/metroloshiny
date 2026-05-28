@@ -1,6 +1,7 @@
 """Utils for DataFrame manipulation."""
 
 import warnings
+from datetime import datetime
 from typing import Optional, Union
 
 import pandas as pd
@@ -212,6 +213,7 @@ def filter_by_nested_dict(
         }
     :param headers: list for matching the df columns with
         the nested_dict keys.
+
     :return: dict {pd.DataFrame index : value of nested_dict}
     """
     # Enuser there is no duplicate entries
@@ -300,6 +302,119 @@ def filter_by_date_range(
         cols_to_drop = [col for col in df.columns if col.startswith(str(date))]
         df = df.drop(columns=cols_to_drop)
     return df
+
+
+def convert_date_column(df: pd.DataFrame) -> pd.DataFrame:
+    """
+    Convert date entries to YYYYmmdd format.
+
+    Used for parsing csv files from thorlabs power meter.
+
+    :param df: pd.DataFrame, containing column e.g. "Date (MM/dd/yyyy)"
+
+    :return: pd.DataFrame with column changed to "Date (YYYYmmdd)"
+    """
+    # Ensure there is only one "Date..." column and its format enclosed by '('
+    date_col = [x for x in df.columns if x.startswith("Date")]
+    if len(date_col) != 1:
+        raise RuntimeError(
+            "Could not convert the dates. "
+            f"Found following date columns: {date_col}"
+        )
+    if len(date_col[0].split("(")) != 2:
+        raise RuntimeError(
+            "Supplied date column not in expected format: "
+            f"'Date (MM/dd/yyyy)'. Found {date_col[0]}"
+        )
+
+    date_format = date_col[0].split("(")[1].replace(")", "")
+    # Already correct format?
+    if date_format.lower() == "yyyymmdd":
+        return df
+    if "/" not in date_format:
+        raise RuntimeError(f"No '/' in <{date_format}>.")
+
+    # Identify the indexes for year, month & day
+    idx_y = None
+    idx_m = None
+    idx_d = None
+    for i, s in enumerate(date_format.split("/")):
+        if s.lower().startswith("y"):
+            idx_y = i
+        if s.lower().startswith("m"):
+            idx_m = i
+        if s.lower().startswith("d"):
+            idx_d = i
+
+    if None in [idx_y, idx_m, idx_d]:
+        raise RuntimeError("Could not identify YYYY, MM and DD.")
+
+    df_copy = df.copy()
+    # Replace the date values in the cells
+    for _i, row in df.iterrows():
+        d = row[date_col[0]].split("/")
+        y = d[idx_y].strip()
+        m = d[idx_m].strip()
+        d = d[idx_d].strip()
+        dt = datetime.strptime(f"{y}-{m}-{d}", "%Y-%m-%d").strftime("%Y%m%d")
+        df_copy = df.replace(to_replace=row[date_col[0]], value=dt)
+
+    # Update the header
+    df_copy = df_copy.rename(columns={date_col[0]: "Date (YYYYmmdd)"})
+    return df_copy
+
+
+def convert_power_column(df: pd.DataFrame) -> pd.DataFrame:
+    """
+    Convert power entries to mW units.
+
+    Used for parsing csv files from thorlabs power meter.
+
+    :param df: pd.DataFrame, containing column e.g. "Power (W)"
+
+    :return: pd.DataFrame with column changed to "Power (mW)"
+    """
+    # Ensure there is only one "Power..." column and its unit enclosed by '('
+    cols = [x for x in df.columns if x.startswith("Power")]
+    if len(cols) != 1:
+        raise RuntimeError(
+            "Could not convert the power entries. "
+            f"Found following 'Power...' columns: {cols}"
+        )
+    if len(cols[0].split("(")) != 2:
+        raise RuntimeError(f"Power unit not enclosed by '()': Found {cols[0]}")
+    # Get the multiplication factor
+    power_factor = cols[0].split("(")[1].replace(")", "")
+    if power_factor == "mW":
+        return df
+    elif power_factor == "W":
+        power_factor = 1000
+    elif power_factor == "µW":
+        power_factor = 1 / 1000
+    elif power_factor == "nW":
+        power_factor = 1 / 1000000
+    else:
+        raise NotImplementedError(
+            f"Conversion of <{power_factor}> is not supported."
+        )
+
+    # Multiply values
+    df_copy = df.copy()
+    try:
+        df_copy[cols[0]] = round(
+            df[cols[0]].str.replace(",", ".", regex=False).astype(float)
+            * power_factor,
+            6,
+        )
+    except (ValueError, TypeError) as err:
+        raise RuntimeError(
+            "Could not convert the power measurements to numbers. "
+            f"Values =\n{df[cols[0]]}"
+        ) from err
+
+    # Update the header
+    df_copy = df_copy.rename(columns={cols[0]: "Power (mW)"})
+    return df_copy
 
 
 if __name__ == "__main__":
