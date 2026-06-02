@@ -100,7 +100,7 @@ def get_power_over_time_data(
     if line:
         df = df[df[df.columns[0]] == line]
 
-    # Select only a specifc percentage
+    # Select only a specific percentage
     if power_prct:
         df = df[df[df.columns[1]] == power_prct]
 
@@ -136,7 +136,7 @@ def filter_by_column_value(
     :param df: pd.DataFrame.
     :param column_name: str name of the column.
     :param value: str or float column entries to keeps rows.
-    :param drop_column: boolean, wether to keep the column or remove it.
+    :param drop_column: boolean, whether to keep the column or remove it.
 
     :return: pd.DataFrame (new)
     """
@@ -150,7 +150,7 @@ def filter_by_column_value(
 
 def get_light_source_kinds(df: pd.DataFrame) -> list:
     """
-    Check if the data frame columsn for Laser and LED contain values.
+    Check if the data frame columns for Laser and LED contain values.
 
     :param df: pd.DataFrame
 
@@ -200,7 +200,7 @@ def filter_by_nested_dict(
     Used to idientify the rows where to put data into a table.
     The nested_dict contains keys to idientify specific row values,
     e.g. "C1" and "FWHM-Y", and the last level of the nested dict
-    contains the value for entering into the talbe.
+    contains the value for entering into the table.
 
     The result is a dictionary with {index:value}.
     Indices are 0-based and excluding the header row.
@@ -276,12 +276,12 @@ def filter_by_date_range(
     :param df: pd.Dataframe
     :param min: str first date to include in format YYYYmmdd
     :param max: str last date to include in format YYYYmmdd
-    :param start_col: int, 0-based index of the frist date column
+    :param start_col: int, 0-based index of the first date column
 
     :return: filtered pd.DataFrame
     """
     date_headers = [d[:8] for d in df.columns[start_col:]]
-    # Create a list of date colums to be removed
+    # Create a list of date columns to be removed
     dates_to_remove = []
     try:
         min_ = int(min)
@@ -299,7 +299,7 @@ def filter_by_date_range(
             ) from err
         if d < min_ or d > max_:
             dates_to_remove.append(d)
-    # Remove the date colums
+    # Remove the date columns
     for date in dates_to_remove:
         cols_to_drop = [col for col in df.columns if col.startswith(str(date))]
         df = df.drop(columns=cols_to_drop)

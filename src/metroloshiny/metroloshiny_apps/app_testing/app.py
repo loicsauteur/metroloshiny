@@ -24,7 +24,7 @@ with ui.nav_panel(title="Data Upload"):
         with ui.sidebar():
             ui.input_select(
                 "category",
-                "Select a Metrology Categroy",
+                "Select a Metrology Category",
                 choices=["Test PSF", "Test Power"],
                 # selected="PSF",
             )
@@ -154,7 +154,7 @@ def identify_csv(path: str) -> tuple[str, int, Optional[int]]:
                     ) from err
 
     if delimiter is None or first_line is None:
-        raise RuntimeError("Could not parse the uplaoded csv file!")
+        raise RuntimeError("Could not parse the uploaded csv file!")
 
     # Correct the header position?? not sure why minus 2...
     return delimiter, first_line - 2, wavelength

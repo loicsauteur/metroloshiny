@@ -116,7 +116,7 @@ omero_4ch_multi_roi_full_kv = {
     "AVERAGE_FWHM_Y_All_ROIS_C4": 954.0,
     "AVERAGE_FWHM_Z_All_ROIS_C4": 1143.0,
     "ACQUISITION_DATE": "2026-04-24",
-    "MICROSCOPE": "mainteannceTest",
+    "MICROSCOPE": "maintenanceTest",
     "OBJECTIVE_MAGNIFICATION": "0x",
     "OBJECTIVE_NA": "0",
     "ACQUISITION_DATE_NUMBER": "20260424",
@@ -174,7 +174,7 @@ omero_2ch_multi_roi_full_kv = {
     "AVERAGE_FWHM_Y_All_ROIS_C2": 644.0,
     "AVERAGE_FWHM_Z_All_ROIS_C2": 860.0,
     "ACQUISITION_DATE": "2026-04-24",
-    "MICROSCOPE": "mainteannceTest",
+    "MICROSCOPE": "maintenanceTest",
     "OBJECTIVE_MAGNIFICATION": "0x",
     "OBJECTIVE_NA": "0",
     "ACQUISITION_DATE_NUMBER": "20260424",
@@ -226,13 +226,13 @@ omero_2ch_multi_roi_no_avg_kv = {
     "C2_FWHM_Axial_avg_ROI_0277-0354-0342": 369,
     "C2_FWHM_Z_ROI_0277-0354-0342": 848,
     "ACQUISITION_DATE": "2026-04-24",
-    "MICROSCOPE": "mainteannceTest",
+    "MICROSCOPE": "maintenanceTest",
     "OBJECTIVE_MAGNIFICATION": "0x",
     "OBJECTIVE_NA": "0",
     "ACQUISITION_DATE_NUMBER": "20260424",
 }
 
-omero_2ch_singl_roi_kv = {
+omero_2ch_single_roi_kv = {
     "C1_FWHM_Axial_X_ROI_0277-0168-0137": 0,
     "C1_FWHM_Axial_Y_ROI_0277-0168-0137": 762,
     "C1_FWHM_Axial_avg_ROI_0277-0168-0137": 381,
@@ -245,7 +245,7 @@ omero_2ch_singl_roi_kv = {
     "C2_FWHM_Axial_avg_ROI_0277-0168-0137": 744,
     "C2_FWHM_Z_ROI_0277-0168-0137": 981,
     "ACQUISITION_DATE": "2026-04-24",
-    "MICROSCOPE": "mainteannceTest",
+    "MICROSCOPE": "maintenanceTest",
     "OBJECTIVE_MAGNIFICATION": "0x",
     "OBJECTIVE_NA": "0",
     "ACQUISITION_DATE_NUMBER": "20260424",
@@ -256,7 +256,7 @@ omero_1ch_single_roi_kv = {
     "C1_FWHM_Axial_avg_ROI_1018-1080": 401,
     "C1_FWHM_Z_ROI_1018-1080": 1412,
     "ACQUISITION_DATE": "2026-02-13",
-    "MICROSCOPE": "mainteannceTest",
+    "MICROSCOPE": "maintenanceTest",
     "OBJECTIVE_MAGNIFICATION": "0x",
     "OBJECTIVE_NA": "0",
     "ACQUISITION_DATE_NUMBER": "20260213",
@@ -268,10 +268,10 @@ def test_psfdata():
     ch4_full = PSFData(omero_4ch_multi_roi_full_kv)
     ch2_full = PSFData(omero_2ch_multi_roi_full_kv)
     ch2_no_avg = PSFData(omero_2ch_multi_roi_no_avg_kv)
-    ch2_single = PSFData(omero_2ch_singl_roi_kv)
+    ch2_single = PSFData(omero_2ch_single_roi_kv)
     ch1_single = PSFData(omero_1ch_single_roi_kv)
 
-    # Check corrct number of channesl
+    # Check correct number of channesl
     assert ch4_full.n_channels == 4
     assert ch2_full.n_channels == 2
     assert ch2_no_avg.n_channels == 2

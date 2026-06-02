@@ -140,7 +140,7 @@ def test_filter_by_nested_dict():
         df_data_missing[k] = val
     df = pd.DataFrame().from_dict(df_data_missing)
     res = filter_by_nested_dict(df, nested_dict, ["Channel", "FWHM"])
-    # Assert that indicies -1 to -3 are present, but not -4
+    # Assert that indices -1 to -3 are present, but not -4
     assert -1 in list(res.keys())
     assert -2 in list(res.keys())
     assert -3 in list(res.keys())

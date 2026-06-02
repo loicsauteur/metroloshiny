@@ -20,7 +20,7 @@ repos:
     types: [python]
     pass_filenames: false
 
-  - id: ruff
+  - id: ruff-format
     name: ruff-format
     stages: [pre-commit, pre-push]
     language: system
@@ -28,7 +28,7 @@ repos:
     types: [python]
     pass_filenames: false
 
-  - id: ruff
+  - id: ruff-check
     name: ruff-check
     stages: [pre-commit, pre-push]
     language: system
@@ -42,6 +42,13 @@ repos:
     language: system
     entry: pixi run types
     types: [python]
+    pass_filenames: false
+
+  - id: typos
+    name: typos
+    stages: [pre-commit, pre-push]
+    language: system
+    entry: pixi run spell
     pass_filenames: false
 
   - id: pytest

@@ -97,7 +97,7 @@ with ui.nav_panel(title="Data Upload"):
         with ui.sidebar():
             ui.input_select(
                 "category",
-                "Select a Metrology Categroy",
+                "Select a Metrology Category",
                 choices=category_list,
                 # selected="PSF",
             )
@@ -240,7 +240,7 @@ with ui.nav_panel(title="Data Upload"):
                 def render_csv():
                     if input.category() != "Power":
                         # I dont manage to rest the input_file selection
-                        # Hence just rest the talbe.
+                        # Hence just rest the table.
                         return render.DataGrid(pd.DataFrame(), editable=False)
 
                     selected = input.csv_file_selector()
@@ -288,7 +288,7 @@ def check_new_microscope_entries():
             return False, None, None, None
         # Check entry is not the same as in choices
         for m in microscope_list.get():
-            # Remove special charactes an make it lower-case
+            # Remove special characters an make it lower-case
             list_entry = "".join(s.lower() for s in m if s.isalnum())
             text_entry = "".join(s.lower() for s in mic_name if s.isalnum())
             if list_entry == text_entry:
@@ -309,7 +309,7 @@ def check_new_microscope_entries():
             return False, None, None, None
         # Check entry is not the same as in choices
         for o in objective_list.get():
-            # Remove special charactes an make it lower-case
+            # Remove special characters an make it lower-case
             list_entry = "".join(s.lower() for s in o if s.isalnum())
             text_entry = "".join(s.lower() for s in obj_name if s.isalnum())
             if list_entry == text_entry:
@@ -330,7 +330,7 @@ def check_new_microscope_entries():
             return False, None, None, None
         # Check entry is not the same as in choices
         for i in info_list.get():
-            # Remove special charactes an make it lower-case
+            # Remove special characters an make it lower-case
             list_entry = "".join(s.lower() for s in i if s.isalnum())
             text_entry = "".join(s.lower() for s in info_name if s.isalnum())
             if list_entry == text_entry:
@@ -438,7 +438,7 @@ def check_channel_names_provided(df: pd.DataFrame) -> bool:
         else:
             ui.notification_show(
                 f"You entered channel names ({wrong_names}), which are unknown. "
-                f"Pleae use following ones: {df_ch_names}.",
+                f"Please use following ones: {df_ch_names}.",
                 type="error",
             )
         return False
@@ -449,10 +449,10 @@ def match_fwhm_channel_names(
     ori_df: pd.DataFrame, name_df: pd.DataFrame
 ) -> dict:
     """
-    Create a dict for upload by matchin entered names to OMERO channels.
+    Create a dict for upload by matching entered names to OMERO channels.
 
     :param ori_df: pd.DataFrame, of the OMERO FWHM key values
-        with columns: "Channel", "FWHM", "*Acquistion_date_number*"
+        with columns: "Channel", "FWHM", "*Acquisition_date_number*"
     :param name_df: pd.DataFrame, of the manually entered channel names.
         with columns: "Channel", "Enter channel name"
 
@@ -507,7 +507,7 @@ def identify_csv(path: str) -> tuple[str, int, Optional[int]]:
                     ) from err
 
     if delimiter is None or first_line is None or wavelength is None:
-        raise RuntimeError("Could not parse the uplaoded csv file!")
+        raise RuntimeError("Could not parse the uploaded csv file!")
 
     # Correct the header position?? not sure why minus 2...
     return delimiter, first_line - 2, wavelength
@@ -517,7 +517,7 @@ def check_power_prct_provided(df: pd.DataFrame, kind: str) -> bool:
     """
     Check if all power percentage values were provided.
 
-    Also checks if the percentage values match the exisiting
+    Also checks if the percentage values match the existing
     values in the google sheet.
 
     :param df: pd.DataFrame of the entered data
@@ -566,8 +566,8 @@ def check_power_prct_provided(df: pd.DataFrame, kind: str) -> bool:
     if len(bad_vals) > 0:
         ui.notification_show(
             "Entered [%] values does not match previously recoded values.\n"
-            f"You entered unknonw: {bad_vals}.\n"
-            f"Please match to exisiting values: {prct_avail}.",
+            f"You entered unknown: {bad_vals}.\n"
+            f"Please match to existing values: {prct_avail}.",
             type="error",
         )
         return False
@@ -680,7 +680,7 @@ def upload_power_data():
     # Prevent upload for working with local file    #######
     if sheet_reference.get() is None:
         ui.notification_show(
-            "Can't uplaod data when working with local file", type="error"
+            "Can't upload data when working with local file", type="error"
         )
         return
 
@@ -757,16 +757,16 @@ def upload_power_data():
 # OMERO upload      #######################################
 @reactive.effect
 @reactive.event(input.upload_omero_button)
-def uplaod_omero_data():
+def upload_omero_data():
     """
-    Peform checks then upload omero data.
+    Perform checks then upload omero data.
 
     FIXME: Currently for FWHM.
     """
     # Prevent upload for working with local file    #######
     if sheet_reference.get() is None:
         ui.notification_show(
-            "Can't uplaod data when working with local file", type="error"
+            "Can't upload data when working with local file", type="error"
         )
         return
 
@@ -779,7 +779,7 @@ def uplaod_omero_data():
     data = omero_data.data()
     ch_names = omero_channel_names.data_view()  # get the user modified df
     if data is None or data.empty:
-        ui.notification_show("No data for uplaod yet!", type="warning")
+        ui.notification_show("No data for upload yet!", type="warning")
         return
 
     # Check if all channel names were provided correctly ##
@@ -824,7 +824,7 @@ def update_patch_omero(
     *,
     patch,
 ):
-    """Allow only changing of the last column (OMERO channe name entry)."""
+    """Allow only changing of the last column (OMERO channel name entry)."""
     data = omero_channel_names.data()
     row = patch["row_index"]
     col = patch["column_index"]
@@ -885,7 +885,7 @@ def parse_omero_fwhm():
     psf_table = pd.DataFrame(
         psf_table, columns=["Channel", "FWHM", data.get_acquisition_date()]
     )
-    # Create tale for shift between channel entreis
+    # Create tale for shift between channel entries
     if len(data.get_shift_data()) != 0:
         shift_table_part = []
         for k, v in invert_nested_dict(data.get_shift_data()).items():

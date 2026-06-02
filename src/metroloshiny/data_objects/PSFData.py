@@ -65,7 +65,7 @@ class PSFData:
         It removes "wrong" values, if they are below 150 (nm).
 
         :param min_fwhm: int minimal fwhm value to beconiderd as "not wrong"
-        :param compare: bool, will compare to OMERO averge data and
+        :param compare: bool, will compare to OMERO average data and
             raise RuntimeWarnings if values are not the same.
         """
         # Check if there is multiple values to average
@@ -263,7 +263,7 @@ class PSFData:
         for k, v in self.data.items():
             if k == "ACQUISITION_DATE_NUMBER":
                 # Date usually in format = YYYYmmdd
-                # If date string is not of proper lenght
+                # If date string is not of proper length
                 if len(str(v)) != 8:
                     self.acquisition_date = None
                 else:

@@ -1,0 +1,27 @@
+# Exclude specific files from typos
+[files]
+extend-exclude = [
+  ".pixi",
+]
+ignore-hidden = true    # default
+ignore-files = true     # default
+ignore-dot = true       # default
+ignore-vcs = true       # default
+ignore-global = true    # default
+ignore-parent = true    # default
+
+[default]
+binary = false          # default
+check-filename = true   # default
+check-file = true       # default
+unicode = true          # default
+locale = "en"           # default
+extend-ignore-re = []   # default
+extend-ignore-identifiers-re = []   # default
+extend-ignore-words-re = []         # default
+
+[default.extend-words]
+# <typo> = "<correction>"
+
+[default.extend-identifiers]
+# <typo> = "<correction>"

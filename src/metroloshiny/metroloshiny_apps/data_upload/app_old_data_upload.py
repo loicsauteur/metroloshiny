@@ -73,7 +73,7 @@ kind_selector = ui.input_select("kind", "Select light source kind", choices=[])
 line_selector = ui.input_select("line", "Select a wavelength [nm]", choices=[])
 power_selector = ui.input_select("power", "Select power [%]", choices=[])
 
-# OMERO data retrive ui items       ------------------------------------------
+# OMERO data retrieve ui items       -----------------------------------------
 omero_type_selector = ui.input_select(
     "omero_type_selector",
     "Select OMERO type",
@@ -120,7 +120,7 @@ with ui.nav_panel(title="Data Upload"):
         with ui.sidebar():
             ui.input_select(
                 "category",
-                "Select a Metrology Categroy",
+                "Select a Metrology Category",
                 choices=category_list,
                 # selected="PSF",
             )
@@ -200,7 +200,7 @@ with ui.nav_panel(title="Data Upload"):
                         # No selection made (don't return anything)
                         return
                     else:
-                        # Not implmented combinations
+                        # Not implemented combinations
                         return f"Not implemented: {input.upload_type()} for {input.category()}"
 
                 # CSV specific stuff (for Power at objective)       ----------
@@ -270,10 +270,10 @@ with ui.nav_panel(title="Data Upload"):
                     if isinstance(data, str):
                         return data
 
-                    # Create subsequent ui items depending on the updload data type
+                    # Create subsequent ui items depending on the upload data type
                     if _metric == "FWHM":
                         ui_elements = list(
-                            update_confrim_psf_selection(data.get_fwhm_data())
+                            update_confirm_psf_selection(data.get_fwhm_data())
                         )
                         # Set the reactive value for the upload data
                         upload_data.set(data)
@@ -292,7 +292,7 @@ with ui.nav_panel(title="Data Upload"):
                 @reactive.event(
                     input.upload_psf_button, input.upload_type, input.category
                 )
-                def uplaod_psf():
+                def upload_psf():
                     """Upload data to the google sheet."""
                     # Button presses increase counter, if event triggers function
                     # the counter is not increased. Hence, returning empty string
@@ -310,7 +310,7 @@ with ui.nav_panel(title="Data Upload"):
 
                     upload_psf_btn_presses.set(input.upload_psf_button())
 
-                    # Checks before uplaod
+                    # Checks before upload
                     # No upload password
                     if input.upload_pwd() == "":
                         return "Error: Please provide the upload password!"
@@ -341,7 +341,7 @@ with ui.nav_panel(title="Data Upload"):
                     # Get the site
                     site = input.site()
 
-                    # Prevent uplaod for working with local file
+                    # Prevent upload for working with local file
                     if isinstance(g_spreadsheet, pd.DataFrame):
                         return "Prevented upload because working with local-dev-file!"
 
@@ -381,7 +381,7 @@ with ui.nav_panel(title="Data Upload"):
                     except Exception as err:
                         return "Error: " + str(err)
 
-                    return "Data upload sucess!"
+                    return "Data upload success!"
 
 
 # General functions     ------------------------------------------------------
@@ -419,19 +419,19 @@ def identify_csv(path: str) -> tuple[str, int, Optional[int]]:
                     ) from err
 
     if delimiter is None or first_line is None:
-        raise RuntimeError("Could not parse the uplaoded csv file!")
+        raise RuntimeError("Could not parse the uploaded csv file!")
 
     # Correct the header position?? not sure why minus 2...
     return delimiter, first_line - 2, wavelength
 
 
-def update_confrim_psf_selection(channel_dict: dict) -> tuple:
+def update_confirm_psf_selection(channel_dict: dict) -> tuple:
     """
     Update the PSF channel confirmation selection choices.
 
     Choices are updated based on the channel_dict keys
 
-    :param: channel_dict: dict as returned by the validte_omero_input function.
+    :param: channel_dict: dict as returned by the validate_omero_input function.
 
     :return: tuple of ui elements
     """
@@ -772,7 +772,7 @@ def test_add_name_field():
     #               "microscope", choices=microscope_choices.get()
     #          )
     # else:
-    #     # Make sure to remove it if an exisiting microscope is selected
+    #     # Make sure to remove it if an existing microscope is selected
     #     if is_input_select_in_list(card_selectors.get(), "new_mic_name"):
     #         card_selectors.get().pop(1)
     #         card_selectors.set(card_selectors.get())

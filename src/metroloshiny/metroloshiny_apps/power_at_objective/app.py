@@ -5,7 +5,6 @@ import seaborn as sns
 from shiny import reactive
 from shiny.express import input, render, ui
 
-# FIXME: rewrite the app??
 from metroloshiny.utils.dataframe_utils import (
     filter_by_column_value,
     filter_by_date_range,
@@ -21,6 +20,9 @@ from metroloshiny.utils.read_file import (
     get_sheet,
     load_doc,
 )
+
+# FIXME: rewrite the app??
+# FIXME: AttributeError: 'NoneType' object has no attribute 'set_bbox_to_anchor', e.g. > app.py, line 643
 
 # Load Data
 use_dev_local_file = False
@@ -259,7 +261,7 @@ with ui.navset_pill(id="tab"):
                 # Drop all date columns with only NaN values
                 df_filtered = df_filtered.iloc[:, 2:].dropna(axis=1, how="all")
             else:
-                # df constains still both slight source columns
+                # df contains still both light source columns
                 df_filtered = df_filtered.iloc[:, 3:].dropna(axis=1, how="all")
             dates.set(list(df_filtered.columns))
             # Update the ui selection
@@ -306,7 +308,7 @@ with ui.navset_pill(id="tab"):
                 # Drop all date columns with only NaN values
                 df_filtered = df_filtered.iloc[:, 2:].dropna(axis=1, how="all")
             else:
-                # df constains still both slight source columns
+                # df contains still both light source columns
                 df_filtered = df_filtered.iloc[:, 3:].dropna(axis=1, how="all")
             # Parse the dates
             d = parse_dates(list(df_filtered.columns))
@@ -410,7 +412,7 @@ with ui.navset_pill(id="tab"):
                         #           drop_column=False
                         #    )
 
-                        # Remove measurment columns except the need one...
+                        # Remove measurement columns except the need one...
                         if (
                             input.kind() is not None
                             and input.date() is not None
@@ -450,7 +452,7 @@ with ui.navset_pill(id="tab"):
                         # Work on a copy of the table, otherwise
                         #   the reactive value is changed
                         table = table.copy()
-                        # Merge the frist two columns
+                        # Merge the first two columns
                         table["Line [nm] @ [%]"] = (
                             table[table.columns[0]].astype(int).astype(str)
                             + " @ "
@@ -631,7 +633,7 @@ with ui.navset_pill(id="tab"):
                                 x="Date",
                                 y="mW",
                                 markers=True,
-                                style=table.columns[1],  # enusure markers
+                                style=table.columns[1],  # ensure markers
                                 dashes=False,  # keep sloid lines
                                 hue=table.columns[1],  # group by "Line"
                                 palette="turbo",

@@ -41,7 +41,7 @@ def omero_operation(
     :param path_private_data: str path to private_data.csv.
                 If None takes default path "./data/private_data.csv"
 
-    :return: dict with data, with keys (contining the metric string),
+    :return: dict with data, with keys (containing the metric string),
         or None if no matches were found.
     """
     # Get the connection details from file
@@ -61,7 +61,7 @@ def omero_operation(
         kv_pairs, tables = get_tables_and_kv_paris(
             conn=conn, datatype=omero_type, id=omero_id
         )
-        # Get the kv_pari or OMERO.table containing the metric of interst
+        # Get the kv_pari or OMERO.table containing the metric of interest
         data_dict = find_metrics(
             conn=conn,
             datatype=omero_type,
@@ -322,7 +322,7 @@ def find_omero_table(conn: BlitzGateway):
     """
     Test function.
 
-    Deprectaed!
+    Deprecated!
     """
     image = conn.getObject("Image", 2861227)
     # image = conn.getObject("Dataset", 79006)
@@ -366,7 +366,7 @@ def render_dict(d: dict):
     """
     Print a dictionary for CLI viewing.
 
-    Deprectaed!
+    Deprecated!
     """
     if d is None:
         print("--not a dictionary--")

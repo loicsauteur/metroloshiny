@@ -25,7 +25,7 @@ __gspread_headers__ = {
     "Power [%]": 7,  # Power
 }
 
-# Google spreadsheet headers matched to column alphapet
+# Google spreadsheet headers matched to column alphabet
 __gspread_h2a__ = {
     "Site": "A",
     "Microscope": "B",
@@ -42,7 +42,7 @@ __gspread_h2a__ = {
 def identify_entry_coords(
     df: pd.DataFrame,
     microscope: str,
-    objctive: str,
+    objective: str,
     info: str,
     date: Optional[str] = None,
     channel: Optional[str] = None,
@@ -55,7 +55,7 @@ def identify_entry_coords(
     Get worksheet coordinates for entering data.
 
     :param microscope: str
-    :param objctive: str
+    :param objective: str
     :param info: str
     :param date: Optional[str] in YYYYmmdd,
     :param channel: Optional[str] for PSF sheet
@@ -77,10 +77,10 @@ def identify_entry_coords(
     # Pre-check for line & power
     if (line is None) != (line_header is None) != (power is None):
         raise RuntimeError(
-            "The line_hader, line(-item) and power must be specified!"
+            "The line_header, line(-item) and power must be specified!"
         )
 
-    # Sanity checks, make sure optional perameter's columns exist
+    # Sanity checks, make sure optional parameter's columns exist
     if channel is not None and "Channel" not in headers:
         raise RuntimeError(
             "Expected a Channel column in sheet but there was not."
@@ -122,7 +122,7 @@ def identify_entry_coords(
         return n_total_rows + 2, col_target, True
 
     # Get a list of indices where the objective matches     ------------------
-    _rows = df.index[df["Objective"] == objctive].tolist()
+    _rows = df.index[df["Objective"] == objective].tolist()
     rows = list(
         set(rows) & set(_rows)
     )  # Get the intersection of the two lists
@@ -198,7 +198,7 @@ def make_sheet_entry(
     value: Union[float, str],
     site: str,
     microscope: str,
-    objctive: str,
+    objective: str,
     info: str,
     date: Optional[str] = None,
     channel: Optional[str] = None,
@@ -217,7 +217,7 @@ def make_sheet_entry(
 
     :param site: str
     :param microscope: str
-    :param objctive: str
+    :param objective: str
     :param info: str
     :param date: Optional[str] in YYYYmmdd,
     :param channel: Optional[str] for PSF sheet
@@ -227,9 +227,9 @@ def make_sheet_entry(
     :param power: Optional[str] for power sheet
     FIXME: more sheets = more parameters
 
-    :return: str = f"Sucessfully entered <{value}> into cell: {cur_cell_address}"
+    :return: str = f"Successfully entered <{value}> into cell: {cur_cell_address}"
     """
-    # Define the cell formating for updated cells
+    # Define the cell formatting for updated cells
     updated_date_cell_format = {
         "backgroundColor": {"red": 1.0, "green": 1.0, "blue": 0.0},
         "horizontalAlignment": "RIGHT",
@@ -253,7 +253,7 @@ def make_sheet_entry(
     row, col, end_of_sheet = identify_entry_coords(
         df=df,
         microscope=microscope,
-        objctive=objctive,
+        objective=objective,
         info=info,
         date=date,
         channel=channel,
@@ -308,7 +308,7 @@ def make_sheet_entry(
         # Enter the common row entries
         constant_range = f"A{row}:D{row}"
         sheet.update(
-            values=[[site, microscope, objctive, info]],
+            values=[[site, microscope, objective, info]],
             range_name=constant_range,
         )
         sheet.format(ranges=constant_range, format=updated_cell_format)
@@ -358,7 +358,7 @@ def make_sheet_entry(
             value=value,
             format=updated_cell_format,
         )
-    return f"Sucessfully entered <{value}> into cell: {cur_cell_address}"
+    return f"Successfully entered <{value}> into cell: {cur_cell_address}"
 
 
 def update_value_format(
@@ -373,7 +373,7 @@ def update_value_format(
     :param sheet: gspread Worksheet
     :param label: A1 notation for the gspread cell, e.g. A1 (no ranges)
     :param value: Value to enter
-    :param format: dict for the cell foramt
+    :param format: dict for the cell format
     """
     sheet.update_acell(label=label, value=value)
     sheet.format(ranges=label, format=format)
@@ -387,6 +387,6 @@ if __name__ == "__main__":
     # df = ensure_numeric_data(df, first_column=4) # 4 for power, 6 for psf
 
     # make_sheet_entry(
-    #     sheet=sheet, value=123.4, site="Hebelstrasse", microscope="BSL2", objctive="11x/0.3", info="fake"
+    #     sheet=sheet, value=123.4, site="Hebelstrasse", microscope="BSL2", objective="11x/0.3", info="fake"
     # )
     pass

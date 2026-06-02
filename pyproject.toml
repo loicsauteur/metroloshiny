@@ -25,9 +25,10 @@ dev = { features = ["dev"], solve-group = "default"}
 fmt = { cmd="ruff format ." }
 lint = { cmd="ruff check . --fix" }
 types = { cmd="ty check ." }
-black = { cmd="black ."}
+black = { cmd="black ." }
+spell = { cmd="typos ." }
 test = { cmd="pytest" }
-all = { depends-on = ["fmt", "lint", "types", "black", "test"] }
+all = { depends-on = ["fmt", "lint", "types", "black", "spell", "test"] }
 
 [tool.pixi.feature.dev.dependencies]
 pytest = ">=8.3"
@@ -35,6 +36,7 @@ pytest-cov = ">=6.0"
 ruff = ">=0.11"
 pre-commit = ">=4.2"
 black = ">=26.3.1,<27"
+typos = ">=1.47, <2"
 
 [tool.pixi.feature.dev.pypi-dependencies]
 ty = "*"

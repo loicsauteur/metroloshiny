@@ -171,14 +171,14 @@ def get_private_data(key: str, data_path: Optional[str] = None) -> str:
 
 def load_doc(
     gsheet_url: Optional[str] = None,
-    path_servce_account: Optional[str] = None,
+    path_service_account: Optional[str] = None,
     data_path: Optional[str] = None,
     dev_local_file: bool = False,
 ) -> Optional[gspread.Spreadsheet]:
     """
     Get the google spreadsheet document.
 
-    Nees a service account, see here: https://docs.gspread.org/en/latest/oauth2.html#for-bots-using-service-account
+    Needs a service account, see here: https://docs.gspread.org/en/latest/oauth2.html#for-bots-using-service-account
 
     :param gsheet_url: optional, str url to the google sheet.
         Default = None -> gets the url from private data.
@@ -194,14 +194,14 @@ def load_doc(
     """
     if dev_local_file:
         return None
-    if path_servce_account == "":
+    if path_service_account == "":
         gc = gspread.service_account()
-    elif path_servce_account is None:
+    elif path_service_account is None:
         gc = gspread.service_account(
             get_private_data("PathToServiceAccountJSON", data_path=data_path)
         )
     else:
-        gc = gspread.service_account(path_servce_account)
+        gc = gspread.service_account(path_service_account)
 
     if gsheet_url is None:
         gsheet_url = get_private_data("Sheet URL", data_path=data_path)
@@ -221,7 +221,7 @@ def get_sheet(
 
     :return: gspread.Worksheet, pd.DataFrame
     """
-    # Check if the kind is implmented
+    # Check if the kind is implemented
     if kind not in __sheet_names__.keys():
         raise NotImplementedError(f"{kind} is not implemented.")
     # Get the data from the excel sheet
@@ -254,8 +254,8 @@ def load_gspread(
     """
     Load a worksheet from a google sheet document.
 
-    Nees a service account, see here: https://docs.gspread.org/en/latest/oauth2.html#for-bots-using-service-account
-    Optionally, allows getting the full document instad of just a sheet.
+    Needs a service account, see here: https://docs.gspread.org/en/latest/oauth2.html#for-bots-using-service-account
+    Optionally, allows getting the full document instead of just a sheet.
 
     :param gsheet_url: str url to the google sheet.
     :param sheet_name: str name of the google worksheet to load.
@@ -334,7 +334,7 @@ def get_laser_power_objective_data(
             pd.read_excel("./data/metroloshiny_data.xlsx")
         )
 
-    # Load laod google sheet with laser power at objective data
+    # Load google sheet with laser power at objective data
     url = get_private_data("Sheet URL", data_path=data_path)
     path_sa = get_private_data("PathToServiceAccountJSON", data_path=data_path)
     sheet = load_gspread(

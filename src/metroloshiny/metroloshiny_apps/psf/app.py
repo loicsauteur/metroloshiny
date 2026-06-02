@@ -16,13 +16,15 @@ from metroloshiny.utils.dataframe_utils import (
 )
 from metroloshiny.utils.read_file import get_sheet, load_doc
 
+# FIXME: AttributeError: 'NoneType' object has no attribute 'set_bbox_to_anchor' (e.g. > app.py, line 182)
+
 # Load Data
 use_dev_local_file = False
 sheet_doc = load_doc(dev_local_file=use_dev_local_file)
 wsheet_psf, df = get_sheet(sheet_doc, "PSF", dev_local_file=use_dev_local_file)
 
 # Global variable       ------------------------------------------------------
-psf_max_val = df[df.columns[6:]].max().max()  # highes PSF value in dataframe
+psf_max_val = df[df.columns[6:]].max().max()  # highest PSF value in dataframe
 
 # Reactive & general variables      ------------------------------------------
 sites = np.unique(np.asarray(df["Site"]))

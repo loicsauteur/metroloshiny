@@ -31,7 +31,7 @@ __gspread_headers__ = {
     "Power [%]": 7,  # Power
 }
 
-# Google spreadsheet headers matched to column alphapet
+# Google spreadsheet headers matched to column alphabet
 __gspread_h2a__ = {
     "Site": "A",
     "Microscope": "B",
@@ -77,7 +77,7 @@ def make_sheet_entries(
 
     Marks the cells with a yellow background.
     Inputs are handled on the metrology data kind.
-    Any (but not multiple) fo the data parameres must be provided, i.e.
+    Any (but not multiple) of the data parameres must be provided, i.e.
     fwhm_data or power_data or ... FIXME more to come
 
     :param sheet: gs.Worksheet
@@ -172,10 +172,10 @@ def make_sheet_entries(
     # Get a dict {df-row-index : value}
     entry_dict = filter_by_nested_dict(_df, data_to_use, data_headers)
     indices = list(entry_dict.keys())
-    # All indicies are negative: all entries to the end of the sheet
+    # All indices are negative: all entries to the end of the sheet
     if all(val < 0 for val in indices):
         new_entry = True
-    # All indicies are positvie: entries go to exisiting rows
+    # All indices are positvie: entries go to existing rows
     elif all(val >= 0 for val in indices):
         # Create the sorted address (offset row to 1-based index + header row)
         rows = list(entry_dict.keys())
@@ -184,9 +184,9 @@ def make_sheet_entries(
             address_dict[f"{col}{row + 2}"] = entry_dict.get(row)
     else:
         # Get a list of the missing entries
-        inverded_dict = invert_nested_dict(data_to_use)
+        inverted_dict = invert_nested_dict(data_to_use)
         missing_entries = [
-            inverded_dict[k]
+            inverted_dict[k]
             for k in [entry_dict.get(i) for i in indices if i < 0]
         ]
         # print("missing entries:", missing_entries)
@@ -200,9 +200,9 @@ def make_sheet_entries(
         )
 
     # Adding entries            ----------------------------------------------
-    # Add entries to the exisiting rows
+    # Add entries to the existing rows
     if not new_entry:
-        # Check if the addresses are continous
+        # Check if the addresses are continuous
         if not check_if_sequence(address_dict.keys()):
             raise NotImplementedError(
                 "Values to be written are not continuous. "
@@ -238,14 +238,14 @@ def make_sheet_entries(
         value_block = []  # Block for the values in the date column
         for value, path in inverted_dict.items():
             new_line = [site, microscope, objective, info]
-            # To add empty colums, not the index based on path entries
+            # To add empty columns, not the index based on path entries
             empty_col = []
             if line_header is not None:
                 if line_header == "Laser Line [nm]":
                     # To add empty column after the first entry
                     empty_col.append(1)
                 else:
-                    # To add empty colum before the frist entry
+                    # To add empty column before the first entry
                     empty_col.append(0)
 
             # Append further column entries (e.g. 'DAPI', 'FWHM-X')
@@ -314,5 +314,5 @@ if __name__ == "__main__":
     # # df = ensure_numeric_data(df, first_column=4) # 4 for power, 6 for psf
 
     # # make_sheet_entry(
-    # #     sheet=sheet, value=123.4, site="Hebelstrasse", microscope="BSL2", objctive="11x/0.3", info="fake"
+    # #     sheet=sheet, value=123.4, site="Hebelstrasse", microscope="BSL2", objective="11x/0.3", info="fake"
     # # )

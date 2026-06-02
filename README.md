@@ -32,7 +32,7 @@ An example can be found in `example_files/metroloshiny_data_example.xlsx`. I.e. 
 
 Make sure that all sheets already contain at least one entry.
 
-The frist sheet entry for a new "site" should be done manually within the sheet.
+The first sheet entry for a new "site" should be done manually within the sheet.
 
 ## Google service account
 
@@ -42,8 +42,8 @@ Follow these steps:
 
 **Enable API and services in google:**
 
-1. Create a project or select exisiting one in [Google Developers Console](https://console.developers.google.com/)
-2. In **Search for APIs and Servies** search and enable:
+1. Create a project or select existing one in [Google Developers Console](https://console.developers.google.com/)
+2. In **Search for APIs and Services** search and enable:
    - **Google Drive API**
    - **Google Sheets API**
 
@@ -138,7 +138,7 @@ If all goes well, you should see a welcome page on http://hostname:3838/
 If the link is not accessible from outside, the port may not be open. Follow the next paragraph.
 
 ## Opening the port
-If the Shiny Server is not accesible on: http://xx.xx.xx.xx:3838
+If the Shiny Server is not accessible on: http://xx.xx.xx.xx:3838
 
 You may have to open the port  on the linux server, i.e. allow the port with:
 
@@ -217,7 +217,7 @@ The file should be located as follows:
 - Sheet URL: URL to the google sheet
 - Upload password: A password you define, used for uploading data from the metroloshiny app to your google sheet
 
-OMERO entries are optional, in case you want to retrive data saved on OMERO.
+OMERO entries are optional, in case you want to retrieve data saved on OMERO.
 
 - OMERO HOST: OMERO web-address
 - OMERO PORT: OMERO port
@@ -256,7 +256,7 @@ E.g. copy the one of the metroloshiny apps to the `/srv/shiny-server`:
 
 `cp -R /path/to/metroloshiny/power_at_objective /srv/shiny-server/power_at_objective/`
 
-**In case the destination exisits already, remove that folder before copying the new version**
+**In case the destination exists already, remove that folder before copying the new version**
 
 e.g.: `sudo rm -r /srv/shiny-server/power_at_objective/`
 
@@ -279,6 +279,6 @@ In case you changed the dependencies, update also your python environment:
 `pixi install`
 
 <!--
-On the server I have the problem that the pixi lock made chagnes and I can thus not pull new commits...
-`git resotre pixi.lock`
+On the server I have the problem that the pixi lock made changes and I can thus not pull new commits...
+`git restore pixi.lock`
 -->

@@ -179,7 +179,7 @@ def theo_fwhm_quarep(ex: int, na: float, ri: float) -> tuple[float, float]:
 
 def get_today() -> str:
     """
-    Get today's date in formate YYYYMMDD.
+    Get today's date in format YYYYMMDD.
 
     :return: str
     """
@@ -208,7 +208,7 @@ def check_duplicate_dict_values(
     for k, v in d.items():
         if v != exclude:
             groups[v].append(k)
-    # Return key & value for first item that has mulitple values
+    # Return key & value for first item that has multiple values
     for k, v in groups.items():
         if len(v) > 1:
             return {k: v}
@@ -223,7 +223,7 @@ def invert_nested_dict(nested_dict: dict) -> dict:
             "C1" : {'FWHM-X': 911.0, 'FWHM-Y': 852.0, 'FWHM-Z': 1260.0}
         }
 
-    :raises KeyError if the final value happens to occure more than once.
+    :raises KeyError if the final value happens to occur more than once.
 
     :return: dict e.g. {
             911.0:  ['C1', 'FWHM-X']
@@ -242,7 +242,7 @@ def invert_nested_dict(nested_dict: dict) -> dict:
             if current in inverted.keys():
                 raise KeyError(
                     "Failed to invert the nested dict, because the value "
-                    f"{current} happens to occure multiple times..."
+                    f"{current} happens to occur multiple times..."
                 )
             inverted[current].append(path)
 
@@ -256,7 +256,7 @@ def invert_nested_dict(nested_dict: dict) -> dict:
 
 def check_if_sequence(seq: list[str]) -> bool:
     """
-    Check if a list of strings of cell addresses is continous.
+    Check if a list of strings of cell addresses is continuous.
 
     True for: [A1, A2, B3, ...]
     False for [A1, A3, B4, ...]
@@ -278,7 +278,7 @@ def check_if_sequence(seq: list[str]) -> bool:
             i = i + 1
         s = "".join(s)
         numbers.append(s)
-    # Check if the sequence is continous
+    # Check if the sequence is continuous
     for i in range(1, len(numbers)):
         try:
             cur = int(numbers[i])
@@ -289,7 +289,7 @@ def check_if_sequence(seq: list[str]) -> bool:
             raise ValueError(
                 f"Could not parse <{numbers[i]}> or "
                 f"<{numbers[i - 1]}> to integer for "
-                "checking if cell addresses are continous."
+                "checking if cell addresses are continuous."
             ) from err
     return True
 
