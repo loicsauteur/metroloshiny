@@ -67,9 +67,8 @@ def make_sheet_entries(
     date: Optional[str] = None,
     fwhm_data: Optional[dict] = None,
     power_data: Optional[Any] = None,  # FIXME to be defined & implemented
-    # channel: Optional[str] = None, # FIXME currently unused
-    # fwhm: Optional[str] = None, # FIXME currently unused
     line_header: Optional[str] = None,  # FIXME currently unused
+    # FIXME unused below
     line: Optional[str] = None,  # FIXME currently unused
     power: Optional[str] = None,  # FIXME currently unused
 ):
@@ -90,6 +89,10 @@ def make_sheet_entries(
     :param fwhm_data: Optional[dict[dict]], FWHM data to be entered, e.g.:
         {"DAPI" : {'FWHM-X': 911.0, 'FWHM-Y': 852.0, 'FWHM-Z': 1260.0}, ... }
     :param power_data: Optional[Any] = None,  # FIXME to be defined
+        {647: {5: 1.5, 10: 3.1, 50: 15.6}, ... } or in words:
+        {wavelength: {power: mW, ... }, ... }
+    :param line_header: str, column header for the light source kind.
+        Can be either: "Laser Line [nm]" or "LED Line [nm]"
 
     :return: no return
     """
@@ -123,18 +126,26 @@ def make_sheet_entries(
                     )
         # Convert the sheet to pandas
         df = pd.DataFrame(sheet.get_all_records())
+        # see read_file > get_sheet
         df = ensure_numeric_data(df, first_column=6)
         # List the column headers for identifying the sheet rows
         data_headers = ["Channel", "FWHM"]
         data_to_use = fwhm_data
 
-    # TODO same check for other data dicts
+    # Check power data
     if power_data is not None:
         data_to_use = power_data
-        data_headers = ["Line x", "Power"]  # FIXME to be done
-        raise NotImplementedError(
-            "Data upload for Power measurements not yet implemented!"
-        )
+        df = pd.DataFrame(sheet.get_all_records())
+        # see read_file > get_sheet
+        df = ensure_numeric_data(df, first_column=4)
+        if line_header not in ["Laser Line [nm]", "LED Line [nm]"]:
+            raise KeyError(
+                "The 'line_header' must be: 'Laser Line [nm]' or "
+                f"'LED Line [nm]'. <{line_header}> is not supported!"
+            )
+        data_headers = [line_header, "Power [%]"]
+
+    # TODO same check for other data dicts FIXME
 
     # Identify column & the cell address for the date   ----------------------
     headers = [str(x) for x in df.columns]
@@ -142,7 +153,9 @@ def make_sheet_entries(
         col = len(df.columns) + 1
     else:
         col = headers.index(date) + 1
-
+    # Add a new column if necessary
+    if sheet.column_count < col:
+        sheet.add_cols(cols=1)
     date_cell = sheet.cell(row=1, col=col)
     col = date_cell.address.replace(str(1), "")
 
@@ -181,8 +194,8 @@ def make_sheet_entries(
         # msg = msg + "\n- ".join([" -> ".join(x) for x in missing_entries])
         raise RuntimeError(
             "The sheet does not seem to be ordered properly (alphabetically):"
-            " some row entries exisit while others don't.\nThis requires "
-            "manual addition of the missing rows into the the google sheet.\n"
+            " some row entries exist while others don't.\nThis requires "
+            "manual addition of the missing rows into the google sheet.\n"
             f"\n{missing_entries}"
         )
 
@@ -220,28 +233,34 @@ def make_sheet_entries(
 
     # Create new entries at the bottom of the sheet
     else:
-        inverted_dict = invert_nested_dict(
-            # Ensure the dictionary is sorted
-            # {
-            #     k: v
-            #     for k, v in sorted(
-            #         data_to_use.items(), key=lambda item: item[0]
-            #     )
-            # }
-            # FIXME: not tested if the  version blow works as the one above
-            dict(sorted(data_to_use))
-        )
+        inverted_dict = invert_nested_dict(dict(sorted(data_to_use.items())))
         new_block = []  # Block for the first columns
         value_block = []  # Block for the values in the date column
         for value, path in inverted_dict.items():
             new_line = [site, microscope, objective, info]
+            # To add empty colums, not the index based on path entries
+            empty_col = []
+            if line_header is not None:
+                if line_header == "Laser Line [nm]":
+                    # To add empty column after the first entry
+                    empty_col.append(1)
+                else:
+                    # To add empty colum before the frist entry
+                    empty_col.append(0)
+
             # Append further column entries (e.g. 'DAPI', 'FWHM-X')
-            for p in path:
+            for path_count, p in enumerate(path):
+                # Insert empty columns
+                if path_count in empty_col:
+                    new_line.append("")
                 new_line.append(p)
             new_block.append(new_line)
             value_block.append([value])
         start_row = len(df) + 2
         end_row = start_row + len(inverted_dict) - 1
+        # Add additional rows if necessary # TODO not checked...
+        if sheet.row_count < end_row:
+            sheet.add_rows(rows=end_row - sheet.row_count)
         # Get column letter of the last column
         last_col_letter = chr(ord("@") + len(new_block[0]))
         # Write the common info block

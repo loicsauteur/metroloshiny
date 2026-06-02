@@ -195,7 +195,7 @@ def filter_by_nested_dict(
     df: pd.DataFrame, nested_dict: dict, headers: list[str]
 ) -> dict:
     """
-    Get indexes of the dataframe for values in a nested_dict.
+    Get indices of the dataframe for values in a nested_dict.
 
     Used to idientify the rows where to put data into a table.
     The nested_dict contains keys to idientify specific row values,
@@ -215,6 +215,7 @@ def filter_by_nested_dict(
         the nested_dict keys.
 
     :return: dict {pd.DataFrame index : value of nested_dict}
+        sorted by index value
     """
     # Enuser there is no duplicate entries
     try:
@@ -226,7 +227,7 @@ def filter_by_nested_dict(
             )
     except KeyError as err:
         raise KeyError(
-            f"Selected headers do not matcht the table headers: {err}"
+            f"Selected headers do not match the table headers: {err}"
         ) from err
 
     # Create invered nested dict = {value: path of keys}
@@ -258,11 +259,12 @@ def filter_by_nested_dict(
             result[neg_idx] = value
         elif len(index_list) > 1:
             raise RuntimeError(
-                f"I expected here a dataframe with only one entry but got:\n{_df}"
+                f"Expected here a dataframe with only one entry but got:\n{_df}"
             )
         else:
             result[index_list[0]] = value
-    return result
+    # Return the sorted dictionary
+    return dict(sorted(result.items()))
 
 
 def filter_by_date_range(
@@ -310,7 +312,8 @@ def convert_date_column(df: pd.DataFrame) -> pd.DataFrame:
 
     Used for parsing csv files from thorlabs power meter.
 
-    :param df: pd.DataFrame, containing column e.g. "Date (MM/dd/yyyy)"
+    :param df: pd.DataFrame, containing column e.g. "Date (MM/dd/yyyy)",
+        i.e. column that starts with "Date"
 
     :return: pd.DataFrame with column changed to "Date (YYYYmmdd)"
     """
@@ -370,7 +373,8 @@ def convert_power_column(df: pd.DataFrame) -> pd.DataFrame:
 
     Used for parsing csv files from thorlabs power meter.
 
-    :param df: pd.DataFrame, containing column e.g. "Power (W)"
+    :param df: pd.DataFrame, containing column e.g. "Power (W)",
+        i.e. column tat stats with "Power"
 
     :return: pd.DataFrame with column changed to "Power (mW)"
     """

@@ -1,7 +1,7 @@
 """Utils for common usage."""
 
 import datetime
-from collections import defaultdict
+from collections import Counter, defaultdict
 from typing import Optional
 
 from bs4 import BeautifulSoup
@@ -292,6 +292,18 @@ def check_if_sequence(seq: list[str]) -> bool:
                 "checking if cell addresses are continous."
             ) from err
     return True
+
+
+def list_duplicates(arr: list) -> list:
+    """
+    Get a list of duplicate items within a list.
+
+    :param arr: list, of values
+
+    :return: list, of duplicate values (may be empty)
+    """
+    dup = [i for i, count in Counter(arr).items() if count > 1]
+    return dup
 
 
 if __name__ == "__main__":

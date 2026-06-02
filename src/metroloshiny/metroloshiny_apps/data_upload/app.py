@@ -1,3 +1,4 @@
+import math
 from typing import TYPE_CHECKING, Optional
 
 import numpy as np
@@ -12,6 +13,7 @@ from metroloshiny.data_objects.PSFData import PSFData
 from metroloshiny.utils.common_utils import (
     check_duplicate_dict_values,
     invert_nested_dict,
+    list_duplicates,
 )
 from metroloshiny.utils.dataframe_utils import (
     convert_date_column,
@@ -30,6 +32,8 @@ from metroloshiny.utils.write_gspread import make_sheet_entries
 use_dev_local_file = False
 sheet_doc = load_doc(dev_local_file=use_dev_local_file)
 # wsheet_psf, df = get_sheet(sheet_doc, "PSF", dev_local_file=use_dev_local_file)
+
+# FIXME: write test for the apps? how to mock?
 
 # Reactive values       ------------------------------------------------------
 sheet_reference = reactive.value(None)
@@ -63,7 +67,7 @@ omero_type_selector = ui.input_select(
     selected="Image",
 )
 omero_id_selector = ui.input_text(
-    "omero_id_selector", "OMERO ID", "Enter OMERO ID...2861227 or 2832822"
+    "omero_id_selector", "OMERO ID", "Enter OMERO ID..."
 )
 check_omero_data = ui.input_action_button("check_omero_data", "Check OMERO")
 upload_omero_button = ui.input_action_button(
@@ -198,6 +202,8 @@ with ui.nav_panel(title="Data Upload"):
 
             # Upload from CSV       ------------------------------------------
             with ui.nav_panel(title="Upload from CSV"):
+                # Wavelength value to be used for upload
+                upload_lambda = reactive.value(None)
 
                 @render.ui
                 @reactive.event(input.category)
@@ -208,6 +214,7 @@ with ui.nav_panel(title="Data Upload"):
                             f"{input.category()} upload from CSV not implemented!",
                             type="warning",
                         )
+                        upload_lambda.set(None)
                         return f"{input.category()} upload from CSV not implemented!"
                     # It seems impossible to reset the selected file (even if dialog does not show it)
                     return csv_file_selector, csv_light_selector
@@ -271,6 +278,7 @@ def check_new_microscope_entries():
     obj_name = input.new_obj_name()
     info_name = input.new_info_name()
 
+    # Check if text was entered if new entry selected
     if mic.startswith("*"):
         # Check if text was entered
         if mic_name.startswith("Enter"):
@@ -336,19 +344,23 @@ def check_new_microscope_entries():
         info = input.new_info_name()
 
     # Check if text was entered, but drop down was not set
-    if not mic_name.startswith("Enter") and not mic.startswith("*"):
+    if not mic_name.startswith("Enter") and not input.microscope().startswith(
+        "*"
+    ):
         ui.notification_show(
             "You entered a name for the microscope but forgot to select a new entry from the drop-down choices.",
             type="warning",
         )
         return False, None, None, None
-    if not obj_name.startswith("Enter") and not obj.startswith("*"):
+    if not obj_name.startswith("Enter") and not input.objective().startswith(
+        "*"
+    ):
         ui.notification_show(
             "You entered a name for the objective but forgot to select a new entry from the drop-down choices.",
             type="warning",
         )
         return False, None, None, None
-    if not info_name.startswith("Enter") and not info.startswith("*"):
+    if not info_name.startswith("Enter") and not input.info().startswith("*"):
         ui.notification_show(
             "You entered a info but forgot to select a new entry from the drop-down choices.",
             type="warning",
@@ -400,14 +412,13 @@ def check_channel_names_provided(df: pd.DataFrame) -> bool:
         return False
 
     # Check with the data table itself      #########################
-    # Filter the DF
-    df = dataframe.get().copy()
+    g_df = dataframe.get().copy()
     # Filter dataframe
-    df = filter_by_column_value(df, "Site", input.site())
-    df = filter_by_column_value(df, "Microscope", input.microscope())
-    df = filter_by_column_value(df, "Objective", input.objective())
+    g_df = filter_by_column_value(g_df, "Site", input.site())
+    g_df = filter_by_column_value(g_df, "Microscope", input.microscope())
+    g_df = filter_by_column_value(g_df, "Objective", input.objective())
     # Get the unique channel names
-    df_ch_names = list(np.unique(np.asarray(df["Channel"])))
+    df_ch_names = list(np.unique(np.asarray(g_df["Channel"])))
     # No df ch names = new entry
     if len(df_ch_names) == 0:
         return True
@@ -449,7 +460,6 @@ def match_fwhm_channel_names(
         {"DAPI" : {'FWHM-X': 911.0, 'FWHM-Y': 852.0, 'FWHM-Z': 1260.0}, ... }
     """
     result_dict = {}
-    # should be: {"DAPI" : {'FWHM-X': 911.0, 'FWHM-Y': 852.0, 'FWHM-Z': 1260.0}, ... }
 
     for _i, row in ori_df.iterrows():
         ch = row["Channel"]  # e.g. C4
@@ -496,18 +506,78 @@ def identify_csv(path: str) -> tuple[str, int, Optional[int]]:
                         f"{line}, using <{' '.join(line.split(' ')[-2:])}>"
                     ) from err
 
-    if delimiter is None or first_line is None:
+    if delimiter is None or first_line is None or wavelength is None:
         raise RuntimeError("Could not parse the uplaoded csv file!")
 
     # Correct the header position?? not sure why minus 2...
     return delimiter, first_line - 2, wavelength
 
 
+def check_power_prct_provided(df: pd.DataFrame, kind: str) -> bool:
+    """
+    Check if all power percentage values were provided.
+
+    Also checks if the percentage values match the exisiting
+    values in the google sheet.
+
+    :param df: pd.DataFrame of the entered data
+    :param kin: str, to filter by the entered light source kind
+
+    :return: bool, True if all is good
+    """
+    # Check that all rows are filled
+    col_data = df[df.columns[-1]]
+    for i in col_data:
+        if i is None or math.isnan(i):
+            ui.notification_show(
+                "Please enter values for all rows in the "
+                f"<{df.columns[-1]}> column.",
+                type="error",
+            )
+            return False
+
+    # Check for duplicate entries
+    col_data = list(col_data)
+    if len(col_data) != len(set(col_data)):
+        ui.notification_show(
+            "You entered the same values multiple times: "
+            f"{list_duplicates(col_data)}",
+            type="error",
+        )
+        return False
+
+    # Check if previously entered power prct match entered values
+    g_df = dataframe.get().copy()
+    g_df = filter_by_column_value(g_df, "Site", input.site())
+    g_df = filter_by_column_value(g_df, "Microscope", input.microscope())
+    g_df = filter_by_column_value(g_df, "Objective", input.objective())
+    # Keep only rows with values for the light source kind
+    g_df = g_df.dropna(subset=[kind])
+
+    prct_avail = list(np.unique(np.asarray(g_df["Power [%]"])))
+    if len(prct_avail) == 0:
+        # No entries yet -> all good
+        return True
+    # Check for entered values that are not present
+    bad_vals = []
+    for i in col_data:
+        if i not in prct_avail:
+            bad_vals.append(i)
+    if len(bad_vals) > 0:
+        ui.notification_show(
+            "Entered [%] values does not match previously recoded values.\n"
+            f"You entered unknonw: {bad_vals}.\n"
+            f"Please match to exisiting values: {prct_avail}.",
+            type="error",
+        )
+        return False
+    return True
+
+
 # Reactive functions    ------------------------------------------------------
 
+
 # CSV upload        #######################################
-
-
 @render_csv.set_patch_fn
 def update_patch_csv_power(
     *,
@@ -526,9 +596,18 @@ def update_patch_csv_power(
             f"You can only edit values in the column: {ori_data.columns[-1]}",
             type="warning",
         )
-        # Convert the value to str, to avoid
+        # Convert the value to standard default types to avoid, e.g.:
         # "TypeError: Object of type int64 is not JSON serializable"
-        return str(ori_value)
+        if isinstance(type(ori_value), str):
+            return str(ori_value)
+        elif isinstance(type(ori_value), np.float64):
+            return float(ori_value)
+        elif isinstance(type(ori_value), np.int64):
+            return int(ori_value)
+        else:
+            raise NotImplementedError(
+                f"{type(ori_value)} values are not implemented!"
+            )
 
     # Make sure the entry is an integer between 1-100
     try:
@@ -552,10 +631,9 @@ def parse_csv_power():
     """
     Convert the uploaded csv to a DataFrame.
 
-    Currently hard-coded specifically for one type of laser power meausrement csv file.
+    Currently hard-coded specifically for one type of laser
+    power meausrement csv file.
     """
-    # FIXME here: reset the csv_file_selector when switching between categories!
-
     csv: Optional[list[FileInfo]] = input.csv_file_selector()
     if csv is None:
         return pd.DataFrame()
@@ -563,9 +641,12 @@ def parse_csv_power():
     # Get the csv path (from the list of dicts in csv)
     path = csv[0]["datapath"]
 
-    # FIXME should have this function throwing an error if csv not compatible
-    # FIXME     catch the error here to return an empty dataframe
-    delimiter, first_line, wavelength = identify_csv(path)
+    # Try to parse the csv
+    try:
+        delimiter, first_line, wavelength = identify_csv(path)
+    except Exception as err:
+        ui.notification_show(str(err), type="error")
+        return pd.DataFrame()
 
     df = pd.read_csv(path, sep=delimiter, header=first_line)
     # Remove "unnamed columns"
@@ -582,6 +663,7 @@ def parse_csv_power():
     df = convert_power_column(df)
 
     # Add column for entries of power %
+    upload_lambda.set(wavelength)
     df[f"Enter the intensity (%) for {wavelength}nm"] = np.nan
     return df
 
@@ -613,13 +695,63 @@ def upload_power_data():
         ui.notification_show("No data for upload yet!", type="warning")
         return
 
-    # FIXME temp usage of unused variables
-    a = [cur_mic, cur_obj, cur_info]
-    a.sort()
+    # Make sure th light source kind has been selected  ###
+    light_source_kind = input.csv_light_selector()
+    if light_source_kind.startswith("Please cho"):
+        ui.notification_show(
+            "Please <Select the light source kind>!", type="error"
+        )
+        return
+    # Rename according to the google sheet column   #######
+    elif light_source_kind == "Laser":
+        light_source_kind = "Laser Line [nm]"
+    elif light_source_kind == "LED":
+        light_source_kind = "LED Line [nm]"
 
-    # TODO: Check if all values have been provided
+    # Check if all values have been provided
+    if not check_power_prct_provided(data, light_source_kind):
+        return
 
-    print("All good so far")
+    # Check the upload password     #######################
+    if not check_upload_password(input.upload_pwd()):
+        ui.notification_show(
+            "Please provide the correct <Password for upload>!", type="error"
+        )
+        return
+
+    # Prepare the upload data       #######################
+    # Get the date
+    date_col_name = [x for x in data.columns if x.startswith("Date")]
+    date = list(np.unique(np.asarray(data[date_col_name])))
+
+    # Convert the power data into a nested dict => {wavelength: {power: mW}}
+    wavelength = upload_lambda.get()
+    if wavelength is None:
+        raise RuntimeError("Something went wrong: wavelength is None...")
+    data_dict = {wavelength: {}}
+    power_col_name = [x for x in data.columns if x.startswith("Power")]
+    for _i, row in data.iterrows():
+        prct = row[data.columns[-1]]
+        power = row[power_col_name[0]]
+        data_dict[wavelength][prct] = power
+
+    # Upload the data               #######################
+    try:
+        make_sheet_entries(
+            sheet=sheet_reference.get(),
+            site=input.site(),
+            microscope=cur_mic,
+            objective=cur_obj,
+            info=cur_info,
+            date=date[0],
+            power_data=data_dict,
+            line_header=light_source_kind,
+        )
+        ui.notification_show("Successfully uploaded the data!", type="message")
+    except Exception as err:
+        ui.notification_show(
+            f"Could not upload the data:\n{err}", type="error"
+        )
 
 
 # OMERO upload      #######################################
@@ -664,6 +796,7 @@ def uplaod_omero_data():
     # Upload the data
     # FIXME shift Reference-XYZ -> should it be 0 or nan? -> PSFdata object
     #       how does it visualise once the visualisation is implemented?
+    #       ---> FIXME later...
     try:
         make_sheet_entries(
             sheet=sheet_reference.get(),
@@ -679,7 +812,7 @@ def uplaod_omero_data():
         ui.notification_show(
             f"Could not upload the data:\n{err}", type="error"
         )
-    # FIXME test notification
+    # FIXME test notification to see colors
     # ui.notification_show("default", type="default") # white
     # ui.notification_show("error", type="error") # red
     # ui.notification_show("message", type="message") # blue

@@ -83,8 +83,27 @@ def test_check_if_sequence():
     assert not cu.check_if_sequence(bad)
 
 
+def test_list_duplicates():
+    """Test list_duplicate function."""
+    good = [1, 2, 3, 4]
+    good2 = [1, "a", "b", 4]
+    bad = [1, 2, 2, 4, 3, 5, 3]
+    bad2 = [1, 5, "a", "a", "b", 6, 5]
+    assert len(cu.list_duplicates(good)) == 0
+    assert len(cu.list_duplicates(good2)) == 0
+    bad = cu.list_duplicates(bad)
+    bad2 = cu.list_duplicates(bad2)
+    assert len(bad) == 2
+    assert len(bad2) == 2
+    assert 2 in bad
+    assert 3 in bad
+    assert 5 in bad2
+    assert "a" in bad2
+
+
 if __name__ == "__main__":
-    test_invert_nested_dict()
+    pass
+    # test_list_duplicates()
     # test_check_if_sequence()
     # test_get_ui_id()
     # test_is_input_select_in_list()

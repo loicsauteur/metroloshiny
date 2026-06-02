@@ -125,7 +125,8 @@ def test_filter_by_nested_dict():
     res = filter_by_nested_dict(df, nested_dict, ["Channel", "FWHM"])
     # There should be one key == -1
     ks = list(res.keys())
-    assert ks.index(-1) == len(ks) - 1, "Error for missing value"
+    assert -1 in ks, "Error for missing value -> not there"
+    assert ks.index(-1) == 0, "Error missing value is not at the first pos."
     with pytest.raises(ValueError, match="-2 is not in list"):
         # There should not be a -2 index in the list
         list(res.keys()).index(-2)
