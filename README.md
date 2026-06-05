@@ -1,17 +1,18 @@
 # Table of Contents
 1. [Overview](#Overview) <!--This works!-->
-2. Prerequisites
-   1. Google sheet
+2. [Prerequisites](#Prerequisites)
+   1. [Google sheet](#Google-sheet)
    2. [Google service account](#Google-service-account)
-3. Running locally
-4. Installation on Linux server
-   1. Shiny Server installation
-   2. Opening the port
-   3. Shiny Server configuration
-   4. Getting metroloshiny
-      1. config private_data.csv
-   4. Deploying the Shiny app(s)
-      1. Deployment automation with pixi
+3. [Running locally](#Running-locally)
+   1. [Testing locally](#Testing-locally)
+4. [Installation on Linux server](#Installation-on-Linux-server)
+   1. [Shiny Server installation](#Shiny-Server-installation)
+   2. [Opening the port](#Opening-the-port)
+   3. [Shiny Server configuration](#Shiny-Server-configuration)
+   4. [Getting metroloshiny](#Getting-metroloshiny)
+      1. [config private_data.csv](#config-private_data.csv)
+   4. [Deploying the Shiny app(s)](#Deploying-the-Shiny-app(s))
+      1. [Deployment automation with pixi](#Deployment-automation-with-pixi)
 
 
 # Overview
@@ -87,6 +88,14 @@ Use VS Code with the Shiny extension to apps run locally.
 To update the repo to the newest version:
 
 `git pull`
+
+## Testing locally
+
+Playwright must be installed in the dev environment before running tests (shiny app test runs):
+
+```bash
+pixi run playwright
+```
 
 <!--
 Commit changes:

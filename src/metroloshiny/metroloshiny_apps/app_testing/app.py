@@ -1,5 +1,3 @@
-"""Testing editable table."""
-
 from typing import TYPE_CHECKING, Optional
 
 import numpy as np

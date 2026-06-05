@@ -22,6 +22,7 @@ default = { solve-group = "default" }
 dev = { features = ["dev"], solve-group = "default"}
 
 [tool.pixi.feature.dev.tasks]
+playwright = { cmd="playwright install" }
 fmt = { cmd="ruff format ." }
 lint = { cmd="ruff check . --fix" }
 types = { cmd="ty check ." }
@@ -31,12 +32,14 @@ test = { cmd="pytest" }
 all = { depends-on = ["fmt", "lint", "types", "black", "spell", "test"] }
 
 [tool.pixi.feature.dev.dependencies]
-pytest = ">=8.3"
+pytest = ">=9.0.2,<10"
 pytest-cov = ">=6.0"
 ruff = ">=0.11"
 pre-commit = ">=4.2"
 black = ">=26.3.1,<27"
 typos = ">=1.47, <2"
+playwright = ">=1.50,<2.0"
+pytest-playwright = ">=0.8,<0.9" # for testing shiny apps, may need a task for "playwright install"
 
 [tool.pixi.feature.dev.pypi-dependencies]
 ty = "*"
@@ -45,12 +48,10 @@ ty = "*"
 #test = ["pytest"]
 
 [tool.pixi.tasks]
-#deploy = "sudo rm -r /srv/shiny-server/power_at_objective;sudo cp -R /users/stud/s/sautlo01/metroloshiny/src/metroloshiny/power_at_objective /srv/shiny-server/power_at_objective/;sudo rm -r /srv/shiny-server/data_upload;sudo cp -R /users/stud/s/sautlo01/metroloshiny/src/metroloshiny/data_upload /srv/shiny-server/data_upload/;sudo systemctl restart shiny-server"
 # remove all files in shiny-server, copy metroloshiny-app (relative to cwd), restart server
 deploy = "sudo rm -r /srv/shiny-server/*;sudo cp -R src/metroloshiny/metroloshiny_apps/. /srv/shiny-server/;sudo systemctl restart shiny-server"
 
 [tool.pixi.dependencies]
-pytest = ">=9.0.2,<10"
 shiny = ">=1.4.0,<2"
 seaborn = ">=0.13.2,<0.14"
 pandas = ">=3.0.1,<4"

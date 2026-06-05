@@ -119,7 +119,6 @@ def get_private_data(key: str, data_path: Optional[str] = None) -> str:
     """
     Load 'private data' saved from a csv file.
 
-    TODO: provide example file...
     If data_path is not provided, will check:
         - "./data/private_data.csv"
         - same path relative to this file
@@ -197,6 +196,7 @@ def load_doc(
     if path_service_account == "":
         gc = gspread.service_account()
     elif path_service_account is None:
+        # FIXME? since relative path to JSON, exec must be in repo-base dir
         gc = gspread.service_account(
             get_private_data("PathToServiceAccountJSON", data_path=data_path)
         )

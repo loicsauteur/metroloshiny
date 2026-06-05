@@ -33,8 +33,6 @@ use_dev_local_file = False
 sheet_doc = load_doc(dev_local_file=use_dev_local_file)
 # wsheet_psf, df = get_sheet(sheet_doc, "PSF", dev_local_file=use_dev_local_file)
 
-# FIXME: write test for the apps? how to mock?
-
 # Reactive values       ------------------------------------------------------
 sheet_reference = reactive.value(None)
 dataframe = reactive.value(None)
