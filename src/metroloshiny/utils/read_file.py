@@ -12,7 +12,7 @@ __linux_private_data_path__ = "/absolute/path/to/private_data.csv"
 
 # Worksheet names
 __sheet_names__ = {
-    "Power": "laser_power_objective_measurements",
+    "Power": "laser_power_measurements",
     "PSF": "psf_measurements",
 }
 
@@ -233,7 +233,10 @@ def get_sheet(
         )
     else:
         # Load the sheet and convert it to a dataframe
-        sheet = doc.worksheet(__sheet_names__.get(kind))
+        try:
+            sheet = doc.worksheet(__sheet_names__.get(kind))
+        except gspread.exceptions.WorksheetNotFound as err:
+            raise RuntimeError(f"The Worksheet doesn't exist: {err}") from err
         df = pd.DataFrame(sheet.get_all_records())
     # Ensure numeric data
     if kind == "Power":
@@ -339,7 +342,7 @@ def get_laser_power_objective_data(
     path_sa = get_private_data("PathToServiceAccountJSON", data_path=data_path)
     sheet = load_gspread(
         gsheet_url=url,
-        sheet_name="laser_power_objective_measurements",
+        sheet_name="laser_power_measurements",
         path_service_account=path_sa,
     )
     df = pd.DataFrame(sheet.get_all_records())

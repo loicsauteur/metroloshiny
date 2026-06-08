@@ -1,6 +1,7 @@
 """Utils for common usage."""
 
 import datetime
+import os
 from collections import Counter, defaultdict
 from typing import Optional
 
@@ -306,8 +307,27 @@ def list_duplicates(arr: list) -> list:
     return dup
 
 
+def set_local_file(default: Optional[bool] = False) -> bool:
+    """
+    Return True if in pytest.
+
+    Used for setting local file usage (excel sheet instead of google sheet).
+
+    :param default: Optional bool, if True returns True.
+        To overwrite the logic.
+
+    :return: bool
+    """
+    if default:
+        return default
+    if os.environ.get("PYTEST_VERSION") is not None:
+        return True
+    else:
+        return False
+
+
 if __name__ == "__main__":
     # d = {"DAPI": "C1", "GFP": "None", "Cy3": "C2", "Cy5": "None"}
     # a = check_duplicate_dict_values(d=d, exclude="None")
     # print("found duplicate:", a, type(a))
-    pass
+    set_local_file()

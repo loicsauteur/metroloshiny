@@ -5,6 +5,7 @@ from shiny import reactive
 from shiny.express import input, render, ui
 
 from metroloshiny.utils.common_utils import (
+    set_local_file,
     theo_fwhm_2photon,
     theo_fwhm_pointscanner,
     theo_fwhm_spinning,
@@ -16,10 +17,10 @@ from metroloshiny.utils.dataframe_utils import (
 )
 from metroloshiny.utils.read_file import get_sheet, load_doc
 
-# FIXME: AttributeError: 'NoneType' object has no attribute 'set_bbox_to_anchor' (e.g. > app.py, line 182)
+# FIXME: add plot (table) for shifts
 
 # Load Data
-use_dev_local_file = False
+use_dev_local_file = set_local_file()
 sheet_doc = load_doc(dev_local_file=use_dev_local_file)
 wsheet_psf, df = get_sheet(sheet_doc, "PSF", dev_local_file=use_dev_local_file)
 
@@ -28,12 +29,13 @@ psf_max_val = df[df.columns[6:]].max().max()  # highest PSF value in dataframe
 
 # Reactive & general variables      ------------------------------------------
 sites = np.unique(np.asarray(df["Site"]))
+# FIXME: microsocpes, objectives, info - never really used...
 microscopes = reactive.value([])
 objectives = reactive.value([])
 info = reactive.value([])  # for filtering on the info column
 df_data = reactive.value(None)  # Contains only channel, FWHM & Date cols
 df_final = reactive.value(None)  # Final plotting data
-df_final_table = reactive.value(None)  # Final plotting date for table display
+df_final_table = reactive.value(None)  # Final plotting data for table display
 ch_check_boxes = reactive.value(None)  # Selectors for channel displays
 fwhm_check_boxes = reactive.value(
     None
@@ -45,7 +47,7 @@ theoretical_fwhm = reactive.value(
 
 # Create UI         ----------------------------------------------------------
 ui.page_opts(title="Metrology: PSF")
-with ui.nav_panel(title="PSF Metrology"):
+with ui.nav_panel(title="PSF"):
     # Sidebar          -------------------------------------------------------
     with ui.layout_sidebar():
         with ui.sidebar():
@@ -54,7 +56,7 @@ with ui.nav_panel(title="PSF Metrology"):
             ui.input_select("objective", "Select an objective", choices=[])
             ui.input_select("info", "Filter by info column", choices=[])
 
-        # Selection card     ------------------------------------------------------
+        # Selection card     -------------------------------------------------
         with ui.navset_card_underline(title="Plotting options"):
             with ui.nav_panel(title=""):
                 # Add checkboxes & other as columns
@@ -119,6 +121,8 @@ with ui.nav_panel(title="PSF Metrology"):
                             ri_selection,
                         )
 
+        with ui.navset_card_underline(title="PSF over time"):
+            with ui.nav_panel(title="Plot"):
                 # Add a date range selection
                 @render.ui
                 def render_date_range_selection():
@@ -142,8 +146,6 @@ with ui.nav_panel(title="PSF Metrology"):
                     )
                     return date_range_selection
 
-        with ui.navset_card_underline(title="PSF over time"):
-            with ui.nav_panel(title="Plot"):
                 # Render the plot
                 @render.plot
                 def plot_psf_over_time():
@@ -181,8 +183,9 @@ with ui.nav_panel(title="PSF Metrology"):
                     ax.set(ylim=(-10, y_max))
                     # Move legend to the right of the plot
                     legend = ax.get_legend()
-                    legend.set_bbox_to_anchor((1.05, 1))
-                    legend.set_loc("upper left")
+                    if legend is not None:
+                        legend.set_bbox_to_anchor((1.05, 1))
+                        legend.set_loc("upper left")
                     # X-labels
                     plt.xticks(rotation=45, ha="right")  # rotate the x-ticks
                     # Do not show all the ticks (for more than 10)
@@ -429,7 +432,7 @@ def update_microscope_choices():
     """Update microscope choices based on site selection."""
     # Filter the data frame (always the original) and
     # set the reactive result dataframe
-    df_filtered = filter_by_column_value(df, "Site", input.site())
+    df_filtered = filter_by_column_value(df.copy(), "Site", input.site())
     # Get a list of microscopes and set the reactive result
     m_filtered = np.unique(np.asarray(df_filtered["Microscope"]))
     microscopes.set(list(m_filtered))
@@ -442,7 +445,7 @@ def update_microscope_choices():
 def update_objective_choices():
     """Update objective choices based on microscope selection."""
     # Filter original df from start
-    df_filtered = filter_by_column_value(df, "Site", input.site())
+    df_filtered = filter_by_column_value(df.copy(), "Site", input.site())
     df_filtered = filter_by_column_value(
         df_filtered, "Microscope", input.microscope()
     )
@@ -458,7 +461,7 @@ def update_objective_choices():
 def update_info_choices():
     """Update info choices based on microscope & objective selection."""
     # Filter original df from start
-    df_filtered = filter_by_column_value(df, "Site", input.site())
+    df_filtered = filter_by_column_value(df.copy(), "Site", input.site())
     df_filtered = filter_by_column_value(
         df_filtered, "Microscope", input.microscope()
     )

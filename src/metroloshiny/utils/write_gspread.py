@@ -14,7 +14,7 @@ from metroloshiny.utils.read_file import ensure_numeric_data
 
 # Google spreadsheet names
 __gspread_names__ = {
-    "Power": "laser_power_objective_measurements",
+    "Power": "laser_power_measurements",
     "PSF": "psf_measurements",
 }
 
@@ -57,6 +57,8 @@ _updated_cell_format_ = _updated_date_cell_format_.copy()  # For all entries
 _updated_cell_format_["horizontalAlignment"] = "LEFT"
 # updated_cell_format["textFormat"]["bold"] = False # Not working...
 
+# FIXME: probably it would be saver to have DataFrames instead nested_dicts as inputs, to allow same values as input
+
 
 def make_sheet_entries(
     sheet: gs.Worksheet,
@@ -66,8 +68,8 @@ def make_sheet_entries(
     info: str,
     date: Optional[str] = None,
     fwhm_data: Optional[dict] = None,
-    power_data: Optional[Any] = None,  # FIXME to be defined & implemented
-    line_header: Optional[str] = None,  # FIXME currently unused
+    power_data: Optional[Any] = None,
+    line_header: Optional[str] = None,
     # FIXME unused below
     line: Optional[str] = None,  # FIXME currently unused
     power: Optional[str] = None,  # FIXME currently unused
@@ -88,10 +90,10 @@ def make_sheet_entries(
     :param date: Optional[str] YYYYmmdd. Default None -> gets Today
     :param fwhm_data: Optional[dict[dict]], FWHM data to be entered, e.g.:
         {"DAPI" : {'FWHM-X': 911.0, 'FWHM-Y': 852.0, 'FWHM-Z': 1260.0}, ... }
-    :param power_data: Optional[Any] = None,  # FIXME to be defined
+    :param power_data: Optional[Any] = None,
         {647: {5: 1.5, 10: 3.1, 50: 15.6}, ... } or in words:
         {wavelength: {power: mW, ... }, ... }
-    :param line_header: str, column header for the light source kind.
+    :param line_header: Optional[str], column header for the light source kind.
         Can be either: "Laser Line [nm]" or "LED Line [nm]"
 
     :return: no return

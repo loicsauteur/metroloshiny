@@ -14,6 +14,7 @@ from metroloshiny.utils.common_utils import (
     check_duplicate_dict_values,
     invert_nested_dict,
     list_duplicates,
+    set_local_file,
 )
 from metroloshiny.utils.dataframe_utils import (
     convert_date_column,
@@ -29,7 +30,7 @@ from metroloshiny.utils.read_file import (
 from metroloshiny.utils.write_gspread import make_sheet_entries
 
 # Load Data
-use_dev_local_file = False
+use_dev_local_file = set_local_file()
 sheet_doc = load_doc(dev_local_file=use_dev_local_file)
 # wsheet_psf, df = get_sheet(sheet_doc, "PSF", dev_local_file=use_dev_local_file)
 

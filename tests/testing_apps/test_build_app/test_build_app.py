@@ -12,6 +12,9 @@ def test_basic_app(page: Page, local_app: ShinyAppProc) -> None:
     Test the app, build similarly to my other apps.
 
     This was for testing pytest purposes.
+
+    API for testing:
+    https://shiny.posit.co/py/api/testing/playwright.controller.InputSelect.html#shiny.playwright.controller.InputSelect
     """
     # Navigate to the app URL when it's ready
     page.goto(local_app.url)
