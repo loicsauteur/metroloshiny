@@ -20,7 +20,7 @@ from metroloshiny.utils.read_file import get_sheet, load_doc
 # FIXME: add plot (table) for shifts
 
 # Load Data
-use_dev_local_file = set_local_file()
+use_dev_local_file = set_local_file(True)  # FIXME undo
 sheet_doc = load_doc(dev_local_file=use_dev_local_file)
 wsheet_psf, df = get_sheet(sheet_doc, "PSF", dev_local_file=use_dev_local_file)
 
@@ -30,9 +30,6 @@ psf_max_val = df[df.columns[6:]].max().max()  # highest PSF value in dataframe
 # Reactive & general variables      ------------------------------------------
 sites = np.unique(np.asarray(df["Site"]))
 # FIXME: microsocpes, objectives, info - never really used...
-microscopes = reactive.value([])
-objectives = reactive.value([])
-info = reactive.value([])  # for filtering on the info column
 df_data = reactive.value(None)  # Contains only channel, FWHM & Date cols
 df_final = reactive.value(None)  # Final plotting data
 df_final_table = reactive.value(None)  # Final plotting data for table display
@@ -435,9 +432,8 @@ def update_microscope_choices():
     df_filtered = filter_by_column_value(df.copy(), "Site", input.site())
     # Get a list of microscopes and set the reactive result
     m_filtered = np.unique(np.asarray(df_filtered["Microscope"]))
-    microscopes.set(list(m_filtered))
     # Update the ui selection (using the reactive variable)
-    ui.update_select("microscope", choices=microscopes.get())
+    ui.update_select("microscope", choices=list(m_filtered))
 
 
 @reactive.effect
@@ -451,9 +447,8 @@ def update_objective_choices():
     )
     # Get a list of unique objective choices
     o = np.unique(np.asarray(df_filtered["Objective"]))
-    objectives.set(list(o))
     # Update the ui selection
-    ui.update_select("objective", choices=objectives.get())
+    ui.update_select("objective", choices=list(o))
 
 
 @reactive.effect
@@ -470,9 +465,8 @@ def update_info_choices():
     )
     # Get a list of unique info items
     i = np.unique(np.asarray(df_filtered["Info"]))
-    info.set(list(i))
     # Update the ui selection
-    ui.update_select("info", choices=info.get())
+    ui.update_select("info", choices=list(i))
 
 
 # General functions         --------------------------------------------------

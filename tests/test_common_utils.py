@@ -1,5 +1,6 @@
 """Test for common utils.py."""
 
+import numpy as np
 import pytest
 from shiny.express import ui
 
@@ -99,6 +100,58 @@ def test_list_duplicates():
     assert 3 in bad
     assert 5 in bad2
     assert "a" in bad2
+
+
+def test_create_css_color_dict():
+    """Test create_css_color_dict function."""
+    wave = [350, 405, 445, 488, 515, 561, 594, 647, 669, 750, 800]
+    prct = [5, 10, 25, 50, 75, 90, 100]
+
+    # Test wrong min max input
+    with pytest.raises(
+        ValueError, match=r"Min <500> must be smaller than max <500>!"
+    ):
+        cu.create_css_color_dict(wave, min_val=500, max_val=500)
+    with pytest.raises(
+        ValueError, match=r"Min <500> must be smaller than max <450>!"
+    ):
+        cu.create_css_color_dict(wave, min_val=500, max_val=450)
+
+    # Check normal usage
+    wave_dict = cu.create_css_color_dict(wave, min_val=380, max_val=700)
+    assert len(wave_dict) == len(wave)
+    unique_colors = np.unique(np.asarray(list(wave_dict.values())))
+    # Darkred is not unique (twice in list)
+    assert len(unique_colors) == len(wave) - 1
+    for k, v in wave_dict.items():
+        if k <= 380:
+            assert v == "indigo"
+        if k >= 700:
+            assert v == "darkred"
+
+    # Test wrong usage
+    prct_dict = cu.create_css_color_dict(prct)
+    for col in prct_dict.values():
+        assert col == "indigo"
+
+    # Test proper usage
+    prct_dict = cu.create_css_color_dict(prct, min_val=5, max_val=100)
+    unique_colors = np.unique(np.asarray(list(prct_dict.values())))
+    assert len(unique_colors) == len(prct_dict) == len(prct)
+
+    # Test too many colors (returns an empty dict)
+    out = cu.create_css_color_dict(list(range(50)), min_val=0, max_val=50)
+    assert not out
+    # Same, but min/max not specified gives valid dict output
+    out = cu.create_css_color_dict(list(range(50)))
+    assert out
+
+    # Check that the input are all numbers
+    wrong_list = [450, "500", "600", "text"]
+    good_list = [455.5, "300", "833", 600, "561"]
+    with pytest.raises(ValueError, match=r"Range values must be numbers*"):
+        cu.create_css_color_dict(wrong_list)
+    assert cu.create_css_color_dict(good_list)
 
 
 if __name__ == "__main__":

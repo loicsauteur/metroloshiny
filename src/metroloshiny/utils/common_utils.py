@@ -5,6 +5,7 @@ import os
 from collections import Counter, defaultdict
 from typing import Optional
 
+import numpy as np
 from bs4 import BeautifulSoup
 
 
@@ -326,8 +327,105 @@ def set_local_file(default: Optional[bool] = False) -> bool:
         return False
 
 
+def create_css_color_dict(
+    range_list: list,
+    min_val: Optional[int] = 380,
+    max_val: Optional[int] = 700,
+) -> dict:
+    """
+    Map input values do CSS colors.
+
+    To create color dictionaries for plotly plots (up to 14 colors).
+    Suggestion: use it only for matching colors to wavelength values.
+
+    :param range_list: list of numbers to map colors to.
+    :param min_val: int, lowest input number to map color to.
+        Default 380. If None, will check min value of the input array.
+    :param max_val: int, highest input number to map color to.
+        Default 700. If None, will check max value of the input array.
+    :return: dict, key = input numbers, values = CSS color names.
+        return empty dict if request color number > max color numbers
+    """
+    # Make sure all values are numbers
+    try:
+        range_list = [float(x) for x in range_list]
+    except ValueError as err:
+        raise ValueError(
+            f"Range values must be numbers. Input: {range_list}"
+        ) from err
+
+    # Set min max values if None
+    min_v = min(range_list) if min_val is None else min_val
+    max_v = max(range_list) if max_val is None else max_val
+    if min_val is None:
+        min_val = min(range_list)
+    if max is None:
+        max_val = max(range_list)
+    if min_v >= max_v:
+        raise ValueError(f"Min <{min_v}> must be smaller than max <{max_v}>!")
+    # Re-adjust min/max if inputs are lower/higher than current - dont do that
+    # if min_val > min(range_list):
+    #     min_val = min(range_list)
+    # if max_val < max(range_list):
+    #     max_val = max(range_list)
+
+    # Make sure only unique input values
+    range_list.sort()
+    range_list = list(np.unique(np.asarray(range_list)))
+
+    # My default color range (14 colors in total)
+    all_colors = {
+        0: "indigo",
+        0.08: "purple",
+        0.15: "mediumblue",
+        0.23: "dodgerblue",
+        0.30: "aqua",
+        0.38: "darkturquoise",
+        0.46: "springgreen",
+        0.54: "green",
+        0.62: "olive",
+        0.69: "gold",
+        0.77: "orange",
+        0.885: "tomato",
+        0.92: "red",
+        1: "darkred",
+    }
+    # TODO: maybe would be good to check if all colors really exist:
+    # https://plotly.com/python/css-colors/
+
+    # Return an empty dict if requested colors > max colors
+    valid_range = [x for x in range_list if x >= min_v and x <= max_v]
+    if len(valid_range) > len(all_colors):
+        return {}
+
+    # Normalise the input numbers to values 0-1
+    norm_range = [(x - min_v) / (max_v - min_v) for x in range_list]
+    # Distribute colors more evenly, if n input numbers close to max colors
+    # Dont do that either...
+    # valid_range = [x for x in range_list if x >= min_val and x <= max_val]
+    # if len(valid_range) >= 8:
+    #     print("distributing evenly")
+    #     norm_range = [0 for x in range_list if x < min_val]
+    #     for i in np.linspace(0, 1, len(valid_range)):
+    #         norm_range.append(i)
+    #     for i in range_list:
+    #         if i > max_val:
+    #             norm_range.append(i)
+
+    # if len(norm_range) != len(range_list):
+    #     raise RuntimeError(
+    #         "Something went wrong! I did a logic error..."
+    #     )
+
+    dict_out = {}
+    for i in range(len(range_list)):
+        closes_color = min(
+            all_colors.keys(), key=lambda x: abs(x - norm_range[i])
+        )
+        dict_out[range_list[i]] = all_colors.get(closes_color)
+
+    return dict_out
+
+
 if __name__ == "__main__":
-    # d = {"DAPI": "C1", "GFP": "None", "Cy3": "C2", "Cy5": "None"}
-    # a = check_duplicate_dict_values(d=d, exclude="None")
-    # print("found duplicate:", a, type(a))
-    set_local_file()
+    pass

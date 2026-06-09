@@ -1,11 +1,16 @@
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
+import plotly.express as px
 import seaborn as sns
 from shiny import reactive
 from shiny.express import input, render, ui
+from shinywidgets import render_widget
 
-from metroloshiny.utils.common_utils import set_local_file
+from metroloshiny.utils.common_utils import (
+    create_css_color_dict,
+    set_local_file,
+)
 from metroloshiny.utils.dataframe_utils import (
     filter_by_column_value,
     filter_by_date_range,
@@ -25,14 +30,15 @@ wsheet_psf, dataframe = get_sheet(
     sheet_doc, "Power", dev_local_file=use_dev_local_file
 )
 
+# FIXME: on line 466 - not sure how: UserWarning: Ignoring `palette` because no `hue` variable has been assigned.
+
 # Global variable       ------------------------------------------------------
 
 # Reactive & general variables      ------------------------------------------
 sites = np.unique(np.asarray(dataframe["Site"]))
 light_kinds = list(dataframe.columns[4:6])  # Laser or LED
-df_data = reactive.value(None)  # Contains ??
-df_final = reactive.value(None)  # Final plotting data
-df_final_table = reactive.value(None)  # Final plotting data for table display
+# Contains filtered dataframe by sidebar selection except line & power
+df_data = reactive.value(None)
 
 
 # Create UI         ----------------------------------------------------------
@@ -92,7 +98,8 @@ with ui.nav_panel(title="Light Source Power"):
                     )
                     return dr
 
-                @render.plot
+                # @render.plot
+                @render_widget
                 def plot_power_stability():
                     """Render the power stability plot."""
                     df = create_power_stability_table()
@@ -440,22 +447,14 @@ def create_power_stability_plot(df: pd.DataFrame):  # -> sns.lineplot:
 
     :return: sns.lineplot
     """
-    fig, ax = plt.subplots()
     # Do not show a plot if both power and line are set to "All"
     line = input.line()
     prct = input.power()
     if line == "All" and prct == "All":
-        # Show empty plot
-        msg = "Cannot show all lines at all powers!"
-        ax.text(0.5, 0.5, msg, ha="center", va="center")
-        ax.set_axis_off()
-        return fig
+        return no_data_fig("Cannot show all lines at all powers!")
     # Show not plot if there is no data
     if df.empty:
-        # Show empty plot
-        ax.text(0.5, 0.5, "No data to visualise!", ha="center", va="center")
-        ax.set_axis_off()
-        return fig
+        return no_data_fig()
 
     # Merge line/power columns and pivot the table
     line = None if line == "All" else float(line)
@@ -464,39 +463,128 @@ def create_power_stability_plot(df: pd.DataFrame):  # -> sns.lineplot:
 
     # Create the plot #####################################
     # Group the plot by power or line and colors accordingly
-    plot = sns.lineplot(
-        data=df,
-        x="Date",
-        y="mW",
-        markers=True,
-        # ensure markers
-        style=df.columns[2] if input.power() == "All" else df.columns[1],
-        # keep solid lines
-        dashes=False,
-        # group by "Power [%]" if prct=all, else by "Line"
-        hue=df.columns[2] if input.power() == "All" else df.columns[1],
-        palette="turbo",
-        # adjust line colors
-        hue_norm=(0, 100) if input.power() == "All" else (380, 700),
-        # ensure precise line values
-        legend="full",
+    # plot = sns.lineplot(
+    #     data=df,
+    #     x="Date",
+    #     y="mW",
+    #     markers=True,
+    #     # ensure markers
+    #     style=df.columns[2] if input.power() == "All" else df.columns[1],
+    #     # keep solid lines
+    #     dashes=False,
+    #     # group by "Power [%]" if prct=all, else by "Line"
+    #     hue=df.columns[2] if input.power() == "All" else df.columns[1],
+    #     palette="turbo",
+    #     # adjust line colors
+    #     hue_norm=(0, 100) if input.power() == "All" else (380, 700),
+    #     # ensure precise line values
+    #     legend="full",
+    # )
+
+    # # Move legend to the right of the plot
+    # legend = ax.get_legend()
+    # if legend is not None:
+    #     legend.set_bbox_to_anchor((1.05, 1))
+    #     legend.set_loc("upper left")
+    # # X-labels adjustments
+    # plt.xticks(rotation=45, ha="right")  # rotate ticks
+    # ticks = ax.get_xticks()
+    # new_ticks = np.linspace(0, len(ticks) - 1, min(10, len(ticks)), dtype=int)
+    # ax.set_xticks(new_ticks)
+    # ax.set_xlabel("")
+    # fig.tight_layout()
+    # return plot
+
+    # Create a plot with plotly
+    group_col = df.columns[2] if input.power() == "All" else df.columns[1]
+    wavelengths = np.unique(np.asarray(df[df.columns[1]]))
+    color_map = (
+        {} if input.power() == "All" else create_css_color_dict(wavelengths)
     )
 
-    # Move legend to the right of the plot
-    legend = ax.get_legend()
-    if legend is not None:
-        legend.set_bbox_to_anchor((1.05, 1))
-        legend.set_loc("upper left")
-    # X-labels adjustments
-    plt.xticks(rotation=45, ha="right")  # rotate ticks
-    ticks = ax.get_xticks()
-    if len(ticks) > 10:
-        # Limit ticks to sqroot(n-ticks) (+ 1)
-        new_ticks = ticks[:: int(len(ticks) ** 0.5)]
-        # Make sure the last date tick is shown
-        if new_ticks[-1] != ticks[-1]:
-            new_ticks.append(ticks[-1])
-        ax.set_xticks(new_ticks)
-    ax.set_xlabel("")
-    fig.tight_layout()
+    plot = px.line(
+        df,
+        x="Date",
+        y="mW",
+        color=group_col,
+        line_group=group_col,
+        line_dash=group_col,  # gives different dashes per group
+        markers=True,
+        hover_data={
+            "Date": True,
+            "mW": ":.3f",
+            group_col: True,
+        },
+        color_discrete_map=color_map,
+    )
+
+    # Move legend to the right
+    plot.update_layout(
+        template="simple_white",
+        legend={
+            "yanchor": "top",
+            "y": 1,
+            "xanchor": "left",
+            "x": 1.02,
+        },
+        margin={"r": 200},
+    )
+
+    # Rotate x-axis labels
+    plot.update_xaxes(
+        tickangle=45,
+        # Reduce number of displayed ticks
+        nticks=10,
+        showgrid=False,
+        title="",
+    )
+    plot.update_yaxes(showgrid=True, gridcolor="lightgrey")
+
+    # Custom hover template
+    plot.update_traces(
+        hovertemplate="<b>%{fullData.name}</b><br>"
+        "Date: %{x}<br>"
+        "mW: %{y:.3f}<extra></extra>"
+    )
     return plot
+
+
+def no_data_fig_simple(message: str = "No data to visualise!"):
+    """
+    Show a no data plot with matplotlib.
+
+    :param message: str, to display in the plot.
+
+    :return: matplot fig
+    """
+    fig, ax = plt.subplots()
+    ax.text(0.5, 0.5, message, ha="center", va="center")
+    ax.set_axis_off()
+    return fig
+
+
+def no_data_fig(message: str = "No data to visualise!"):
+    """
+    Show a no data plot with plotly.
+
+    :param message: str, to display in the plot.
+
+    :return: plotly.plot
+    """
+    fig = px.line(pd.DataFrame({"x": [], "y": []}), x="x", y="y")
+    fig.add_annotation(
+        text=message,
+        x=0.5,
+        y=0.5,
+        xref="paper",
+        yref="paper",
+        showarrow=False,
+        font={"size": 20, "color": "gray"},
+    )
+
+    fig.update_layout(template="simple_white", showlegend=False)
+
+    fig.update_xaxes(visible=False)
+    fig.update_yaxes(visible=False)
+
+    return fig
