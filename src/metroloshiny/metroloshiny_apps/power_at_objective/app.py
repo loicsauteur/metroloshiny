@@ -581,10 +581,7 @@ def no_data_fig(message: str = "No data to visualise!"):
         showarrow=False,
         font={"size": 20, "color": "gray"},
     )
-
     fig.update_layout(template="simple_white", showlegend=False)
-
     fig.update_xaxes(visible=False)
     fig.update_yaxes(visible=False)
-
     return fig

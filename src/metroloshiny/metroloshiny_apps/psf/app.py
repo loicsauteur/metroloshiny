@@ -1,8 +1,14 @@
+# import seaborn as sns
+import warnings
+from typing import Optional, Union
+
 import matplotlib.pyplot as plt
 import numpy as np
-import seaborn as sns
+import pandas as pd
+import plotly.express as px
 from shiny import reactive
 from shiny.express import input, render, ui
+from shinywidgets import render_widget
 
 from metroloshiny.utils.common_utils import (
     set_local_file,
@@ -14,32 +20,27 @@ from metroloshiny.utils.common_utils import (
 from metroloshiny.utils.dataframe_utils import (
     filter_by_column_value,
     filter_by_date_range,
+    parse_dates,
 )
 from metroloshiny.utils.read_file import get_sheet, load_doc
 
-# FIXME: add plot (table) for shifts
-
 # Load Data
-use_dev_local_file = set_local_file(True)  # FIXME undo
+use_dev_local_file = set_local_file()
 sheet_doc = load_doc(dev_local_file=use_dev_local_file)
-wsheet_psf, df = get_sheet(sheet_doc, "PSF", dev_local_file=use_dev_local_file)
+wsheet_psf, dataframe = get_sheet(
+    sheet_doc, "PSF", dev_local_file=use_dev_local_file
+)
 
 # Global variable       ------------------------------------------------------
-psf_max_val = df[df.columns[6:]].max().max()  # highest PSF value in dataframe
+# highest PSF value in dataframe (reset after filtering by objective)
+psf_max_val = reactive.value(dataframe[dataframe.columns[6:]].max().max())
+sites = np.unique(np.asarray(dataframe["Site"]))
 
-# Reactive & general variables      ------------------------------------------
-sites = np.unique(np.asarray(df["Site"]))
-# FIXME: microsocpes, objectives, info - never really used...
-df_data = reactive.value(None)  # Contains only channel, FWHM & Date cols
-df_final = reactive.value(None)  # Final plotting data
-df_final_table = reactive.value(None)  # Final plotting data for table display
-ch_check_boxes = reactive.value(None)  # Selectors for channel displays
-fwhm_check_boxes = reactive.value(
-    None
-)  # Selectors for FWHM measurement display
-theoretical_fwhm = reactive.value(
-    None
-)  # Tuple (lateral, axial) theoretical FWHM values
+# Reactive variables              --------------------------------------------
+# Contains data filtered by sidebar selections
+df_data = reactive.value(None)
+# Same as df_data but retains non-numeric values (i.e. Reference channel info)
+df_ref = reactive.value(None)
 
 
 # Create UI         ----------------------------------------------------------
@@ -62,17 +63,32 @@ with ui.nav_panel(title="PSF"):
                 ):
 
                     @render.ui
-                    @reactive.event(ch_check_boxes)
                     def render_channel_choices():
+                        """Show channels and FWHM UI choices."""
+                        ch_selection = ui.input_checkbox_group(
+                            "ch_selection", "", choices={}
+                        )
+                        fwhm_selection = ui.input_checkbox_group(
+                            "fwhm_selection", "", choices={}
+                        )
+                        date_range_selection = ui.input_date_range(
+                            "date_range_selection",
+                            "Select date range:",
+                            start=None,
+                            end=None,
+                            format="yyyymmdd",
+                        )
                         return (
                             "Select channels for plotting:",
-                            ch_check_boxes.get(),
+                            ch_selection,
                             "FWHM to display:",
-                            fwhm_check_boxes.get(),
+                            fwhm_selection,
+                            date_range_selection,
                         )
 
                     @render.ui
                     def render_theoreticals():
+                        """Show theoretical UI choices."""
                         ch_calc_selection = ui.input_select(
                             "ch_calc_selection", "", choices=[]
                         )
@@ -90,6 +106,7 @@ with ui.nav_panel(title="PSF"):
 
                     @render.ui
                     def render_calculations():
+                        """Show UI options to calculate theoretical values."""
                         mic_kind_selection = ui.input_select(
                             "mic_kind_selection",
                             "Microscope kind",
@@ -118,224 +135,476 @@ with ui.nav_panel(title="PSF"):
                             ri_selection,
                         )
 
+        # PSF over time     --------------------------------------------------
         with ui.navset_card_underline(title="PSF over time"):
             with ui.nav_panel(title="Plot"):
-                # Add a date range selection
-                @render.ui
-                def render_date_range_selection():
-                    """Find min/max dates and create range selection."""
-                    dates = df_data.get()
-                    if dates is None or dates.empty:
-                        return
-                    # Find the min and max dates
-                    dates = list(dates.columns[2:])
-                    dates_stripped = []
-                    for d in dates:
-                        dates_stripped.append(d[:8])
 
-                    # Create date range selection
-                    date_range_selection = ui.input_date_range(
-                        "date_range_selection",
-                        "Select date range:",
-                        start=min(dates_stripped),
-                        end=max(dates_stripped),
-                        format="yyyymmdd",
+                @render_widget
+                def show_fwhm_plot():
+                    _, df_plot = add_theoretical_fwhm()
+                    return create_plot(
+                        df_plot, y_range=[-10, psf_max_val.get()]
                     )
-                    return date_range_selection
-
-                # Render the plot
-                @render.plot
-                def plot_psf_over_time():
-                    """Create the plot."""
-                    _df = df_final.get()
-                    fig, ax = plt.subplots()
-                    # Show no data plot
-                    if _df is None or _df.empty:
-                        ax.text(
-                            0.5,
-                            0.5,
-                            "No data to visualsise!",
-                            ha="center",
-                            va="center",
-                        )
-                        ax.set_axis_off()
-                        return fig
-                    sns.lineplot(
-                        _df,
-                        x="Date",
-                        y="nm",
-                        markers=True,
-                        style=_df.columns[0],
-                        dashes=False,
-                        hue=_df.columns[0],
-                        palette="turbo",
-                        legend="full",
-                    )
-                    # Sanity check: ensure that max PSF val < as theoreticals
-                    y_max = psf_max_val * 1.05
-                    for val in theoretical_fwhm.get():
-                        if val > y_max:
-                            y_max = val * 1.05
-                    # Fix Y axis min/max according to -10 to max+5% in original df
-                    ax.set(ylim=(-10, y_max))
-                    # Move legend to the right of the plot
-                    legend = ax.get_legend()
-                    if legend is not None:
-                        legend.set_bbox_to_anchor((1.05, 1))
-                        legend.set_loc("upper left")
-                    # X-labels
-                    plt.xticks(rotation=45, ha="right")  # rotate the x-ticks
-                    # Do not show all the ticks (for more than 10)
-                    ticks = ax.get_xticks()
-                    if len(ticks) > 10:
-                        new_ticks = ticks[:: int(len(ticks) ** 0.5)]
-                        # Make sure the last date tick is shown
-                        if new_ticks[-1] != ticks[-1]:
-                            new_ticks.append(ticks[-1])
-                        ax.set_xticks(new_ticks)
-                    ax.set_xlabel("")
-                    fig.tight_layout()
-                    return fig
 
             with ui.nav_panel(title="Table"):
 
                 @render.data_frame
-                def test2():
-                    return df_final_table.get()
+                def show_fwhm_table():
+                    df_table, _ = add_theoretical_fwhm()
+                    return df_table
+
+        # Shift over time     ------------------------------------------------
+        with ui.navset_card_underline(title="Chromatic shift over time"):
+            with ui.nav_panel(title="Plot"):
+
+                @render.text
+                def show_ref_channel():
+                    _, ref_channel = check_shift_ref_ch()
+                    return f"Reference channel: {ref_channel}"
+
+                @render_widget
+                def show_shift_plot():
+                    _, df_plot = get_shift_data()
+                    return create_plot(df_plot)
+
+            with ui.nav_panel(title="Table"):
+
+                @render.data_frame
+                def show_shift_table():
+                    df, _ = get_shift_data()
+                    return df
 
 
-# Reactive functions        --------------------------------------------------
-@reactive.effect()
-@reactive.event(
-    input.ch_selection,
-    input.fwhm_selection,
-    input.theoretical,
-    theoretical_fwhm,
-    input.date_range_selection,
-)
-def create_display_df():
+# General functions         --------------------------------------------------
+
+
+def create_plot(
+    df: pd.DataFrame,
+    y_label: Optional[str] = None,
+    y_range: Optional[list[Union[int, float]]] = None,
+):
     """
-    Filter the filtered DF by card selections.
+    Create a plotly plot from a dataframe.
 
-    Adds also entries for theoretical values.
-    FYI: sorts the dates (columns).
+    Expected are 5 columns, e.g.:
+    "Channel FWHM", Channel, "FWHM", Date, "value"
+    (From the original dataframe the first two columns combined make the first
+    column, then the dataframe is pivoted with the melt function.)
+
+    :param df: pd.DataFrame
+    :param ylabel: str, if None (default), takes the last header of the df
+    :param y_max: list[int], min/max values for the plot y-axis,
+        if None, takes the absolute min/max of the dataframe values to plot.
+
+    :return: plotly line plot
     """
-    # Get the filtered dataframe (as a copy)
-    if df_data.get() is None or df_data.get().empty:
-        return
-    _df = df_data.get().copy()
+    # Show no data figure if no data
+    if df is None or df.empty:
+        return no_data_fig()
 
-    # Drop NAN columns (no measurement for a specific date)
-    _df = _df.dropna(axis=1, how="all")
+    # Make sure that there is values to be displayed
+    _df = df.dropna(subset=[df.columns[-1]])
+    if _df.empty:
+        return no_data_fig()
 
-    # Make sure all date columns contain float (numeric is already ensured)
-    for col in _df.columns[2:]:
-        _df[col] = df[col].astype(float)
+    # Set the y_label if it is None
+    if y_label is None:
+        y_label = df.columns[-1]
 
-    # Filter data by selected channels and FWHM to display
-    ch_sel = input.ch_selection()
-    fwhm_sel = input.fwhm_selection()
-    if len(ch_sel) != len(np.unique(np.asarray(_df["Channel"]))):
-        _df = _df[_df["Channel"].isin(list(ch_sel))]
-    if len(fwhm_sel) != len(np.unique(np.asarray(_df["FWHM"]))):
-        _df = _df[_df["FWHM"].isin(list(fwhm_sel))]
+    # Check range and adjust it if necessary
+    if y_range is None:
+        abs_max = df[df.columns[-1]].abs().max() * 1.05
+        y_range = [-abs_max, abs_max]
+    else:
+        cur_max = df[df.columns[-1]].max()
+        input_max = y_range[1]
+        y_max = cur_max if input_max < cur_max else input_max
+        y_range = [y_range[0], y_max * 1.05]
 
-    # Add theoretical values to the data
-    theoretical_sel = input.theoretical()
-    for theo in theoretical_sel:
-        entry = [input.ch_calc_selection(), theo.capitalize()]
-        while len(entry) < len(_df.columns):
-            if theo == "lateral":
-                entry.append(theoretical_fwhm.get()[0])
-            else:
-                entry.append(theoretical_fwhm.get()[1])
-        _df.loc[len(_df)] = entry
-
-    # Remove the date columns that do not fall into the date range selection
-    start_date = input.date_range_selection()[0].strftime("%Y%m%d")
-    end_date = input.date_range_selection()[1].strftime("%Y%m%d")
-    _df = filter_by_date_range(_df, start_date, end_date)
-
-    # Merge the Channel and FWHM columns (and drop the original ones)
-    _df["PSF"] = (
-        _df[_df.columns[0]].astype(str) + " " + _df[_df.columns[1]].astype(str)
+    # Create the plot
+    plot = px.line(
+        df,
+        x="Date",
+        y=y_label,
+        color=df.columns[0],
+        line_group=df.columns[0],
+        line_dash=df.columns[0],
+        markers=True,
+        hover_data={
+            "Date": True,
+            y_label: ":.0f",
+            df.columns[0]: True,
+        },
     )
-    _df = _df.drop(columns=_df.columns[:2])
-    # Move new (last) col to beginning
-    cols = list(_df)
-    cols.insert(0, cols.pop(cols.index(cols[-1])))
-    _df = _df.loc[:, cols]
+    # Move legend to the right
+    plot.update_layout(
+        template="simple_white",
+        legend={
+            "yanchor": "top",
+            "y": 1,
+            "xanchor": "left",
+            "x": 1.02,
+        },
+        margin={"r": 200},
+        yaxis_range=y_range,
+    )
 
-    # Sort date columns
-    cols = [_df.columns[0]]
-    for c in sorted(_df.columns[1:]):
-        cols.append(c)
-    _df = _df.reindex(cols, axis=1)
+    # Rotate x-axis labels
+    plot.update_xaxes(
+        tickangle=45,
+        # Reduce number of displayed ticks
+        nticks=10,
+        showgrid=False,
+        title="",
+    )
+    plot.update_yaxes(showgrid=True, gridcolor="lightgrey")
 
-    # Set the reactive value for the table view
-    df_final_table.set(_df)
+    # Custom hover template
+    plot.update_traces(
+        hovertemplate="<b>%{fullData.name}</b><br>"
+        "Date: %{x}<br>"
+        "mW: %{y:.3f}<extra></extra>"
+    )
+    return plot
 
-    # Pivot the table?
-    _df = _df.melt(id_vars=_df.columns[0], var_name="Date", value_name="nm")
 
-    # Set the final df reactive value for data display
-    df_final.set(_df)
+def calculate_theoretical_values(
+    kind: str, ex: Optional[float], na: Optional[float], ri: Optional[float]
+) -> tuple[float, float]:
+    """
+    Calculate theoretical FWHM values.
 
+    :param kind: str, one of: Widefield, Point Scanner, Spinning disk, 2-Photon
+    :param ex: float, excitation wavelength
+    :param na: float, NA
+    :param ri: float, refractive index
 
-@reactive.effect()
-@reactive.event(
-    input.ch_calc_selection,
-    input.mic_kind_selection,
-    input.ex_selection,
-    input.na_selection,
-    input.ri_selection,
-)
-def update_theoretical_values():
-    """Calculate theoretical FWHM values."""
-    w = input.ex_selection()
-    na = input.na_selection()
-    ri = input.ri_selection()
-    # Return if values are None or 0
-    if w is None or w == 0:
-        return
+    :return: tuple[float], (FWHM-lateral, FWHM-axial)
+    """
+    # Return (0, 0) if values are None or 0
+    if ex is None or ex == 0:
+        return (0, 0)
     if na is None or na == 0:
-        return
+        return (0, 0)
     if ri is None or ri == 0:
-        return
+        return (0, 0)
+    if kind is None:
+        return (0, 0)
 
-    kind = input.mic_kind_selection()
+    # Make sure that values are float
+    try:
+        ex = float(ex)
+        na = float(na)
+        ri = float(ri)
+    except ValueError as err:
+        raise ValueError(
+            "One of the values is not a number. "
+            f"Excitaiton={ex}, NA={na}, refractive index={ri}"
+        ) from err
+    # Calculate the values based on kind
     if kind == "Widefield":
-        theo = theo_fwhm_widefield(w, na, ri)
+        theo = theo_fwhm_widefield(ex, na, ri)
     elif kind == "Point Scanner":
-        theo = theo_fwhm_pointscanner(w, na, ri)
+        theo = theo_fwhm_pointscanner(ex, na, ri)
     elif kind == "Spinning disk":
-        theo = theo_fwhm_spinning(w, na, ri)
+        theo = theo_fwhm_spinning(ex, na, ri)
     elif kind == "2-Photon":
-        theo = theo_fwhm_2photon(w, na, ri)
+        theo = theo_fwhm_2photon(ex, na, ri)
     else:
         raise NotImplementedError(
             f"Calculation of FWHM for {kind} is not implemented."
         )
-
-    # Set the reactive value
+    # Check for complex numbers, and return 0s if so
     for i in theo:
-        # In case of complex number (e.g. wrong NA and/or RI): set to (0, 0)
         if not isinstance(i, float):
-            theoretical_fwhm.set((0, 0))
-            return
-    theoretical_fwhm.set((round(theo[0], 2), round(theo[1], 2)))
+            return (0, 0)
+    return theo
+
+
+def no_data_fig_simple(message: str = "No data to visualise!"):
+    """
+    Show a no data plot with matplotlib.
+
+    :param message: str, to display in the plot.
+
+    :return: matplot fig
+    """
+    fig, ax = plt.subplots()
+    ax.text(0.5, 0.5, message, ha="center", va="center")
+    ax.set_axis_off()
+    return fig
+
+
+def no_data_fig(message: str = "No data to visualise!"):
+    """
+    Show a no data plot with plotly.
+
+    :param message: str, to display in the plot.
+
+    :return: plotly.plot
+    """
+    fig = px.line(pd.DataFrame({"x": [], "y": []}), x="x", y="y")
+    fig.add_annotation(
+        text=message,
+        x=0.5,
+        y=0.5,
+        xref="paper",
+        yref="paper",
+        showarrow=False,
+        font={"size": 20, "color": "gray"},
+    )
+    fig.update_layout(template="simple_white", showlegend=False)
+    fig.update_xaxes(visible=False)
+    fig.update_yaxes(visible=False)
+
+    return fig
+
+
+# Reactive functions        --------------------------------------------------
+
+
+@reactive.calc
+@reactive.event(df_ref, input.date_range_selection)
+def check_shift_ref_ch():
+    """
+    Identify the reference channel.
+
+    Work on "unfiltered" dataframe to keep all channels in it.
+
+    Reference-X/Y/Z information is lost already during loading of sheet.
+    Hence, try to identify via NaN values...
+
+    :return: tuple(bool, str):
+        - bool, True if channel was identified
+        - str, message to display in UI, can be channel name
+
+    """
+    df = df_ref.get()
+    if df is None or df.empty:
+        return False, ""
+
+    df = pd.DataFrame(df)
+    # Keep only "Shift" rows
+    with warnings.catch_warnings():
+        warnings.filterwarnings(
+            "ignore",
+            message="Boolean Series key will be reindexed to match DataFrame index",
+        )
+        df = df[df["FWHM"].str.startswith("Shift")]
+
+    if df.empty:
+        return False, "No shift data"
+    # Remove date columns outside selected date range
+    start_date = input.date_range_selection()[0].strftime("%Y%m%d")
+    end_date = input.date_range_selection()[1].strftime("%Y%m%d")
+    df = filter_by_date_range(df=df, min=start_date, max=end_date)
+
+    # Keep only rows which have NaN values (may have been text, or missing values)
+    df_nan = df[df.isnull().any(axis=1)]
+    ref_channel = np.unique(np.asarray(df_nan["Channel"]))
+    if len(ref_channel) == 1:
+        return True, ref_channel[0]
+    elif len(ref_channel) == 0:
+        return False, "Could not identify ref channel"
+    else:
+        ui.notification_show(
+            "Shift reference channel could not be identified. "
+            "Maybe due to: (1) change of reference channel over different measurements; "
+            f"(2) missing measurements. Possible channels = {ref_channel}",
+            type="warning",
+        )
+        return False, "ERROR: could not determine ref channel"
+
+
+@reactive.calc
+@reactive.event(
+    df_data,
+    input.theoretical,
+    input.mic_kind_selection,
+    input.ex_selection,
+    input.na_selection,
+    input.ri_selection,
+    input.ch_selection,
+    input.fwhm_selection,
+    input.date_range_selection,
+)
+def add_theoretical_fwhm() -> tuple[pd.DataFrame, pd.DataFrame]:
+    """
+    Add the theoretical FWHM to the dataframe.
+
+    Triggers on card selections inputs AND df_data.
+
+    Creates the final data to be plotted.
+
+    :return: tuple(pd.DataFrame)
+        - dataframe for table
+        - dataframe for plotting (pivoted)
+    """
+    df = get_raw_fwhm_data()
+    if df.empty:
+        return df, df
+
+    # Filter data by selected Channels and FWHM to display
+    ch_sel = input.ch_selection()
+    fwhm_sel = input.fwhm_selection()
+    if len(ch_sel) != len(np.unique(np.asarray(df["Channel"]))):
+        df = df[df["Channel"].isin(list(ch_sel))]
+    if len(fwhm_sel) != len(np.unique(np.asarray(df["FWHM"]))):
+        df = df[df["FWHM"].isin(list(fwhm_sel))]
+
+    # Reset index the dataframe to avoid mistakes when adding new rows
+    df = df.reset_index(drop=True)
+
+    # Add theoretical values to the data
+    theo_sel = input.theoretical()
+    kind = input.mic_kind_selection()
+    ex = input.ex_selection()
+    na = input.na_selection()
+    ri = input.ri_selection()
+    values = calculate_theoretical_values(kind, ex, na, ri)
+    for t in theo_sel:
+        entry = [
+            f"Theoretical {kind} " + str(input.ch_calc_selection()),
+            t.capitalize(),
+        ]
+        while len(entry) < len(df.columns):
+            if t == "lateral":
+                entry.append(values[0])
+            else:
+                entry.append(values[1])
+        df.loc[len(df)] = entry
+
+    # Merge the Channel and FWHM columns (don't drop the original ones)
+    plot_df = df.copy()
+    plot_df["PSF"] = (
+        df[df.columns[0]].astype(str) + " " + df[df.columns[1]].astype(str)
+    )
+    # Move the new last col to the beginning
+    cols = list(plot_df)
+    cols.insert(0, cols.pop(cols.index(cols[-1])))
+    plot_df = plot_df.loc[:, cols]
+    # Pivot the table
+    plot_df = plot_df.melt(
+        id_vars=plot_df.columns[:3], var_name="Date", value_name="nm"
+    )
+    return df, plot_df
+
+
+@reactive.calc
+@reactive.event(df_data, input.ch_selection, input.date_range_selection)
+def get_shift_data() -> tuple[pd.DataFrame, pd.DataFrame]:
+    """
+    Filter the dataframe for shift values.
+
+    :return: tuple[pd.DataFrame]:
+        - dataframe for table
+        - dataframe for plotting (pivoted)
+    """
+    df = df_data.get()
+    if df is None or df.empty:
+        return pd.DataFrame(), pd.DataFrame()
+
+    df = pd.DataFrame(df)
+    # Remove date columns outside selected date range
+    start_date = input.date_range_selection()[0].strftime("%Y%m%d")
+    end_date = input.date_range_selection()[1].strftime("%Y%m%d")
+    df = filter_by_date_range(df=df, min=start_date, max=end_date)
+
+    # Remove non Shift rows
+    with warnings.catch_warnings():
+        warnings.filterwarnings(
+            "ignore",
+            message="Boolean Series key will be reindexed to match DataFrame index",
+        )
+        df = df[df["FWHM"].str.startswith("Shift")]
+
+    # Replace NaN values with 0 for reference channel
+    do_replace, ref_name = check_shift_ref_ch()
+    if do_replace:
+        mask = df["Channel"] == ref_name
+        df.loc[mask] = df.loc[mask].fillna(0)
+        # Rename the channel name
+        new_ref_name = ref_name + " ref."
+        df.loc[mask, "Channel"] = new_ref_name
+
+    # Filter data by selected Channels
+    ch_sel = list(input.ch_selection())
+    if ref_name in ch_sel:
+        # Prevent from removing the reference
+        ch_sel.append(new_ref_name)
+    # if len(ch_sel) != len(np.unique(np.asarray(df["Channel"]))):
+    df = df[df["Channel"].isin(list(ch_sel))]
+
+    # Merge the Channel and FWHM columns (don't drop the original ones)
+    plot_df = df.copy()
+    plot_df["Shift"] = (
+        df[df.columns[0]].astype(str) + " " + df[df.columns[1]].astype(str)
+    )
+    # Move the new last col to the beginning
+    cols = list(plot_df)
+    cols.insert(0, cols.pop(cols.index(cols[-1])))
+    plot_df = plot_df.loc[:, cols]
+    # Pivot the table
+    plot_df = plot_df.melt(
+        id_vars=plot_df.columns[:3], var_name="Date", value_name="voxels"
+    )
+    return df, plot_df
+
+
+@reactive.calc
+@reactive.event(df_data, input.date_range_selection)
+def get_raw_fwhm_data() -> pd.DataFrame:
+    """
+    Filter the dataframe for FWHM values.
+
+    Sets also the plotting UI selection choices.
+
+    :return: pd.DataFrame
+    """
+    df = df_data.get()
+    if df is None or df.empty:
+        return pd.DataFrame()
+
+    df = pd.DataFrame(df)
+    # Remove date columns outside selected date range
+    start_date = input.date_range_selection()[0].strftime("%Y%m%d")
+    end_date = input.date_range_selection()[1].strftime("%Y%m%d")
+    df = filter_by_date_range(df=df, min=start_date, max=end_date)
+
+    # Remove non FWHM rows
+    with warnings.catch_warnings():
+        warnings.filterwarnings(
+            "ignore",
+            message="Boolean Series key will be reindexed to match DataFrame index",
+        )
+        df = df[df["FWHM"].str.startswith("FWHM")]
+
+    # Set the plotting option choices
+    channels = np.unique(np.asarray(df["Channel"]))
+    ch_dict = {ch: ch for ch in channels}
+    ui.update_checkbox_group(
+        "ch_selection", choices=ch_dict, selected=list(ch_dict.keys())
+    )
+    fwhms = np.unique(np.asarray(df["FWHM"]))
+    fwhm_dict = {f: f for f in fwhms}
+    ui.update_checkbox_group(
+        "fwhm_selection", choices=fwhm_dict, selected=list(fwhm_dict.keys())
+    )
+    ui.update_select("ch_calc_selection", choices=list(channels))
+    return df
 
 
 @reactive.effect()
 @reactive.event(input.ch_calc_selection)
 def update_theoretical_calculation():
     """
-    Update values for theoretical calculations.
+    Update UI values for theoretical calculations.
 
     Based on the channel selection for the calculation.
+    Also updates the NA and RI selections
     """
-    # Update the wavelength
     cur = input.ch_calc_selection()
+    # Try to map a string input to a wavelength
     val = 488
     if cur == "DAPI":
         val = 405
@@ -345,15 +614,28 @@ def update_theoretical_calculation():
         val = 561
     if cur == "Cy5":
         val = 647
-    ui.update_numeric("ex_selection", value=val)
-    # Update the NA and guess the refractive index based on NA
-    _objective = input.objective()
-    na = 1.0  # Default value
+    # If the selected channel is already a wavelength
     try:
-        na = float(_objective.split("/")[1])
-    except Exception:
+        val = float(cur)
+    except ValueError:
         pass
+    ui.update_numeric("ex_selection", value=val)
+
+    # Update the NA and guess the refractive index based on NA
+    objective = input.objective()
+    na = 1.0  # Default value
+    ri = 1.0  # Default value
+    if objective.startswith("ID"):
+        # TODO try to get the information from the database
+        pass
+    else:
+        # Try to parse the selection (expected "max/NA")
+        try:
+            na = float(objective.split("/")[1])
+        except Exception:
+            pass
     ui.update_numeric("na_selection", value=na)
+    # TODO find a way to discrimnate if values come from ID or not...
     ri = 1.0
     if na > 1:
         ri = 1.515
@@ -361,48 +643,13 @@ def update_theoretical_calculation():
 
 
 @reactive.effect
-@reactive.event(df_data)
-def create_card_data_selectors():
-    """Create checkbox groups for channels and FWHM entries."""
-    _df = df_data.get()
-    # If filtered df is None, there should be no checkboxes
-    if _df is None:
-        ch_check_boxes.set([])
-        return
-    # The dataframe only contains columns Channel, FWHM and dates
-    # Get unique channel names
-    channels = np.unique(np.asarray(_df["Channel"]))
-    # Create a checkbox group for the channels
-    ch_dict = {}
-    for ch in channels:
-        ch_dict[ch] = ch
-    ch_check_boxes.set(
-        ui.input_checkbox_group(
-            "ch_selection", "", choices=ch_dict, selected=list(ch_dict.keys())
-        )
-    )
-    # Update also the ch_calc_selection
-    ui.update_select("ch_calc_selection", choices=list(channels))
-    # Get unique FWHM names
-    fwhms = np.unique(np.asarray(_df["FWHM"]))
-    # Create a checkbox group for the FWHM
-    fwhm_dict = {}
-    for f in fwhms:
-        fwhm_dict[f] = f
-    fwhm_check_boxes.set(
-        ui.input_checkbox_group(
-            "fwhm_selection",
-            "",
-            choices=fwhm_dict,
-            selected=list(fwhm_dict.keys()),
-        )
-    )
-
-
-@reactive.effect
 @reactive.event(input.site, input.microscope, input.objective, input.info)
-def create_final_data():
-    """Filter the data by the common columns."""
+def filter_by_sidebar_selections():
+    """
+    Filter the data by the common columns.
+
+    Sets also the date range selection min/max.
+    """
     # Check that all selections are valid (not None)
     site_ = input.site()
     mic_ = input.microscope()
@@ -410,17 +657,41 @@ def create_final_data():
     info_ = input.info()
     if None in [site_, mic_, obj_, info_]:
         df_data.set(None)
+        df_ref.set(None)
         return
     # Filter the dataframe and set the reactive value (work with df copy)
-    _df = filter_by_column_value(df.copy(), "Site", input.site())
-    _df = filter_by_column_value(
-        _df,
-        "Microscope",
-        input.microscope(),
-    )
-    _df = filter_by_column_value(_df, "Objective", input.objective())
-    _df = filter_by_column_value(_df, "Info", input.info())
-    df_data.set(_df)
+    df = filter_by_column_value(dataframe.copy(), "Site", input.site())
+    df = filter_by_column_value(df, "Microscope", input.microscope())
+    df = filter_by_column_value(df, "Objective", input.objective())
+    # Reset the psf max value
+    psf_max_val.set(df[df.columns[3:]].max().max())
+    df = filter_by_column_value(df, "Info", input.info())
+    # Drop NAN columns
+    df = df.dropna(axis=1, how="all")
+    # Before enusring numeric, keep copy of that dataframe
+    df_ref.set(df)
+    # Ensure numeric data values (date columns)
+    for col in df.columns[2:]:
+        df[col] = df[col].astype(float)
+    # Sort the date columns
+    cols = list(df.columns[:2])
+    for c in sorted(df.columns[2:]):
+        cols.append(c)
+    df = df.reindex(cols, axis=1)
+    df_data.set(df)
+
+
+@reactive.effect
+@reactive.event(df_data)
+def update_date_range_ui():
+    df = df_data.get()
+    if df is None or df.empty:
+        return
+    # Update the date range selections
+    dates = parse_dates(list(df.columns[2:]))
+    if len(dates) == 0:
+        return
+    ui.update_date_range("date_range_selection", start=dates[0], end=dates[-1])
 
 
 @reactive.effect
@@ -429,7 +700,9 @@ def update_microscope_choices():
     """Update microscope choices based on site selection."""
     # Filter the data frame (always the original) and
     # set the reactive result dataframe
-    df_filtered = filter_by_column_value(df.copy(), "Site", input.site())
+    df_filtered = filter_by_column_value(
+        dataframe.copy(), "Site", input.site()
+    )
     # Get a list of microscopes and set the reactive result
     m_filtered = np.unique(np.asarray(df_filtered["Microscope"]))
     # Update the ui selection (using the reactive variable)
@@ -441,7 +714,9 @@ def update_microscope_choices():
 def update_objective_choices():
     """Update objective choices based on microscope selection."""
     # Filter original df from start
-    df_filtered = filter_by_column_value(df.copy(), "Site", input.site())
+    df_filtered = filter_by_column_value(
+        dataframe.copy(), "Site", input.site()
+    )
     df_filtered = filter_by_column_value(
         df_filtered, "Microscope", input.microscope()
     )
@@ -456,7 +731,9 @@ def update_objective_choices():
 def update_info_choices():
     """Update info choices based on microscope & objective selection."""
     # Filter original df from start
-    df_filtered = filter_by_column_value(df.copy(), "Site", input.site())
+    df_filtered = filter_by_column_value(
+        dataframe.copy(), "Site", input.site()
+    )
     df_filtered = filter_by_column_value(
         df_filtered, "Microscope", input.microscope()
     )
@@ -467,6 +744,3 @@ def update_info_choices():
     i = np.unique(np.asarray(df_filtered["Info"]))
     # Update the ui selection
     ui.update_select("info", choices=list(i))
-
-
-# General functions         --------------------------------------------------
