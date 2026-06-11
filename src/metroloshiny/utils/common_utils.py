@@ -3,10 +3,16 @@
 import datetime
 import os
 from collections import Counter, defaultdict
+from importlib.metadata import version
 from typing import Optional
 
 import numpy as np
 from bs4 import BeautifulSoup
+
+
+def get_version() -> str:
+    """Get the metroloshiny version."""
+    return version("metroloshiny")[:11]
 
 
 def get_ui_id(input) -> str:

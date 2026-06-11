@@ -35,6 +35,11 @@ Make sure that all sheets already contain at least one entry.
 
 The first sheet entry for a new "site" should be done manually within the sheet.
 
+> [!NOTE]
+> - The sheet names may not be changed.
+> - The first (common) column names may not be changed (e.g. Site, Microscope, Objective, Info, Channel, FWHM, ...)
+> - Date columns must be in format YYYYmmdd (there may be more text after that)
+
 ## Google service account
 
 To retrieve (and write) data to the google sheet, metroloshiny requires you to create a service account.

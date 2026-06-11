@@ -12,6 +12,7 @@ if TYPE_CHECKING:
 from metroloshiny.data_objects.PSFData import PSFData
 from metroloshiny.utils.common_utils import (
     check_duplicate_dict_values,
+    get_version,
     invert_nested_dict,
     list_duplicates,
     set_local_file,
@@ -88,7 +89,7 @@ upload_power_button = ui.input_action_button(
 )
 
 # Build the GUI     items       ----------------------------------------------
-ui.page_opts(title="Metrology Upload")
+ui.page_opts(title="Metrology Upload", footer=f"Version {get_version()}")
 with ui.nav_panel(title="Data Upload"):
     # Sidebar
     with ui.layout_sidebar():

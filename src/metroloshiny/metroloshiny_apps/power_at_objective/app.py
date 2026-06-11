@@ -9,6 +9,7 @@ from shinywidgets import render_widget
 
 from metroloshiny.utils.common_utils import (
     create_css_color_dict,
+    get_version,
     set_local_file,
 )
 from metroloshiny.utils.dataframe_utils import (
@@ -42,7 +43,7 @@ df_data = reactive.value(None)
 
 
 # Create UI         ----------------------------------------------------------
-ui.page_opts(title="Metrology: Power")
+ui.page_opts(title="Metrology: Power", footer=f"Version {get_version()}")
 with ui.nav_panel(title="Light Source Power"):
     # Sidebar          -------------------------------------------------------
     with ui.layout_sidebar():

@@ -11,6 +11,7 @@ from shiny.express import input, render, ui
 from shinywidgets import render_widget
 
 from metroloshiny.utils.common_utils import (
+    get_version,
     set_local_file,
     theo_fwhm_2photon,
     theo_fwhm_pointscanner,
@@ -44,7 +45,7 @@ df_ref = reactive.value(None)
 
 
 # Create UI         ----------------------------------------------------------
-ui.page_opts(title="Metrology: PSF")
+ui.page_opts(title="Metrology: PSF", footer=f"Version {get_version()}")
 with ui.nav_panel(title="PSF"):
     # Sidebar          -------------------------------------------------------
     with ui.layout_sidebar():
