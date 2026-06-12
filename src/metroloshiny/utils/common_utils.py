@@ -481,6 +481,7 @@ def get_objective_na(df: pd.DataFrame, id: str) -> Optional[float]:
     try:
         na = get_objective_info(df, id, "NA")
     except ValueError as err:
+        # Objective not in database
         raise RuntimeError(str(err)) from err
     # Make sure the return value is a number
     try:
@@ -503,6 +504,7 @@ def get_objective_ri(df: pd.DataFrame, id: str) -> Optional[float]:
     try:
         ri = get_objective_info(df, id, "Refractive Index")
     except ValueError as err:
+        # Objective not in database
         raise RuntimeError(str(err)) from err
     # Make sure the return value is a number
     try:
@@ -510,6 +512,30 @@ def get_objective_ri(df: pd.DataFrame, id: str) -> Optional[float]:
     except ValueError:
         return None
     return ri
+
+
+def get_objective_mag(df: pd.DataFrame, id: str) -> Optional[int]:
+    """
+    Get the magnification for objective in the database.
+
+    :param df: pd.DataFrame, of the objecive database
+    :param id: str, objective id number, e.g. ID17,
+        Should/must always start with "ID"
+
+    :return: int, magnification of the objective, or None if parsing error
+    """
+    try:
+        x = get_objective_info(df, id, "Magnification")
+    except ValueError as err:
+        # Objective not in database
+        raise RuntimeError(str(err)) from err
+    # Make sure the return value is a number
+    x = str(x).lower().strip("x")
+    try:
+        x = int(float(x))
+    except ValueError:
+        return None
+    return x
 
 
 if __name__ == "__main__":

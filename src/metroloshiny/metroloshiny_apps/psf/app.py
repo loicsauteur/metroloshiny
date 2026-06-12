@@ -11,6 +11,7 @@ from shiny.express import input, render, ui
 from shinywidgets import render_widget
 
 from metroloshiny.utils.common_utils import (
+    get_objective_mag,
     get_objective_na,
     get_objective_ri,
     get_version,
@@ -31,7 +32,7 @@ from metroloshiny.utils.read_file import get_sheet, load_doc
 # TODO change channel naming restriction (try get names from OMERO channels), & calibrate XYZ shift
 
 # Load Data
-use_dev_local_file = set_local_file()
+use_dev_local_file = set_local_file(True)
 sheet_doc = load_doc(dev_local_file=use_dev_local_file)
 wsheet_psf, dataframe = get_sheet(
     sheet_doc, "PSF", dev_local_file=use_dev_local_file
@@ -809,10 +810,32 @@ def update_objective_choices():
     )
     # Get a list of unique objective choices
     o = np.unique(np.asarray(df_filtered["Objective"]))
+    # Create a dictionary with adapted names for IDs
+    o_dict = {}
+    for i in o:
+        # keys=input values, values=shown to user
+        if i.startswith("ID"):
+            try:
+                na = get_objective_na(objective_df, i)
+                if na is None:
+                    # in case of parsing error
+                    na = "?"
+            except RuntimeError:
+                # in case not in objective_db
+                na = "?"
+            try:
+                mag = get_objective_mag(objective_df, i)
+                if mag is None:
+                    mag = "?"
+            except RuntimeError:
+                mag = "?"
+            o_dict[i] = f"{mag!s}x/{na} ({i})"
+        else:
+            o_dict[i] = i
     # Update the ui selection
-    ui.update_select("objective", choices=list(o))
+    ui.update_select("objective", choices=o_dict)
     # Update the objective choices
-    objective_choices.set(list(o))
+    objective_choices.set(o_dict.keys())
 
 
 @reactive.effect

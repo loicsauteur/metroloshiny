@@ -189,6 +189,7 @@ def test_objective_db_functions():
     # Check "sub-functions"
     assert cu.get_objective_na(df, "ID1") == 0.2
     assert cu.get_objective_ri(df, "ID19") == 1.518
+    assert cu.get_objective_mag(df, "ID4") == 40
     with pytest.raises(
         RuntimeError, match=r"The .*is not present in the objective database."
     ):
