@@ -155,6 +155,7 @@ with ui.nav_panel(title="Data Upload"):
                     return omero_type_selector, omero_id_selector
 
                 # Show 2 tables: Data for upload and channel naming table
+                ui.div(style="margin-top: 20px;")  # add a spacing
                 with ui.layout_column_wrap(width=1 / 2):
                     with ui.card():
                         ui.card_header("OMERO data")
@@ -196,6 +197,8 @@ with ui.nav_panel(title="Data Upload"):
                             return render.DataGrid(channels, editable=True)
 
                 # Show the upload button
+                ui.div(style="margin-top: 20px;")  # add a spacing
+
                 @render.ui
                 def show_omero_upload_btn():
                     return upload_omero_button

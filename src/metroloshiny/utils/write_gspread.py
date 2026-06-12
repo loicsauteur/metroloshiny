@@ -16,6 +16,7 @@ from metroloshiny.utils.read_file import ensure_numeric_data
 __gspread_names__ = {
     "Power": "laser_power_measurements",
     "PSF": "psf_measurements",
+    "Objectives": "objective_db",
 }
 
 # Google spreadsheet headers 1-based indices

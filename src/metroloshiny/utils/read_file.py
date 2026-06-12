@@ -13,6 +13,7 @@ __linux_private_data_path__ = "/absolute/path/to/private_data.csv"
 __sheet_names__ = {
     "Power": "laser_power_measurements",
     "PSF": "psf_measurements",
+    "Objectives": "objective_db",
 }
 
 
@@ -144,6 +145,9 @@ def get_sheet(
         df = ensure_numeric_data(df, first_column=4)
     elif kind == "PSF":
         df = ensure_numeric_data(df, first_column=6)
+    elif kind == "Objectives":
+        # Do not ensure numeric data for the objective_db
+        df = pd.DataFrame(df)
     else:
         raise NotImplementedError
     return sheet, df

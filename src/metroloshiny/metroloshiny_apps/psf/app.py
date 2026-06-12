@@ -11,6 +11,8 @@ from shiny.express import input, render, ui
 from shinywidgets import render_widget
 
 from metroloshiny.utils.common_utils import (
+    get_objective_na,
+    get_objective_ri,
     get_version,
     set_local_file,
     theo_fwhm_2photon,
@@ -25,12 +27,21 @@ from metroloshiny.utils.dataframe_utils import (
 )
 from metroloshiny.utils.read_file import get_sheet, load_doc
 
+# TODO Add plot for single date chromatic shift, that shows shift in XY
+# TODO change channel naming restriction (try get names from OMERO channels), & calibrate XYZ shift
+
 # Load Data
 use_dev_local_file = set_local_file()
 sheet_doc = load_doc(dev_local_file=use_dev_local_file)
 wsheet_psf, dataframe = get_sheet(
     sheet_doc, "PSF", dev_local_file=use_dev_local_file
 )
+# Load objectives dataframe conditionally
+objective_df = None
+if dataframe["Objective"].str.startswith("ID").any():
+    _, objective_df = get_sheet(
+        sheet_doc, "Objectives", dev_local_file=use_dev_local_file
+    )
 
 # Global variable       ------------------------------------------------------
 # highest PSF value in dataframe (reset after filtering by objective)
@@ -42,6 +53,8 @@ sites = np.unique(np.asarray(dataframe["Site"]))
 df_data = reactive.value(None)
 # Same as df_data but retains non-numeric values (i.e. Reference channel info)
 df_ref = reactive.value(None)
+# Remember choices for objectives (to create an objective_db table)
+objective_choices = reactive.value(None)
 
 
 # Create UI         ----------------------------------------------------------
@@ -57,7 +70,7 @@ with ui.nav_panel(title="PSF"):
 
         # Selection card     -------------------------------------------------
         with ui.navset_card_underline(title="Plotting options"):
-            with ui.nav_panel(title=""):
+            with ui.nav_panel(title="Options"):
                 # Add checkboxes & other as columns
                 with ui.layout_column_wrap(
                     width=1 / 3, min_height="150px", max_height="2000px"
@@ -135,6 +148,26 @@ with ui.nav_panel(title="PSF"):
                             na_selection,
                             ri_selection,
                         )
+
+            with ui.nav_panel(title="Objective information"):
+
+                @render.text
+                @reactive.event(objective_choices)
+                def show_objective_table_info():
+                    """Show info if no database objective available."""
+                    oc = objective_choices.get()
+                    if oc is None:
+                        return ""
+                    if any(s.startswith("ID") for s in oc):
+                        return ""
+                    else:
+                        return "No objective information available."
+
+                @render.data_frame
+                def show_objective_table():
+                    """Render available objective table."""
+                    o_df, styles = get_objective_table()
+                    return render.DataGrid(o_df, styles=styles)
 
         # PSF over time     --------------------------------------------------
         with ui.navset_card_underline(title="PSF over time"):
@@ -362,6 +395,47 @@ def no_data_fig(message: str = "No data to visualise!"):
 
 
 # Reactive functions        --------------------------------------------------
+
+
+@reactive.calc
+@reactive.event(df_data, objective_choices)
+def get_objective_table() -> tuple[pd.DataFrame, list[dict]]:
+    """
+    Get the table about the objectives for the selected microscope.
+
+    Only lists objectives that have been used (i.e. in the PSF dataframe)
+    Highlight the selected objective.
+
+    :return: pd.DataFrame
+        DataFrame of available objectives
+    :return: list[dict]]
+        List of dict to be used to highlight row in DataGrid
+    """
+    # Make sure DF ready and selections valid
+    if df_data.get() is None or df_data.get().empty:
+        return pd.DataFrame(), []
+    objective = input.objective()
+    available = objective_choices.get()
+    if objective is None or available is None:
+        return pd.DataFrame(), []
+    # Get a list of objectives that start with ID
+    valid = [x for x in available if x.startswith("ID")]
+    if len(valid) == 0:
+        return pd.DataFrame(), []
+    # Create dataframe subset from objective_db
+    subset = objective_df.copy()
+    subset = subset[subset["ID"].isin(available)]
+    subset = subset.reset_index(drop=True)
+    # Create a style to highlight the selection
+    selected = subset[subset["ID"] == objective].index
+    styles = [
+        {
+            # Rows are re-indexed (NOT df.index)
+            "rows": list(selected),
+            "style": {"background-color": "yellow", "font-weight": "bold"},
+        }
+    ]
+    return subset, styles
 
 
 @reactive.calc
@@ -596,15 +670,20 @@ def get_raw_fwhm_data() -> pd.DataFrame:
 
 
 @reactive.effect()
-@reactive.event(input.ch_calc_selection)
+@reactive.event(df_data, input.ch_calc_selection)
 def update_theoretical_calculation():
     """
     Update UI values for theoretical calculations.
 
     Based on the channel selection for the calculation.
-    Also updates the NA and RI selections
+    Also updates the NA and RI selections.
     """
+    # Make sure that the dataframe and selections are valid
+    if df_data.get() is None or df_data.get().empty:
+        return
     cur = input.ch_calc_selection()
+    if cur is None:
+        return
     # Try to map a string input to a wavelength
     val = 488
     if cur == "DAPI":
@@ -627,8 +706,15 @@ def update_theoretical_calculation():
     na = 1.0  # Default value
     ri = 1.0  # Default value
     if objective.startswith("ID"):
-        # TODO try to get the information from the database
-        pass
+        try:
+            _na = get_objective_na(objective_df, objective)
+            _ri = get_objective_ri(objective_df, objective)
+            # None values from parsing errors -> leave to default
+            na = na if _na is None else _na
+            ri = ri if _ri is None else _ri
+        except RuntimeError as err:
+            # In case the ID is not in the database
+            ui.notification_show(str(err), type="warning")
     else:
         # Try to parse the selection (expected "max/NA")
         try:
@@ -725,6 +811,8 @@ def update_objective_choices():
     o = np.unique(np.asarray(df_filtered["Objective"]))
     # Update the ui selection
     ui.update_select("objective", choices=list(o))
+    # Update the objective choices
+    objective_choices.set(list(o))
 
 
 @reactive.effect

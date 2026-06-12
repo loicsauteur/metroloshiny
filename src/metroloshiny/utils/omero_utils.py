@@ -378,13 +378,13 @@ def render_dict(d: dict):
 
 
 if __name__ == "__main__":
-    out = omero_operation(
-        operation=None,
-        omero_type="Image",
-        omero_id=2832822,
-        metric_id="FWHM",
-    )
-    render_dict(out)
+    # out = omero_operation(
+    #     operation=None,
+    #     omero_type="Image",
+    #     omero_id=2832822,
+    #     metric_id="FWHM",
+    # )
+    # render_dict(out)
 
     """
     from sara (dataset with second last image containing a table)

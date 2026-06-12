@@ -4,9 +4,10 @@ import datetime
 import os
 from collections import Counter, defaultdict
 from importlib.metadata import version
-from typing import Optional
+from typing import Optional, Union
 
 import numpy as np
+import pandas as pd
 from bs4 import BeautifulSoup
 
 
@@ -431,6 +432,84 @@ def create_css_color_dict(
         dict_out[range_list[i]] = all_colors.get(closes_color)
 
     return dict_out
+
+
+def get_objective_info(
+    df: pd.DataFrame, id: str, info: str
+) -> Union[str, int, float]:
+    """
+    Load any of the values from the objective database for an objective.
+
+    :param df: pd.DataFrame, of the objecive database
+    :param id: str, objective id number, e.g. ID17,
+        Should/must always start with "ID"
+    :param info: str, any of the column headers of the objecitve database
+
+    :return: the value for row with "id" and column "info"
+    """
+    # Make sure it is the correct dataframe
+    if "ID" != df.columns[0]:
+        raise RuntimeError(
+            "The dataframe does not seem to be the objecive database."
+        )
+    # Make sure the "info" is in the dataframe
+    if info not in df.columns:
+        raise KeyError(
+            f"<{info}> is not a valid key for the objective database. "
+            f"Please use: {df.columns[1:]}"
+        )
+    # Check that the requested ID is in the df
+    if id not in df["ID"].values:
+        raise ValueError(
+            f"The ID <{id}> is not present in the objective database."
+        )
+
+    return df.loc[df["ID"] == id, info].iloc[0]
+
+
+def get_objective_na(df: pd.DataFrame, id: str) -> Optional[float]:
+    """
+    Get the NA for objective in the database.
+
+    :param df: pd.DataFrame, of the objecive database
+    :param id: str, objective id number, e.g. ID17,
+        Should/must always start with "ID"
+
+    :return: float, NA of the objective, or None if parsing error
+    """
+    # Get the NA of the objective
+    try:
+        na = get_objective_info(df, id, "NA")
+    except ValueError as err:
+        raise RuntimeError(str(err)) from err
+    # Make sure the return value is a number
+    try:
+        na = float(na)
+    except ValueError:
+        return None
+    return na
+
+
+def get_objective_ri(df: pd.DataFrame, id: str) -> Optional[float]:
+    """
+    Get the refractive index for objective in the database.
+
+    :param df: pd.DataFrame, of the objecive database
+    :param id: str, objective id number, e.g. ID17,
+        Should/must always start with "ID"
+
+    :return: float, RI of the objective, or None if parsing error
+    """
+    try:
+        ri = get_objective_info(df, id, "Refractive Index")
+    except ValueError as err:
+        raise RuntimeError(str(err)) from err
+    # Make sure the return value is a number
+    try:
+        ri = float(ri)
+    except ValueError:
+        return None
+    return ri
 
 
 if __name__ == "__main__":

@@ -1,10 +1,12 @@
 """Test for common utils.py."""
 
 import numpy as np
+import pandas as pd
 import pytest
 from shiny.express import ui
 
 import metroloshiny.utils.common_utils as cu
+from metroloshiny.utils.read_file import get_sheet, load_doc
 
 
 def create_input_list() -> list:
@@ -154,10 +156,48 @@ def test_create_css_color_dict():
     assert cu.create_css_color_dict(good_list)
 
 
+def test_objective_db_functions():
+    """Test functions to getting data from the objective sheet."""
+    # Get local objective data (xlsx)
+    doc = load_doc(dev_local_file=True)
+    _, df = get_sheet(doc=doc, kind="Objectives", dev_local_file=True)
+
+    # Check for error with wrong dataframe
+    df_wrong = pd.DataFrame([], columns=["1", "2"])
+    with pytest.raises(
+        RuntimeError,
+        match=r"The dataframe does not seem to be the objecive database\.",
+    ):
+        cu.get_objective_info(df_wrong, "ID1", "NA")
+
+    # Check for error when column header not present
+    with pytest.raises(
+        KeyError, match=r".*is not a valid key for the objective database\."
+    ):
+        cu.get_objective_info(df, "ID1", "NameX")
+
+    assert cu.get_objective_info(df, "ID2", "ID") == "ID2"
+    assert cu.get_objective_info(df, "ID2", "Magnification") == "10x"
+    assert cu.get_objective_info(df, "ID3", "Manufacturer") == "Nikon"
+
+    # Check non-existent ID
+    with pytest.raises(
+        ValueError, match=r"The .*is not present in the objective database."
+    ):
+        cu.get_objective_info(df, "ID666.9", "NA")
+
+    # Check "sub-functions"
+    assert cu.get_objective_na(df, "ID1") == 0.2
+    assert cu.get_objective_ri(df, "ID19") == 1.518
+    with pytest.raises(
+        RuntimeError, match=r"The .*is not present in the objective database."
+    ):
+        cu.get_objective_na(df, "ID47-88")
+    with pytest.raises(
+        RuntimeError, match=r"The .*is not present in the objective database."
+    ):
+        cu.get_objective_na(df, "ID1-YZ")
+
+
 if __name__ == "__main__":
     pass
-    # test_list_duplicates()
-    # test_check_if_sequence()
-    # test_get_ui_id()
-    # test_is_input_select_in_list()
-    # print("success")
