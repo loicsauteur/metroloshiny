@@ -327,7 +327,13 @@ def set_local_file(default: Optional[bool] = False) -> bool:
     :return: bool
     """
     if default:
-        return default
+        if os.environ.get("PYTEST_VERSION") is not None:
+            raise RuntimeError(
+                "Local file is set to TRUE during pytest: "
+                "Probably forgot to reset to the default!"
+            )
+        else:
+            return default
     if os.environ.get("PYTEST_VERSION") is not None:
         return True
     else:

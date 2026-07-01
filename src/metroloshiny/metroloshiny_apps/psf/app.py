@@ -30,9 +30,10 @@ from metroloshiny.utils.read_file import get_sheet, load_doc
 
 # TODO Add plot for single date chromatic shift, that shows shift in XY
 # TODO change channel naming restriction (try get names from OMERO channels), & calibrate XYZ shift
+# FIXME upload -> acquisition_date_number == 0 (Nikon images) -> set to today?
 
 # Load Data
-use_dev_local_file = set_local_file(True)
+use_dev_local_file = set_local_file()
 sheet_doc = load_doc(dev_local_file=use_dev_local_file)
 wsheet_psf, dataframe = get_sheet(
     sheet_doc, "PSF", dev_local_file=use_dev_local_file

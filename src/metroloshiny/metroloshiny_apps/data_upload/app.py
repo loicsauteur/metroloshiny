@@ -878,7 +878,11 @@ def parse_omero_fwhm():
         ui.notification_show(str(err), type="error")
         return None
     # Manage the PSF data
-    data = PSFData(data)
+    data = PSFData(
+        data
+    )  # FIXME get more than just the kv/table -> also other metadata (e.g. channel)
+    # FIXME: Acquisition_date_number = 0 -> set to current date?
+    # TODO: calibrate the shift values?
     # Create a table for FWHM entries
     psf_table = []
     for k, v in invert_nested_dict(data.get_fwhm_data()).items():

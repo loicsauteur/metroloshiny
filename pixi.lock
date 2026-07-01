@@ -2778,7 +2778,7 @@ packages:
   timestamp: 1733255681319
 - pypi: ./
   name: metroloshiny
-  version: 0.1.2.dev0+gbb8bf8eed.d20260611
+  version: 0.1.4.dev0+gef6893355.d20260612
   sha256: cc948cdc7a6c95240d93d1b9a0820c7a9763269857e174478adf40c4564f62bb
   requires_dist:
   - tables>=3.11.1,<4
