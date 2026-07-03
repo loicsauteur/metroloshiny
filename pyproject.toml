@@ -13,6 +13,9 @@ requires = ["hatchling", "hatch-vcs"]
 [tool.hatch.version]
 source = "vcs"
 
+[tool.hatch.build.targets.wheel]
+packages = ["src/metroloshiny"]
+
 [tool.pixi.workspace]
 channels = ["conda-forge"]
 platforms = ["linux-64", "osx-arm64"]
@@ -69,6 +72,8 @@ zeroc-ice = "3.6.5.*"
 omero-py = "5.21.2.*"
 plotly = ">=6.8.0,<7"
 anywidget = ">=0.11.0,<0.12"
+hatch = "*"
+hatch-vcs = "*"
 
 [tool.black]
 line-length = 79
