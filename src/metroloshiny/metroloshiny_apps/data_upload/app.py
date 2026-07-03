@@ -421,6 +421,7 @@ def check_channel_names_provided(df: pd.DataFrame) -> bool:
     g_df = filter_by_column_value(g_df, "Site", input.site())
     g_df = filter_by_column_value(g_df, "Microscope", input.microscope())
     g_df = filter_by_column_value(g_df, "Objective", input.objective())
+    g_df = filter_by_column_value(g_df, "Info", input.info())
     # Get the unique channel names
     df_ch_names = list(np.unique(np.asarray(g_df["Channel"])))
     # No df ch names = new entry
@@ -442,7 +443,7 @@ def check_channel_names_provided(df: pd.DataFrame) -> bool:
         else:
             ui.notification_show(
                 f"You entered channel names ({wrong_names}), which are unknown. "
-                f"Please use following ones: {df_ch_names}.",
+                f"Please use the existing ones: {df_ch_names}.",
                 type="error",
             )
         return False
@@ -467,9 +468,9 @@ def match_fwhm_channel_names(
 
     for _i, row in ori_df.iterrows():
         ch = row["Channel"]  # e.g. C4
-        name = name_df.loc[name_df["Channel"] == ch, name_df.columns[-1]].iloc[
-            0
-        ]
+        name = str(
+            name_df.loc[name_df["Channel"] == ch, name_df.columns[-1]].iloc[0]
+        )
         if name in result_dict.keys():
             result_dict[name][row["FWHM"]] = row[ori_df.columns[-1]]
         else:
@@ -798,9 +799,6 @@ def upload_omero_data():
         return
 
     # Upload the data
-    # FIXME shift Reference-XYZ -> should it be 0 or nan? -> PSFdata object
-    #       how does it visualise once the visualisation is implemented?
-    #       ---> FIXME later...
     try:
         make_sheet_entries(
             sheet=sheet_reference.get(),

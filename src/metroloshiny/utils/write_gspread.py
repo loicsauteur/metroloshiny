@@ -110,19 +110,19 @@ def make_sheet_entries(
     address_dict = None  # dict mapping cell addresses to values
     data_to_use = None  # will point to fwhm_data or power_data or ...
 
-    # Check fwhm data
+    # Check fwhm data >>>>>>>>>>>>>>>>>
     if fwhm_data is not None:
         for ch, values in fwhm_data.items():
-            # FIXME remove the conditional startwith C??
-            if not ch.startswith("C") and ch not in [
-                "DAPI",
-                "GFP",
-                "Cy3",
-                "Cy5",
-            ]:
-                raise RuntimeError(
-                    f"FWHM data channel name <{ch}> not supported"
-                )
+            # FIXME remove channel naming limitation
+            # if not ch.startswith("C") and ch not in [
+            #     "DAPI",
+            #     "GFP",
+            #     "Cy3",
+            #     "Cy5",
+            # ]:
+            #     raise RuntimeError(
+            #         f"FWHM data channel name <{ch}> not supported"
+            #     )
             for f in values.keys():
                 # Allow only entries for FWHM and Shift
                 if not f.startswith(("FWHM-", "Shift-")):
@@ -137,7 +137,7 @@ def make_sheet_entries(
         data_headers = ["Channel", "FWHM"]
         data_to_use = fwhm_data
 
-    # Check power data
+    # Check power data >>>>>>>>>>>>>>>>
     if power_data is not None:
         data_to_use = power_data
         df = pd.DataFrame(sheet.get_all_records())
