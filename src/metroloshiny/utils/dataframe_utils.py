@@ -1,72 +1,9 @@
 """Utils for DataFrame manipulation."""
 
-import warnings
 from datetime import datetime
 from typing import Optional, Union
 
 import pandas as pd
-
-from metroloshiny.utils.common_utils import invert_nested_dict
-
-
-@DeprecationWarning
-def get_linearity(
-    df: pd.DataFrame, date: str, rename_cols: bool = False
-) -> pd.DataFrame:
-    """# FIXME unused."""
-    df = df.pivot(index=df.columns[1], columns=df.columns[0], values=date)
-    # ensure that the header are all strings
-    if rename_cols:
-        df.columns = [str(x) + "nm" for x in df.columns]
-    return df
-
-
-@DeprecationWarning
-def wavelength_to_color(w: Union[int, str]):
-    """# FIXME unused.
-
-    # Make sure to work with a number (remove 'nm')
-    """
-    if isinstance(w, str):
-        w = w.split("nm")[0].strip()
-        try:
-            w = int(w)
-        except Exception as e:
-            print("Could not convert str to int:", e)
-
-    print(w, type(w))
-    # Convert wavelength to RGB
-    w = int(w)
-    if 380 <= w <= 440:
-        r, g, b = -(w - 440) / (440 - 380), 0.0, 1.0
-    elif 440 < w <= 490:
-        r, g, b = 0.0, (w - 440) / (490 - 440), 1.0
-    elif 490 < w <= 530:
-        r, g, b = 0.0, 1.0, -(w - 530) / (530 - 490)
-    elif 530 < w <= 580:
-        r, g, b = (w - 510) / (580 - 530), 1.0, 0.0
-    elif 580 < w <= 645:
-        r, g, b = 1.0, -(w - 645) / (645 - 580), 0.0
-    elif 645 < w <= 750:
-        r, g, b = 1.0, 0.0, 0.0
-    else:
-        r, g, b = 0.0, 0.0, 0.0
-
-    # intensity correction
-    if 380 <= w <= 420:
-        factor = 0.3 + 0.7 * (w - 380) / (420 - 380)
-    elif 420 < w <= 645:
-        factor = 1.0
-    elif 645 < w <= 750:
-        factor = 0.3 + 0.7 * (750 - w) / (750 - 645)
-    else:
-        factor = 0.0
-
-    gamma = 0.8
-    r = (r * factor) ** gamma
-    g = (g * factor) ** gamma
-    b = (b * factor) ** gamma
-    return (r, g, b)
 
 
 def get_power_over_time_data(
@@ -191,11 +128,130 @@ def parse_dates(dates: list[str]) -> list[str]:
     return new_dates
 
 
+def nested_dict_to_table(
+    nested_dict: dict, headers: list[str]
+) -> pd.DataFrame:
+    """
+    Convert a nested dictionary to a (flat) dataframe.
+
+    :param nested_dict: dict, e.g. {
+            "C1" : {'FWHM-X': 911.0, 'FWHM-Y': 852.0, 'FWHM-Z': 1260.0},
+            ...
+        }
+    :param headers: list[str], for the table headers, e.g.
+        ["h1", "h2"]
+
+    :return: pd.DataFrame, e.g.
+        h1  |   h2   |  Value
+        -----------------------
+        C1  | FWHM-X |  911.0
+        C1  | FWHM-Y |  852.0
+        C1  | FWHM-Z |  1260.0
+        ...
+
+    """
+
+    def dict_to_rows(d, path=()):
+        """Create dict rows."""
+        rows = []
+        for k, v in d.items():
+            if isinstance(v, dict):
+                rows.extend(dict_to_rows(v, (*path, k)))
+            else:
+                rows.append((*path, k, v))
+        return rows
+
+    h = headers.copy()  # copy to not modify the input
+    h.append("Value")
+    return pd.DataFrame(dict_to_rows(nested_dict), columns=h)
+
+
+def identify_target_rows(
+    df: pd.DataFrame,
+    nested_dict: dict,
+    headers: list[str],
+    table_out: bool = False,
+) -> Union[dict, pd.DataFrame]:
+    """
+    Get indices of the dataframe for values in a nested_dict.
+
+    Used to idientify the rows where to put data into a table.
+    The nested_dict contains keys to idientify specific row values,
+    e.g. "C1" and "FWHM-Y", and the last level of the nested dict
+    contains the value for entering into the table.
+
+    The result is a dictionary with {index:value}.
+    Indices are 0-based and excluding the header row.
+    If an entry form the nested dict cannot be matched into the table,
+    the index will be negative (decreasing by unmatched counts).
+
+    INFO: replaced filter_by_nested_dict()
+
+    :param df: pd.DataFrame
+    :param nested_dict: e.g. {
+            "C1" : {'FWHM-X': 911.0, 'FWHM-Y': 852.0, 'FWHM-Z': 1260.0}
+        }
+    :param headers: list for matching the df columns with
+        the nested_dict keys.
+    :param table_out: bool (default False), will return the full pd.Dataframe
+        h1  |   h2   |  Value  | match_index
+        ------------------------------------
+        C1  | FWHM-X |  911.0  |     2
+        C1  | FWHM-Y |  852.0  |     5
+        C1  | FWHM-Z |  1260.0 |    -1
+        ...
+
+    :return: dict {pd.DataFrame index : value of nested_dict}
+        sorted by index value. Or
+        pd.DataFrame if table_out == True
+
+    """
+    # Ensure there is no duplicate entries
+    try:
+        _df = df.duplicated(subset=headers, keep=False)
+        if _df.any():
+            duplicates = df.loc[_df, headers]
+            raise ValueError(
+                f"Duplicate entries in the dataframe:\n{duplicates}"
+            )
+    except KeyError as err:
+        raise KeyError(
+            f"Selected headers do not match the table headers: {err}"
+        ) from err
+
+    # Convert the nested dict to a flat table
+    table = nested_dict_to_table(nested_dict, headers=headers.copy())
+
+    # (Copy and) rename the index of the database
+    lookup = df.copy()[headers].reset_index(names="match_index")
+    # "Merge" the 2 dataframes (keeps table and adds match_index col)
+    table = table.merge(lookup, on=headers, how="left")
+    # Decrementally index rows that were not found
+    mask = table["match_index"].isna()
+    table.loc[mask, "match_index"] = -pd.RangeIndex(1, mask.sum() + 1)
+    # Make sure the matched index is integer
+    table["match_index"] = table["match_index"].astype(int)
+
+    if table_out:
+        return table
+
+    # Create a result dictionary with key = dataframe index, value
+    result = {}
+    for _idx, row in table.iterrows():
+        result[row["match_index"]] = row["Value"]
+
+    # Return the sorted dictionary
+    return dict(sorted(result.items()))
+
+
+@DeprecationWarning
 def filter_by_nested_dict(
     df: pd.DataFrame, nested_dict: dict, headers: list[str]
 ) -> dict:
     """
     Get indices of the dataframe for values in a nested_dict.
+
+    ! Deprecated !
 
     Used to idientify the rows where to put data into a table.
     The nested_dict contains keys to idientify specific row values,
@@ -217,7 +273,7 @@ def filter_by_nested_dict(
     :return: dict {pd.DataFrame index : value of nested_dict}
         sorted by index value
     """
-    # Enuser there is no duplicate entries
+    # Ensure there is no duplicate entries
     try:
         _df = df.duplicated(subset=headers, keep=False)
         if _df.any():
@@ -231,40 +287,41 @@ def filter_by_nested_dict(
         ) from err
 
     # Create invered nested dict = {value: path of keys}
-    inverted_dict = invert_nested_dict(nested_dict)
+    # inverted_dict = invert_nested_dict(nested_dict)
+    raise DeprecationWarning("This function is deprecated!")
 
-    # Create the result dict = {index: value}
-    result = {}
-    neg_idx = 0
+    # # Create the result dict = {index: value}
+    # result = {}
+    # neg_idx = 0
 
-    for value, key_list in inverted_dict.items():
-        if len(headers) != len(key_list):
-            raise RuntimeError(
-                f"Number of specified headers ({len(headers)}) "
-                f"does not match the number of row items {len(key_list)} "
-                f"for the value."
-            )
-        _df = df.copy()
-        for i in range(len(headers)):
-            with warnings.catch_warnings():
-                warnings.filterwarnings(
-                    "ignore",
-                    message="Boolean Series key will be reindexed to match DataFrame index",
-                )
-                _df = _df[df[headers[i]] == key_list[i]]
-        index_list = _df.index.to_list()
-        # print("index_list =", index_list)
-        if len(index_list) == 0:
-            neg_idx = neg_idx - 1
-            result[neg_idx] = value
-        elif len(index_list) > 1:
-            raise RuntimeError(
-                f"Expected here a dataframe with only one entry but got:\n{_df}"
-            )
-        else:
-            result[index_list[0]] = value
-    # Return the sorted dictionary
-    return dict(sorted(result.items()))
+    # for value, key_list in inverted_dict.items():
+    #     if len(headers) != len(key_list):
+    #         raise RuntimeError(
+    #             f"Number of specified headers ({len(headers)}) "
+    #             f"does not match the number of row items {len(key_list)} "
+    #             f"for the value."
+    #         )
+    #     _df = df.copy()
+    #     for i in range(len(headers)):
+    #         with warnings.catch_warnings():
+    #             warnings.filterwarnings(
+    #                 "ignore",
+    #                 message="Boolean Series key will be reindexed to match DataFrame index",
+    #             )
+    #             _df = _df[df[headers[i]] == key_list[i]]
+    #     index_list = _df.index.to_list()
+    #     # print("index_list =", index_list)
+    #     if len(index_list) == 0:
+    #         neg_idx = neg_idx - 1
+    #         result[neg_idx] = value
+    #     elif len(index_list) > 1:
+    #         raise RuntimeError(
+    #             f"Expected here a dataframe with only one entry but got:\n{_df}"
+    #         )
+    #     else:
+    #         result[index_list[0]] = value
+    # # Return the sorted dictionary
+    # return dict(sorted(result.items()))
 
 
 def filter_by_date_range(

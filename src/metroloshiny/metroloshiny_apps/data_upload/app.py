@@ -12,8 +12,8 @@ if TYPE_CHECKING:
 from metroloshiny.data_objects.PSFData import PSFData
 from metroloshiny.utils.common_utils import (
     check_duplicate_dict_values,
+    get_today,
     get_version,
-    invert_nested_dict,
     list_duplicates,
     set_local_file,
 )
@@ -21,6 +21,7 @@ from metroloshiny.utils.dataframe_utils import (
     convert_date_column,
     convert_power_column,
     filter_by_column_value,
+    nested_dict_to_table,
 )
 from metroloshiny.utils.omero_utils import omero_operation
 from metroloshiny.utils.read_file import (
@@ -815,11 +816,6 @@ def upload_omero_data():
         ui.notification_show(
             f"Could not upload the data:\n{err}", type="error"
         )
-    # FIXME test notification to see colors
-    # ui.notification_show("default", type="default") # white
-    # ui.notification_show("error", type="error") # red
-    # ui.notification_show("message", type="message") # blue
-    # ui.notification_show("warning", type="warning") # yellow
 
 
 @omero_channel_names.set_patch_fn
@@ -881,29 +877,30 @@ def parse_omero_fwhm():
     data = PSFData(
         data
     )  # FIXME get more than just the kv/table -> also other metadata (e.g. channel)
-    # FIXME: Acquisition_date_number = 0 -> set to current date?
     # TODO: calibrate the shift values?
     # Create a table for FWHM entries
-    psf_table = []
-    for k, v in invert_nested_dict(data.get_fwhm_data()).items():
-        entry = v.copy()
-        entry.append(k)
-        psf_table.append(entry)
-    psf_table = pd.DataFrame(
-        psf_table, columns=["Channel", "FWHM", data.get_acquisition_date()]
-    )
+    # psf_table = [] # FIXME can probably be removed
+    acquisition_date = data.get_acquisition_date()
+    if acquisition_date is None:
+        acquisition_date = get_today()
+        ui.notification_show(
+            "Could not identify the data acquisition date! Set to today!",
+            type="warning",
+        )
+
+    # Get the PSF data table and rename the columns
+    psf_table = nested_dict_to_table(data.get_fwhm_data(), ["Channel", "FWHM"])
+    psf_table.columns = ["Channel", "FWHM", acquisition_date]
+
     # Create tale for shift between channel entries
     if len(data.get_shift_data()) != 0:
-        shift_table_part = []
-        for k, v in invert_nested_dict(data.get_shift_data()).items():
-            entry = v.copy()
-            entry.append(k)
-            shift_table_part.append(entry)
-        shift_table_part = pd.DataFrame(
-            shift_table_part,
-            columns=["Channel", "FWHM", data.get_acquisition_date()],
+        # get the Shift data and rename the columns
+        shift_table_part = nested_dict_to_table(
+            data.get_shift_data(), ["Channel", "FWHM"]
         )
+        shift_table_part.columns = ["Channel", "FWHM", acquisition_date]
         psf_table = pd.concat([psf_table, shift_table_part])
+
     return psf_table
 
 

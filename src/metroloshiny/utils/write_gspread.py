@@ -7,9 +7,11 @@ import pandas as pd
 
 from metroloshiny.utils.common_utils import (
     check_if_sequence,
-    invert_nested_dict,
 )
-from metroloshiny.utils.dataframe_utils import filter_by_nested_dict
+from metroloshiny.utils.dataframe_utils import (
+    identify_target_rows,
+    nested_dict_to_table,
+)
 from metroloshiny.utils.read_file import ensure_numeric_data
 
 # Google spreadsheet names
@@ -173,7 +175,7 @@ def make_sheet_entries(
         & (df["Info"] == info)
     ]
     # Get a dict {df-row-index : value}
-    entry_dict = filter_by_nested_dict(_df, data_to_use, data_headers)
+    entry_dict = identify_target_rows(_df, data_to_use, data_headers)
     indices = list(entry_dict.keys())
     # All indices are negative: all entries to the end of the sheet
     if all(val < 0 for val in indices):
@@ -187,14 +189,12 @@ def make_sheet_entries(
             address_dict[f"{col}{row + 2}"] = entry_dict.get(row)
     else:
         # Get a list of the missing entries
-        inverted_dict = invert_nested_dict(data_to_use)
-        missing_entries = [
-            inverted_dict[k]
-            for k in [entry_dict.get(i) for i in indices if i < 0]
-        ]
-        # print("missing entries:", missing_entries)
-        # msg = "- "
-        # msg = msg + "\n- ".join([" -> ".join(x) for x in missing_entries])
+        missing_entries = identify_target_rows(
+            _df, data_to_use, data_headers, table_out=True
+        )
+        missing_entries = missing_entries[missing_entries["match_index"] < 0]
+        missing_entries = missing_entries.drop("match_index", axis=1)
+
         raise RuntimeError(
             "The sheet does not seem to be ordered properly (alphabetically):"
             " some row entries exist while others don't.\nThis requires "
@@ -236,10 +236,12 @@ def make_sheet_entries(
 
     # Create new entries at the bottom of the sheet
     else:
-        inverted_dict = invert_nested_dict(dict(sorted(data_to_use.items())))
+        table = nested_dict_to_table(
+            dict(sorted(data_to_use.items())), data_headers
+        )
         new_block = []  # Block for the first columns
         value_block = []  # Block for the values in the date column
-        for value, path in inverted_dict.items():
+        for _idx, row in table.iterrows():
             new_line = [site, microscope, objective, info]
             # To add empty columns, not the index based on path entries
             empty_col = []
@@ -252,15 +254,16 @@ def make_sheet_entries(
                     empty_col.append(0)
 
             # Append further column entries (e.g. 'DAPI', 'FWHM-X')
-            for path_count, p in enumerate(path):
+            print("data-headers", data_headers)
+            for path_count, p in enumerate(data_headers):
                 # Insert empty columns
                 if path_count in empty_col:
                     new_line.append("")
-                new_line.append(p)
+                new_line.append(row[p])
             new_block.append(new_line)
-            value_block.append([value])
+            value_block.append([row["Value"]])
         start_row = len(df) + 2
-        end_row = start_row + len(inverted_dict) - 1
+        end_row = start_row + len(table) - 1
         # Add additional rows if necessary # TODO not checked...
         if sheet.row_count < end_row:
             sheet.add_rows(rows=end_row - sheet.row_count)

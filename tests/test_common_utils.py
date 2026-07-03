@@ -48,32 +48,36 @@ def test_check_duplicate_dict_values():
 
 
 def test_invert_nested_dict():
-    """Test invert_nested_dict function."""
-    d = {"C1": {"FWHM-X": 911.0, "FWHM-Y": 852.0, "FWHM-Z": 1260.0}}
-    res = cu.invert_nested_dict(d)
-    assert len(res) == 3, "Wrong number of keys."
-    for vals in res.values():
-        assert len(vals) == 2, "Wrong number of path elements,"
-    for value, path in res.items():
-        val = dict(d)
-        for p in path:
-            val = val.get(p)
-        msg = f"Value {val} does not match expected value {value}."
-        assert val == value, msg
+    """
+    Test invert_nested_dict function.
 
-    # Test problematcit nested dict
-    d = {
-        "C2": {"Shift-X": -1.2, "Shift-Y": -2.2, "Shift-Z": 6.2},
-        "C3": {"Shift-X": 0.8, "Shift-Y": -3.2, "Shift-Z": 4.0},
-        "C4": {"Shift-X": -0.8, "Shift-Y": -4.8, "Shift-Z": 4.8},
-        "C1": {
-            "Shift-X": "Reference",
-            "Shift-Y": "Reference",
-            "Shift-Z": "Reference",
-        },
-    }
-    with pytest.raises(KeyError, match=r"Failed to invert the nested dict*"):
-        res = cu.invert_nested_dict(d)
+    Deprecated function.
+    """
+    # d = {"C1": {"FWHM-X": 911.0, "FWHM-Y": 852.0, "FWHM-Z": 1260.0}}
+    # res = cu.invert_nested_dict(d)
+    # assert len(res) == 3, "Wrong number of keys."
+    # for vals in res.values():
+    #     assert len(vals) == 2, "Wrong number of path elements,"
+    # for value, path in res.items():
+    #     val = dict(d)
+    #     for p in path:
+    #         val = val.get(p)
+    #     msg = f"Value {val} does not match expected value {value}."
+    #     assert val == value, msg
+
+    # # Test problematcit nested dict
+    # d = {
+    #     "C2": {"Shift-X": -1.2, "Shift-Y": -2.2, "Shift-Z": 6.2},
+    #     "C3": {"Shift-X": 0.8, "Shift-Y": -3.2, "Shift-Z": 4.0},
+    #     "C4": {"Shift-X": -0.8, "Shift-Y": -4.8, "Shift-Z": 4.8},
+    #     "C1": {
+    #         "Shift-X": "Reference",
+    #         "Shift-Y": "Reference",
+    #         "Shift-Z": "Reference",
+    #     },
+    # }
+    # with pytest.raises(KeyError, match=r"Failed to invert the nested dict*"):
+    #     res = cu.invert_nested_dict(d)
 
 
 def test_check_if_sequence():

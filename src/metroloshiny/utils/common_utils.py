@@ -224,9 +224,12 @@ def check_duplicate_dict_values(
     return None
 
 
+@DeprecationWarning
 def invert_nested_dict(nested_dict: dict) -> dict:
     """
     Invert nested dicts to {value: path of keys}.
+
+    ! Deprecated !
 
     :param nested_dict: e.g. {
             "C1" : {'FWHM-X': 911.0, 'FWHM-Y': 852.0, 'FWHM-Z': 1260.0}

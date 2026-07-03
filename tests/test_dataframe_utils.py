@@ -10,7 +10,8 @@ from metroloshiny.utils.dataframe_utils import (
     convert_date_column,
     convert_power_column,
     filter_by_column_value,
-    filter_by_nested_dict,
+    identify_target_rows,
+    nested_dict_to_table,
     parse_dates,
 )
 
@@ -74,81 +75,85 @@ def is_valid_yyyymmdd(date: str) -> bool:
 
 
 def test_filter_by_nested_dict():
-    """Test filter_by_nested_dict function."""
-    nested_dict = {
-        "C1": {"FWHM-X": 911.0, "FWHM-Y": 852.0, "FWHM-Z": 1260.0},
-        "C2": {"FWHM-X": 651.0, "FWHM-Y": 643.0, "FWHM-Z": 860.0},
-        "C3": {"FWHM-X": 823.0, "FWHM-Y": 876.0, "FWHM-Z": 1020.0},
-        "C4": {"FWHM-X": 898.0, "FWHM-Y": 954.0, "FWHM-Z": 1142.0},
-    }
-    df_data = {
-        "Channel": [
-            "C1",
-            "C1",
-            "C1",
-            "C2",
-            "C2",
-            "C2",
-            "C3",
-            "C3",
-            "C3",
-            "C4",
-            "C4",
-            "C4",
-        ],
-        "FWHM": ["FWHM-X", "FWHM-Y", "FWHM-Z"] * 4,
-        "Today": list(range(12)),
-    }
-    df = pd.DataFrame().from_dict(df_data)
-    res = filter_by_nested_dict(df, nested_dict, ["Channel", "FWHM"])
-    assert len(df) == len(res)
+    """
+    Test filter_by_nested_dict function.
 
-    # Check for duplicate rows       -----------------------------------------
-    df_data["Channel"].append("C1")
-    df_data["FWHM"].append("FWHM-Z")
-    df_data["Today"].append(99)
-    df = pd.DataFrame().from_dict(df_data)
-    with pytest.raises(
-        ValueError, match=r"Duplicate entries in the dataframe.*"
-    ):
-        res = filter_by_nested_dict(df, nested_dict, ["Channel", "FWHM"])
+    Deprecated function.
+    """
+    # nested_dict = {
+    #     "C1": {"FWHM-X": 911.0, "FWHM-Y": 852.0, "FWHM-Z": 1260.0},
+    #     "C2": {"FWHM-X": 651.0, "FWHM-Y": 643.0, "FWHM-Z": 860.0},
+    #     "C3": {"FWHM-X": 823.0, "FWHM-Y": 876.0, "FWHM-Z": 1020.0},
+    #     "C4": {"FWHM-X": 898.0, "FWHM-Y": 954.0, "FWHM-Z": 1142.0},
+    # }
+    # df_data = {
+    #     "Channel": [
+    #         "C1",
+    #         "C1",
+    #         "C1",
+    #         "C2",
+    #         "C2",
+    #         "C2",
+    #         "C3",
+    #         "C3",
+    #         "C3",
+    #         "C4",
+    #         "C4",
+    #         "C4",
+    #     ],
+    #     "FWHM": ["FWHM-X", "FWHM-Y", "FWHM-Z"] * 4,
+    #     "Today": list(range(12)),
+    # }
+    # df = pd.DataFrame().from_dict(df_data)
+    # res = filter_by_nested_dict(df, nested_dict, ["Channel", "FWHM"])
+    # assert len(df) == len(res)
 
-    # Check when value is missing       --------------------------------------
-    df_data_miss = {}
-    for k, v in df_data.items():
-        val = list(v)
-        val.pop()
-        val.pop()
-        df_data_miss[k] = val
+    # # Check for duplicate rows       -----------------------------------------
+    # df_data["Channel"].append("C1")
+    # df_data["FWHM"].append("FWHM-Z")
+    # df_data["Today"].append(99)
+    # df = pd.DataFrame().from_dict(df_data)
+    # with pytest.raises(
+    #     ValueError, match=r"Duplicate entries in the dataframe.*"
+    # ):
+    #     res = filter_by_nested_dict(df, nested_dict, ["Channel", "FWHM"])
 
-    df = pd.DataFrame().from_dict(df_data_miss)
-    res = filter_by_nested_dict(df, nested_dict, ["Channel", "FWHM"])
-    # There should be one key == -1
-    ks = list(res.keys())
-    assert -1 in ks, "Error for missing value -> not there"
-    assert ks.index(-1) == 0, "Error missing value is not at the first pos."
-    with pytest.raises(ValueError, match="-2 is not in list"):
-        # There should not be a -2 index in the list
-        list(res.keys()).index(-2)
+    # # Check when value is missing       --------------------------------------
+    # df_data_miss = {}
+    # for k, v in df_data.items():
+    #     val = list(v)
+    #     val.pop()
+    #     val.pop()
+    #     df_data_miss[k] = val
 
-    # Check also for 3 missing values   --------------------------------------
-    df_data_missing = {}
-    for k, v in df_data_miss.items():
-        val = list(v)
-        val.pop()
-        val.pop(0)
-        df_data_missing[k] = val
-    df = pd.DataFrame().from_dict(df_data_missing)
-    res = filter_by_nested_dict(df, nested_dict, ["Channel", "FWHM"])
-    # Assert that indices -1 to -3 are present, but not -4
-    assert -1 in list(res.keys())
-    assert -2 in list(res.keys())
-    assert -3 in list(res.keys())
-    assert -4 not in list(res.keys())
+    # df = pd.DataFrame().from_dict(df_data_miss)
+    # res = filter_by_nested_dict(df, nested_dict, ["Channel", "FWHM"])
+    # # There should be one key == -1
+    # ks = list(res.keys())
+    # assert -1 in ks, "Error for missing value -> not there"
+    # assert ks.index(-1) == 0, "Error missing value is not at the first pos."
+    # with pytest.raises(ValueError, match="-2 is not in list"):
+    #     # There should not be a -2 index in the list
+    #     list(res.keys()).index(-2)
 
-    # Wrong table headers       ----------------------------------------------
-    with pytest.raises(KeyError):
-        res = filter_by_nested_dict(df, nested_dict, ["Channel", "Wrong"])
+    # # Check also for 3 missing values   --------------------------------------
+    # df_data_missing = {}
+    # for k, v in df_data_miss.items():
+    #     val = list(v)
+    #     val.pop()
+    #     val.pop(0)
+    #     df_data_missing[k] = val
+    # df = pd.DataFrame().from_dict(df_data_missing)
+    # res = filter_by_nested_dict(df, nested_dict, ["Channel", "FWHM"])
+    # # Assert that indices -1 to -3 are present, but not -4
+    # assert -1 in list(res.keys())
+    # assert -2 in list(res.keys())
+    # assert -3 in list(res.keys())
+    # assert -4 not in list(res.keys())
+
+    # # Wrong table headers       ----------------------------------------------
+    # with pytest.raises(KeyError):
+    #     res = filter_by_nested_dict(df, nested_dict, ["Channel", "Wrong"])
 
 
 def test_convert_date_column():
@@ -177,6 +182,121 @@ def test_convert_power_column():
         conv = df_conv.iloc[i, power_col].astype(float)
         ori = round(ori * 1000, 6)
         assert ori == conv, f"<{ori}> * 1000 (={ori * 1000}) != <{conv}>"
+
+
+def test_identify_target_rows():
+    """Test identify_target_rows function."""
+    # Simulate the database
+    df_data = {
+        "Channel": [
+            "C1",
+            "C1",
+            "C1",
+            "C2",
+            "C2",
+            "C2",
+            "C3",
+            "C3",
+            "C3",
+            "C4",
+            "C4",
+            "C4",
+        ],
+        "FWHM": ["FWHM-X", "FWHM-Y", "FWHM-Z"] * 4,
+        "Today": list(range(100, 112)),
+    }
+    df = pd.DataFrame().from_dict(df_data)
+
+    nested_dict = {
+        "C1": {"FWHM-X": 911.0, "FWHM-Y": 852.0, "FWHM-Z": 1260.0},
+        "C2": {"FWHM-X": 651.0, "FWHM-Y": 643.0, "FWHM-Z": 860.0},
+        "C3": {"FWHM-X": 823.0, "FWHM-Y": 876.0, "FWHM-Z": 1020.0},
+        "C4": {"FWHM-X": 898.0, "FWHM-Y": 954.0, "FWHM-Z": 1142.0},
+    }
+
+    # Basic check
+    res = identify_target_rows(df, nested_dict, ["Channel", "FWHM"])
+    assert len(df) == len(res)
+    res = identify_target_rows(
+        df, nested_dict, ["Channel", "FWHM"], table_out=True
+    )
+    assert isinstance(res, pd.DataFrame)
+    assert len(df) == len(res)
+    assert len(res.columns) == 4
+
+    # Wrong table headers       ----------------------------------------------
+    with pytest.raises(KeyError):
+        identify_target_rows(df, nested_dict, ["Channel", "Wrong"])
+
+    # Check for duplicate rows       -----------------------------------------
+    df_data["Channel"].append("C1")
+    df_data["FWHM"].append("FWHM-Z")
+    df_data["Today"].append(99)
+    df = pd.DataFrame().from_dict(df_data)
+    with pytest.raises(
+        ValueError, match=r"Duplicate entries in the dataframe.*"
+    ):
+        identify_target_rows(df, nested_dict, ["Channel", "FWHM"])
+
+    # Check when value is missing       --------------------------------------
+    df_data_miss = {}
+    for k, v in df_data.items():
+        val = list(v)
+        val.pop()
+        val.pop()
+        df_data_miss[k] = val
+
+    df = pd.DataFrame().from_dict(df_data_miss)
+    res = identify_target_rows(df, nested_dict, ["Channel", "FWHM"])
+    # There should be one key == -1
+    ks = list(res.keys())
+    assert -1 in ks, "Error for missing value -> not there"
+    assert ks.index(-1) == 0, "Error missing value is not at the first pos."
+    with pytest.raises(ValueError, match="-2 is not in list"):
+        # There should not be a -2 index in the list
+        list(res.keys()).index(-2)
+
+    # Check also for 3 missing values   --------------------------------------
+    df_data_missing = {}
+    for k, v in df_data_miss.items():
+        val = list(v)
+        val.pop()
+        val.pop(0)
+        df_data_missing[k] = val
+    df = pd.DataFrame().from_dict(df_data_missing)
+    res = identify_target_rows(df, nested_dict, ["Channel", "FWHM"])
+    # Assert that indices -1 to -3 are present, but not -4
+    assert -1 in list(res.keys())
+    assert -2 in list(res.keys())
+    assert -3 in list(res.keys())
+    assert -4 not in list(res.keys())
+
+
+def test_nested_dict_to_table():
+    """Test nested_dict_to_table function."""
+    nested_dict = {
+        "C1": {"FWHM-X": 911.0, "FWHM-Y": 852.0, "FWHM-Z": 1260.0},
+        "C2": {"FWHM-X": 651.0, "FWHM-Y": 643.0, "FWHM-Z": 860.0},
+        "C3": {"FWHM-X": 823.0, "FWHM-Y": 876.0, "FWHM-Z": 1020.0},
+        "C4": {"FWHM-X": 898.0, "FWHM-Y": 954.0, "FWHM-Z": 1142.0},
+    }
+    # Too many headers
+    with pytest.raises(
+        ValueError, match=r"4 columns passed, passed data had 3 columns"
+    ):
+        nested_dict_to_table(nested_dict, ["Channel", "FWHM", "extra"])
+    # Too few headers
+    with pytest.raises(
+        ValueError, match=r"2 columns passed, passed data had 3 columns"
+    ):
+        nested_dict_to_table(nested_dict, ["Channel"])
+    headers = ["Channel", "FWHM"]
+    res = nested_dict_to_table(nested_dict, headers)
+    assert len(res) == 12
+    assert headers == [
+        "Channel",
+        "FWHM",
+    ], "Headers were modified by the function!"
 
 
 if __name__ == "__main__":
