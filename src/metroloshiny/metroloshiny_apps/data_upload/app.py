@@ -862,7 +862,7 @@ def parse_omero_fwhm():
         return None
     # Get the data from OMERO
     try:
-        data = omero_operation(
+        data, ch_names, voxels = omero_operation(
             operation=None,
             omero_type=input.omero_type_selector(),
             omero_id=omero_id,
@@ -872,10 +872,13 @@ def parse_omero_fwhm():
         ui.notification_show(str(err), type="error")
         return None
     # Manage the PSF data
-    data = PSFData(
-        data
-    )  # FIXME get more than just the kv/table -> also other metadata (e.g. channel)
-    # TODO: calibrate the shift values?
+    data = PSFData(data)
+    # Try overwriting the key-value channel names with OMERO channel names
+    data.inject_channel_names(ch_names=ch_names)
+    # Try calibrating the pixel shifts
+    data.inject_voxel_size(voxels=voxels)
+    # DONE ! FIXME get more than just the kv/table -> also other metadata (e.g. channel)
+    # DONE ! TODO: calibrate the shift values?
     # Create a table for FWHM entries
     # psf_table = [] # FIXME can probably be removed
     acquisition_date = data.get_acquisition_date()

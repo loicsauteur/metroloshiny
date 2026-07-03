@@ -16,7 +16,7 @@ class PSFData:
     def __init__(self, data: dict):
         self.data = data
         self.n_channels = None
-        self.channel_names = []
+        self.channel_names = []  # ch-names read from key-value pairs (e.g. C2)
         self.acquisition_date = None
         self.na = None
         self.objective = None  # Magnification
@@ -30,6 +30,7 @@ class PSFData:
         self.fwhm_data = {}
 
         # Parse the input data
+        self._set_channel_names_()
         self._get_metadata_()
         self._parse_data_()
         self._set_final_fwhm_data_()
@@ -48,7 +49,94 @@ class PSFData:
         """Getter for the acquisition date."""
         return self.acquisition_date
 
+    def inject_channel_names(self, ch_names: list):
+        """Overwrite channel names with supplied ones."""
+        # Do not adjust channel names if len(injected list) != n_channels
+        if len(ch_names) != self.n_channels:
+            return
+        # Do not adjust channel names if there are duplicates in the list
+        if len(ch_names) != len(set(ch_names)):
+            return
+        # Otherwise adjust the names in the final data dictionaries
+        new_fwhm = {}
+        new_shift = {}
+        for i in range(len(self.channel_names)):
+            old_name = self.channel_names[i]
+            new_name = ch_names[i]
+            # Rename the channel keys in the final data dictionaries
+            new_fwhm[new_name] = self.fwhm_data.get(old_name)
+            # Same for shift data, only if there is any
+            if self.shift_data:
+                new_shift[new_name] = self.shift_data.get(old_name)
+        # Overwrite the existing dictionaries
+        self.fwhm_data = new_fwhm
+        if self.shift_data:
+            self.shift_data = new_shift
+        # Also set the channel names list
+        self.channel_names = ch_names
+
+    def inject_voxel_size(self, voxels: list[float]):
+        """Calibrate shift data with voxel size."""
+        # Do not modify if there is not XYZ voxel sizes
+        if len(voxels) != 3:
+            return
+        # Do not modify if there is not data to modify
+        if not self.shift_data:
+            return
+        # Modify the voxel sizes
+        new_shifts = {}
+        for ch, shifts in self.shift_data.items():
+            for shift, value in shifts.items():
+                new_value = value
+                voxel_index = None
+                if "X" in shift:
+                    voxel_index = 0
+                elif "Y" in shift:
+                    voxel_index = 1
+                elif "Z" in shift:
+                    voxel_index = 2
+                else:
+                    raise RuntimeError(
+                        f"Could not calibrate shift-value = {ch}:{shift}"
+                    )
+                # Try calibrating (skip for non floats, e.g. References)
+                try:
+                    new_value = round(float(value) * voxels[voxel_index], 6)
+                except ValueError:
+                    pass
+                # Add the value to the new dictionary
+                if ch not in new_shifts.keys():
+                    new_shifts[ch] = {
+                        "Shift-X": None,
+                        "Shift-Y": None,
+                        "Shift-Z": None,
+                    }
+                # Add shift-x values
+                if voxel_index == 0:
+                    new_shifts[ch]["Shift-X"] = new_value
+                if voxel_index == 1:
+                    new_shifts[ch]["Shift-Y"] = new_value
+                if voxel_index == 2:
+                    new_shifts[ch]["Shift-Z"] = new_value
+        # Finally, replace the shift data
+        self.shift_data = new_shifts
+
     # Functions      ---------------------------------------------------------
+
+    def _set_channel_names_(self):
+        """Set the channel names according to the key-value pairs."""
+        for k in self.data.keys():
+            if "FWHM_Axial" in k:
+                # Get the ch-name
+                ch = k.split("_")[0]
+                # Add the name to the list
+                if ch not in self.channel_names:
+                    self.channel_names.append(ch)
+        # Sanity check (should not happen)
+        if len(self.channel_names) == self.n_channels:
+            raise RuntimeError(
+                "Number of channel names is not equal to channels"
+            )
 
     def _set_final_fwhm_data_(
         self, min_fwhm: int = 150, compare: bool = False

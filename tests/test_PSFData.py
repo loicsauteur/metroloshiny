@@ -296,6 +296,49 @@ def test_psfdata():
     assert len(ch1_single.get_shift_data()) == 0
 
 
+def test_data_injection():
+    """Test injection functions for channel names and voxel (calibration)."""
+    ch4 = PSFData(omero_4ch_multi_roi_full_kv)
+
+    # Inject channel names      ----------------------------------------------
+    # Inject wrong number of channel names does not modify the object
+    ch4.inject_channel_names(["DAPI", "GFP", "RFP"])
+    assert "DAPI" not in ch4.channel_names
+    assert "DAPI" not in ch4.get_fwhm_data().keys()
+    assert "C1" in ch4.channel_names
+    assert "C1" in ch4.get_fwhm_data().keys()
+    # Iject duplicate names (correct number) -> does not modify object
+    ch4.inject_channel_names(["DAPI", "GFP", "RFP", "GFP"])
+    assert "DAPI" not in ch4.channel_names
+    assert "DAPI" not in ch4.get_fwhm_data().keys()
+    assert "C1" in ch4.channel_names
+    assert "C1" in ch4.get_fwhm_data().keys()
+
+    # Check the the injection works as intended
+    ch4.inject_channel_names(["DAPI", "GFP", "RFP", "NIR"])
+    assert "DAPI" in ch4.channel_names
+    assert "NIR" in ch4.get_fwhm_data().keys()
+
+    # Inject voxel sizes      ------------------------------------------------
+    ch4 = PSFData(omero_4ch_multi_roi_full_kv)
+    ch4_dup = PSFData(omero_4ch_multi_roi_full_kv)
+
+    # Inject only XY voxel size
+    ch4.inject_voxel_size([2, 2])
+    mod_val = ch4.get_shift_data()["C1"]["Shift-Z"]
+    ori_val = ch4_dup.get_shift_data()["C1"]["Shift-Z"]
+    assert mod_val == ori_val
+
+    # Inject correctly
+    ch4.inject_voxel_size([2, 2, 2])
+    mod_val = ch4.get_shift_data()["C2"]["Shift-Z"]
+    ori_val = ch4_dup.get_shift_data()["C2"]["Shift-Z"]
+    assert mod_val == round(ori_val * 2, 6)
+    # Reference channels (strings) should not be modified
+    mod_val = ch4.get_shift_data()["C1"]["Shift-Y"]
+    ori_val = ch4_dup.get_shift_data()["C1"]["Shift-Y"]
+    assert mod_val == ori_val == "Reference-Y"
+
+
 if __name__ == "__main__":
-    # test_psfdata()
     pass

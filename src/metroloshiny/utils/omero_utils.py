@@ -21,7 +21,7 @@ def omero_operation(
     host: Optional[str] = None,
     port: Optional[int] = None,
     path_private_data: Optional[str] = None,
-) -> Optional[dict]:
+) -> tuple[Optional[dict], list, list]:
     """
     Get data from OMERO.
 
@@ -41,8 +41,11 @@ def omero_operation(
     :param path_private_data: str path to private_data.csv.
                 If None takes default path "./data/private_data.csv"
 
-    :return: dict with data, with keys (containing the metric string),
-        or None if no matches were found.
+    :return: tuple of
+        - dict with data, with keys (containing the metric string),
+          or None if no matches were found.
+        - list of channel names
+        - list of XYZ voxels
     """
     # Get the connection details from file
     username, passwd, host, port = get_cred(
@@ -69,13 +72,21 @@ def omero_operation(
             tables=tables,
             metric=metric_id,
         )
+        # Get the image channel name list
+        channel_names = get_channel_names(
+            conn=conn, datatype=omero_type, id=omero_id
+        )
+        # Get the image voxel sizes
+        voxel_size = get_voxel_size(
+            conn=conn, datatype=omero_type, id=omero_id
+        )
 
     finally:
         conn.c.closeSession()
-    # Process the data
-    if data_dict is None:
-        return None
-    return data_dict  # FIXME current return...
+    # # Process the data
+    # if data_dict is None:
+    #     return None, channel_names, voxel_size
+    return data_dict, channel_names, voxel_size
 
 
 def connect_test(
@@ -318,6 +329,49 @@ def get_tables_and_kv_paris(
     return kv_pairs, tables
 
 
+def get_channel_names(conn: BlitzGateway, datatype: str, id: int):
+    """
+    Get the channel names stored for an image on OMERO.
+
+    :param conn: BlitzGateway
+    :param datatype: str, if not "Image" returns empty list
+    :param id: int, Image ID
+
+    :return: list of channel names (empty if datatype != Image)
+    """
+    if datatype != "Image":
+        return []
+    # Get image object
+    img = conn.getObject(datatype, id)
+    # Return list of channel names
+    return img.getChannelLabels()
+
+
+def get_voxel_size(conn: BlitzGateway, datatype: str, id: int):
+    """
+    Get the voxel sizes stored for an image on OMERO.
+
+    :param conn: BlitzGateway
+    :param datatype: str, if not "Image" returns empty list
+    :param id: int, Image ID
+
+    :return: list of XYZ voxel size (empty if datatype != Image)
+    """
+    if datatype != "Image":
+        return []
+    # Get image object
+    img = conn.getObject(datatype, id)
+    # Get pixel information
+    p = img.getPrimaryPixels()
+    # Get the XYZ values
+    v = [
+        p.getPhysicalSizeX().getValue(),
+        p.getPhysicalSizeY().getValue(),
+        p.getPhysicalSizeZ().getValue(),
+    ]
+    return v
+
+
 def find_omero_table(conn: BlitzGateway):
     """
     Test function.
@@ -386,12 +440,13 @@ if __name__ == "__main__":
     # )
     # render_dict(out)
 
-    """
-    from sara (dataset with second last image containing a table)
-    Dataset ID: 79006
-        Image ID: 2861227
+    # """
+    # from sara (dataset with second last image containing a table)
+    # Dataset ID: 79006
+    #     Image ID: 2861227
 
-    from myself image containing key-value pairs
-    Dataset ID: 78303
-        Image ID: 2832822
-    """
+    # from myself image containing key-value pairs
+    # Dataset ID: 78303
+    #     Image ID: 2832822
+    # """
+    pass
