@@ -254,7 +254,6 @@ def make_sheet_entries(
                     empty_col.append(0)
 
             # Append further column entries (e.g. 'DAPI', 'FWHM-X')
-            print("data-headers", data_headers)
             for path_count, p in enumerate(data_headers):
                 # Insert empty columns
                 if path_count in empty_col:

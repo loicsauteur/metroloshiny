@@ -197,6 +197,15 @@ with ui.nav_panel(title="Data Upload"):
                             channels = pd.DataFrame().from_dict(channels)
                             return render.DataGrid(channels, editable=True)
 
+                        @render.ui
+                        def date_override_option():
+                            override_date = ui.input_date(
+                                "override_date",
+                                "Override the date from OMERO?",
+                                format="yyyymmdd",
+                            )
+                            return override_date
+
                 # Show the upload button
                 ui.div(style="margin-top: 20px;")  # add a spacing
 
@@ -799,6 +808,7 @@ def upload_omero_data():
         return
 
     # Upload the data
+    date = input.override_date().strftime("%Y%m%d")  # Convert to str
     try:
         make_sheet_entries(
             sheet=sheet_reference.get(),
@@ -806,7 +816,7 @@ def upload_omero_data():
             microscope=cur_mic,
             objective=cur_obj,
             info=cur_info,
-            date=data.columns[-1],
+            date=date,
             fwhm_data=match_fwhm_channel_names(data, ch_names),
         )
         ui.notification_show("Successfully uploaded the data!", type="message")
@@ -886,8 +896,10 @@ def parse_omero_fwhm():
         acquisition_date = get_today()
         ui.notification_show(
             "Could not identify the data acquisition date! Set to today!",
-            type="warning",
+            type="error",
         )
+    # Update the date override selector
+    ui.update_date("override_date", value=acquisition_date)
 
     # Get the PSF data table and rename the columns
     psf_table = nested_dict_to_table(data.get_fwhm_data(), ["Channel", "FWHM"])

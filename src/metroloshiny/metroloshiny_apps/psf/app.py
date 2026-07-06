@@ -248,7 +248,6 @@ def create_xy_shift_plot(
     """
     # Duplicate the dataframe
     df = df_in.copy()
-    print(df)
     # Show no data plot if no data available
     if df.empty or date not in df.columns:
         return no_data_fig_simple()
@@ -268,7 +267,7 @@ def create_xy_shift_plot(
     # Create plot
     _fig, ax = plt.subplots()
     # Create different spot sizes for each channel
-    sizes = [50 + (s * 10) for s in range(len(df["Channel"]))]
+    sizes = [120 - (s * 15) for s in range(len(df["Channel"]))]
 
     plot = sns.scatterplot(
         data=df,
