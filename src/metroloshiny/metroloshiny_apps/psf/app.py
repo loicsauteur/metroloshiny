@@ -1,4 +1,3 @@
-# import seaborn as sns
 import warnings
 from typing import Optional, Union
 
@@ -6,6 +5,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import plotly.express as px
+import seaborn as sns
 from shiny import reactive
 from shiny.express import input, render, ui
 from shinywidgets import render_widget
@@ -27,10 +27,6 @@ from metroloshiny.utils.dataframe_utils import (
     parse_dates,
 )
 from metroloshiny.utils.read_file import get_sheet, load_doc
-
-# TODO Add plot for single date chromatic shift, that shows shift in XY
-# TODO change channel naming restriction (try get names from OMERO channels), & calibrate XYZ shift
-# FIXME upload -> acquisition_date_number == 0 (Nikon images) -> set to today?
 
 # Load Data
 use_dev_local_file = set_local_file()
@@ -191,7 +187,7 @@ with ui.nav_panel(title="PSF"):
 
         # Shift over time     ------------------------------------------------
         with ui.navset_card_underline(title="Chromatic shift over time"):
-            with ui.nav_panel(title="Plot"):
+            with ui.nav_panel(title="Plot: All"):
 
                 @render.text
                 def show_ref_channel():
@@ -203,6 +199,29 @@ with ui.nav_panel(title="PSF"):
                     _, df_plot = get_shift_data()
                     return create_plot(df_plot)
 
+            with ui.nav_panel(title="Plot: XY"):
+
+                @render.text
+                def show_ref_channel_xy():
+                    _, ref_channel = check_shift_ref_ch()
+                    return f"Reference channel: {ref_channel}"
+
+                @render.ui
+                def show_xy_date_selection():
+                    df_table, _ = get_shift_data()
+                    dates = df_table.columns[2:]
+                    return ui.input_select(
+                        "date_selection", "Date:", choices=list(dates)
+                    )
+
+                @render.plot
+                @reactive.event(input.date_selection)
+                def show_xy_shift_plot():
+                    df_table, _ = get_shift_data()
+                    return create_xy_shift_plot(
+                        df_table, input.date_selection()
+                    )
+
             with ui.nav_panel(title="Table"):
 
                 @render.data_frame
@@ -212,6 +231,72 @@ with ui.nav_panel(title="PSF"):
 
 
 # General functions         --------------------------------------------------
+
+
+def create_xy_shift_plot(
+    df_in: pd.DataFrame,
+    date: str,
+):
+    """
+    Create a scatter plot for the XY shifts (single date measurement).
+
+    :param df: pd.DataFrame with columns,
+        Channel, FWHM and dates
+    :param date: str, date column header to keep/visualise
+
+    :return: sns.lineplot
+    """
+    # Duplicate the dataframe
+    df = df_in.copy()
+    print(df)
+    # Show no data plot if no data available
+    if df.empty or date not in df.columns:
+        return no_data_fig_simple()
+
+    # Pivot the table (excluding the Shift-Z values) & only for selected date
+    df = (
+        df[df["FWHM"] != "Shift-Z"]
+        .pivot(index="Channel", columns="FWHM", values=date)
+        .reset_index()
+    )
+
+    # Get the axes min/max from all dates
+    _max = df_in[df_in.columns[2:]].max().max()
+    _min = df_in[df_in.columns[2:]].min().min()
+    ax_limit = max([abs(_max), abs(_min)]) + 1
+
+    # Create plot
+    _fig, ax = plt.subplots()
+    # Create different spot sizes for each channel
+    sizes = [50 + (s * 10) for s in range(len(df["Channel"]))]
+
+    plot = sns.scatterplot(
+        data=df,
+        x="Shift-X",
+        y="Shift-Y",
+        hue="Channel",
+        size="Channel",
+        sizes=sizes,
+    )
+
+    # Show grid and set axes limit
+    ax.grid(True, axis="both", linestyle=":", color="0.7")
+    ax.set_xlim(-ax_limit, ax_limit)
+    ax.set_ylim(-ax_limit, ax_limit)
+
+    # Solid 0-lines
+    ax.axhline(0, color="0.7", linewidth=1.0)
+    ax.axvline(0, color="0.7", linewidth=1.0)
+
+    # Show tick on both axes the same
+    ax.set_xticks(ax.get_yticks())
+    ax.set_aspect("equal")
+    # Move legend to the right of the plot
+    legend = ax.get_legend()
+    if legend is not None:
+        legend.set_bbox_to_anchor((1.05, 1))
+        legend.set_loc("upper left")
+    return plot
 
 
 def create_plot(
