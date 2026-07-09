@@ -238,7 +238,8 @@ def identify_target_rows(
     # Create a result dictionary with key = dataframe index, value
     result = {}
     for _idx, row in table.iterrows():
-        result[row["match_index"]] = row["Value"]
+        # Make sure that the index is int
+        result[int(row["match_index"])] = row["Value"]
 
     # Return the sorted dictionary
     return dict(sorted(result.items()))

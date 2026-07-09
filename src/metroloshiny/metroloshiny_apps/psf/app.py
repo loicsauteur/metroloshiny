@@ -215,7 +215,7 @@ with ui.nav_panel(title="PSF"):
                     )
 
                 @render.plot
-                @reactive.event(input.date_selection)
+                @reactive.event(input.date_selection, input.ch_selection)
                 def show_xy_shift_plot():
                     df_table, _ = get_shift_data()
                     return create_xy_shift_plot(

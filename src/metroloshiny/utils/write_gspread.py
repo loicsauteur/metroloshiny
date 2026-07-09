@@ -19,9 +19,10 @@ __gspread_names__ = {
     "Power": "laser_power_measurements",
     "PSF": "psf_measurements",
     "Objectives": "objective_db",
+    "Field_Uniformity": "field_dist_uni",
 }
 
-# Google spreadsheet headers 1-based indices
+# Google spreadsheet headers 1-based indices  # FIXME unused
 __gspread_headers__ = {
     "Site": 1,
     "Microscope": 2,
@@ -34,7 +35,7 @@ __gspread_headers__ = {
     "Power [%]": 7,  # Power
 }
 
-# Google spreadsheet headers matched to column alphabet
+# Google spreadsheet headers matched to column alphabet  # FIXME unused
 __gspread_h2a__ = {
     "Site": "A",
     "Microscope": "B",
@@ -174,6 +175,17 @@ def make_sheet_entries(
         & (df["Objective"] == objective)
         & (df["Info"] == info)
     ]
+    if line_header is not None:
+        # Filter by the line wavelength
+        # FIXME this assumes only one wavelength uploaded at once
+        #   currently need because identify_target_rows will raise error
+        #   for duplicate power entries across different wavelengths
+        if len(data_to_use) > 1:
+            raise NotImplementedError(
+                "Upload for multiple wavelength currently not possible. "
+                f"Wavelengths: {data_to_use.keys()}"
+            )
+        _df = _df[_df[line_header] == data_to_use.keys()[0]]
     # Get a dict {df-row-index : value}
     entry_dict = identify_target_rows(_df, data_to_use, data_headers)
     indices = list(entry_dict.keys())
