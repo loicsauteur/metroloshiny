@@ -185,7 +185,7 @@ def make_sheet_entries(
                 "Upload for multiple wavelength currently not possible. "
                 f"Wavelengths: {data_to_use.keys()}"
             )
-        _df = _df[_df[line_header] == data_to_use.keys()[0]]
+        _df = _df[_df[line_header] == next(iter(data_to_use.keys()))]
     # Get a dict {df-row-index : value}
     entry_dict = identify_target_rows(_df, data_to_use, data_headers)
     indices = list(entry_dict.keys())
