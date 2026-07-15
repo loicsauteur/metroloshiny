@@ -129,7 +129,7 @@ def parse_dates(dates: list[str]) -> list[str]:
 
 
 def nested_dict_to_table(
-    nested_dict: dict, headers: list[str]
+    nested_dict: dict, headers: list[str], val_header: str = "Value"
 ) -> pd.DataFrame:
     """
     Convert a nested dictionary to a (flat) dataframe.
@@ -140,6 +140,7 @@ def nested_dict_to_table(
         }
     :param headers: list[str], for the table headers, e.g.
         ["h1", "h2"]
+    :param val_header: str, header for the values. Default = Value
 
     :return: pd.DataFrame, e.g.
         h1  |   h2   |  Value
@@ -162,7 +163,7 @@ def nested_dict_to_table(
         return rows
 
     h = headers.copy()  # copy to not modify the input
-    h.append("Value")
+    h.append(val_header)
     return pd.DataFrame(dict_to_rows(nested_dict), columns=h)
 
 

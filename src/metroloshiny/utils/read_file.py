@@ -15,6 +15,7 @@ __sheet_names__ = {
     "PSF": "psf_measurements",
     "Objectives": "objective_db",
     "Field_Uniformity": "field_dist_uni",
+    "Test": "test_sheet",
 }
 
 
@@ -146,11 +147,13 @@ def get_sheet(
         df = ensure_numeric_data(df, first_column=4)
     elif kind == "PSF":
         df = ensure_numeric_data(df, first_column=6)
-    elif kind == "Objectives":
+    elif kind in ["Objectives", "Test"]:
         # Do not ensure numeric data for the objective_db
         df = pd.DataFrame(df)
     else:
-        raise NotImplementedError
+        raise NotImplementedError(
+            f"Reading sheet <{kind}> is not implemented."
+        )
     return sheet, df
 
 

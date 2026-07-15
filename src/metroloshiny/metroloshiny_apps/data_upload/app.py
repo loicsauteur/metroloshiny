@@ -29,12 +29,19 @@ from metroloshiny.utils.read_file import (
     get_sheet,
     load_doc,
 )
-from metroloshiny.utils.write_gspread import make_sheet_entries
+
+# FIXME temp deactivate
+# from metroloshiny.utils.write_gspread import make_sheet_entries
 
 # Load Data
 use_dev_local_file = set_local_file()
 sheet_doc = load_doc(dev_local_file=use_dev_local_file)
 # wsheet_psf, df = get_sheet(sheet_doc, "PSF", dev_local_file=use_dev_local_file)
+
+# TODO: Choose dataset ID then have choices of IMAGE ID with needed metrics
+# TODO: Maybe a lucky shot multi objective table with single dataset ID??
+# TODO: PSF/bead images have tags = beads, psf
+# TODO: Argolight images have tags = fwhm, argolight
 
 # Reactive values       ------------------------------------------------------
 sheet_reference = reactive.value(None)
@@ -750,17 +757,20 @@ def upload_power_data():
         data_dict[wavelength][prct] = power
 
     # Upload the data               #######################
+    # FIXME temp use variables for per-commit check
+    cur_mic = [cur_mic, cur_obj, cur_info, date]
     try:
-        make_sheet_entries(
-            sheet=sheet_reference.get(),
-            site=input.site(),
-            microscope=cur_mic,
-            objective=cur_obj,
-            info=cur_info,
-            date=date[0],
-            power_data=data_dict,
-            line_header=light_source_kind,
-        )
+        # FIXME temp deactivate
+        # make_sheet_entries(
+        #     sheet=sheet_reference.get(),
+        #     site=input.site(),
+        #     microscope=cur_mic,
+        #     objective=cur_obj,
+        #     info=cur_info,
+        #     date=date[0],
+        #     power_data=data_dict,
+        #     line_header=light_source_kind,
+        # )
         ui.notification_show("Successfully uploaded the data!", type="message")
     except Exception as err:
         ui.notification_show(
@@ -809,16 +819,19 @@ def upload_omero_data():
 
     # Upload the data
     date = input.override_date().strftime("%Y%m%d")  # Convert to str
+    # FIXME temp use variables for per-commit check
+    cur_mic = [cur_mic, cur_obj, cur_info, date]
     try:
-        make_sheet_entries(
-            sheet=sheet_reference.get(),
-            site=input.site(),
-            microscope=cur_mic,
-            objective=cur_obj,
-            info=cur_info,
-            date=date,
-            fwhm_data=match_fwhm_channel_names(data, ch_names),
-        )
+        # FIXME temp deactivate
+        # make_sheet_entries(
+        #     sheet=sheet_reference.get(),
+        #     site=input.site(),
+        #     microscope=cur_mic,
+        #     objective=cur_obj,
+        #     info=cur_info,
+        #     date=date,
+        #     fwhm_data=match_fwhm_channel_names(data, ch_names),
+        # )
         ui.notification_show("Successfully uploaded the data!", type="message")
     except Exception as err:
         ui.notification_show(

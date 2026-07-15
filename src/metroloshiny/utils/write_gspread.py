@@ -1,15 +1,12 @@
 """Utils for writing google sheets."""
 
-from typing import Any, Optional
+from itertools import pairwise
+from typing import Union
 
 import gspread as gs
 import pandas as pd
 
-from metroloshiny.utils.common_utils import (
-    check_if_sequence,
-)
 from metroloshiny.utils.dataframe_utils import (
-    identify_target_rows,
     nested_dict_to_table,
 )
 from metroloshiny.utils.read_file import ensure_numeric_data
@@ -20,32 +17,7 @@ __gspread_names__ = {
     "PSF": "psf_measurements",
     "Objectives": "objective_db",
     "Field_Uniformity": "field_dist_uni",
-}
-
-# Google spreadsheet headers 1-based indices  # FIXME unused
-__gspread_headers__ = {
-    "Site": 1,
-    "Microscope": 2,
-    "Objective": 3,
-    "Info": 4,
-    "Channel": 5,  # PSF
-    "FWHM": 6,  # PSF
-    "Laser Line [nm]": 5,  # Power
-    "LED Line [nm]": 6,  # Power
-    "Power [%]": 7,  # Power
-}
-
-# Google spreadsheet headers matched to column alphabet  # FIXME unused
-__gspread_h2a__ = {
-    "Site": "A",
-    "Microscope": "B",
-    "Objective": "C",
-    "Info": "D",
-    "Channel": "E",  # PSF
-    "FWHM": "F",  # PSF
-    "Laser Line [nm]": "E",  # Power
-    "LED Line [nm]": "F",  # Power
-    "Power [%]": "G",  # Power
+    "Test": "test_sheet",
 }
 
 # Cell formatting dictionaries
@@ -61,186 +33,129 @@ _updated_cell_format_ = _updated_date_cell_format_.copy()  # For all entries
 _updated_cell_format_["horizontalAlignment"] = "LEFT"
 # updated_cell_format["textFormat"]["bold"] = False # Not working...
 
-# FIXME: probably it would be saver to have DataFrames instead nested_dicts as inputs, to allow same values as input
 
-
-def make_sheet_entries(
+def make_entries(
     sheet: gs.Worksheet,
-    site: str,
-    microscope: str,
-    objective: str,
-    info: str,
-    date: Optional[str] = None,
-    fwhm_data: Optional[dict] = None,
-    power_data: Optional[Any] = None,
-    line_header: Optional[str] = None,
-    # FIXME unused below
-    line: Optional[str] = None,  # FIXME currently unused
-    power: Optional[str] = None,  # FIXME currently unused
+    data: pd.DataFrame,
 ):
     """
-    Make google sheet entries.
+    Upload data to a google spread sheet.
 
-    Marks the cells with a yellow background.
-    Inputs are handled on the metrology data kind.
-    Any (but not multiple) of the data parameres must be provided, i.e.
-    fwhm_data or power_data or ... FIXME more to come
-
-    :param sheet: gs.Worksheet
-    :param site: str site name
-    :param microscope: str microscope name
-    :param objective: str objective name
-    :param info: str info column text
-    :param date: Optional[str] YYYYmmdd. Default None -> gets Today
-    :param fwhm_data: Optional[dict[dict]], FWHM data to be entered, e.g.:
-        {"DAPI" : {'FWHM-X': 911.0, 'FWHM-Y': 852.0, 'FWHM-Z': 1260.0}, ... }
-    :param power_data: Optional[Any] = None,
-        {647: {5: 1.5, 10: 3.1, 50: 15.6}, ... } or in words:
-        {wavelength: {power: mW, ... }, ... }
-    :param line_header: Optional[str], column header for the light source kind.
-        Can be either: "Laser Line [nm]" or "LED Line [nm]"
-
-    :return: no return
+    :param sheet: gs.Worksheet reference
+    :param data: pd.DataFrame, should have the same columns as in the sheet.
     """
-    # Sanity checks FIXME add more if more implemented
-    if fwhm_data is None and power_data is None:
-        raise RuntimeError("Cannot make entry without FWHM or Power data!")
+    # Get the sheet dataframe
+    df = pd.DataFrame(sheet.get_all_records())
 
-    # Init stuff
-    df = None  # dataframe of the sheet
-    address_dict = None  # dict mapping cell addresses to values
-    data_to_use = None  # will point to fwhm_data or power_data or ...
-
-    # Check fwhm data >>>>>>>>>>>>>>>>>
-    if fwhm_data is not None:
-        for ch, values in fwhm_data.items():
-            # FIXME remove channel naming limitation
-            # if not ch.startswith("C") and ch not in [
-            #     "DAPI",
-            #     "GFP",
-            #     "Cy3",
-            #     "Cy5",
-            # ]:
-            #     raise RuntimeError(
-            #         f"FWHM data channel name <{ch}> not supported"
-            #     )
-            for f in values.keys():
-                # Allow only entries for FWHM and Shift
-                if not f.startswith(("FWHM-", "Shift-")):
-                    raise RuntimeError(
-                        f"FWHM label <{f}> for channel <{ch}> not supported."
-                    )
-        # Convert the sheet to pandas
-        df = pd.DataFrame(sheet.get_all_records())
-        # see read_file > get_sheet
-        df = ensure_numeric_data(df, first_column=6)
-        # List the column headers for identifying the sheet rows
-        data_headers = ["Channel", "FWHM"]
-        data_to_use = fwhm_data
-
-    # Check power data >>>>>>>>>>>>>>>>
-    if power_data is not None:
-        data_to_use = power_data
-        df = pd.DataFrame(sheet.get_all_records())
-        # see read_file > get_sheet
-        df = ensure_numeric_data(df, first_column=4)
-        if line_header not in ["Laser Line [nm]", "LED Line [nm]"]:
-            raise KeyError(
-                "The 'line_header' must be: 'Laser Line [nm]' or "
-                f"'LED Line [nm]'. <{line_header}> is not supported!"
+    # Check that all data columns (except last) are also in the sheet cols
+    for c in data.columns[:-2]:
+        if c not in df.columns:
+            raise RuntimeError(
+                f"Columns mismatch: <{c}> not found in gspread sheet."
             )
-        data_headers = [line_header, "Power [%]"]
 
-    # TODO same check for other data dicts FIXME
+    # Get a list of the headers that are common
+    merge_headers = list(data.columns[:-1])
 
-    # Identify column & the cell address for the date   ----------------------
+    # Make sure the new data df is sorted
+    data = data.sort_values(by=merge_headers)
+
+    # Ensure numeric data for specific sheet dataframes     ------------------
+    # For power data
+    if "Power [%]" in df.columns:
+        df = ensure_numeric_data(df, first_column=4)
+        # Add missing column to new data dataframe
+        if "Laser Line [nm]" in data.columns:
+            # Insert empty LED Line.. columns
+            data.insert(5, "LED Line [nm]", [""] * len(data))
+        else:
+            # Insert empty Laser Line.. columns
+            data.insert(4, "Laser Line [nm]", [""] * len(data))
+    # For PSF data
+    if "FWHM" in df.columns:
+        df = ensure_numeric_data(df, first_column=6)
+    # TODO ensure numeric data also for other sheets
+
+    # Identify column & cell address for the date       ----------------------
     headers = [str(x) for x in df.columns]
+    date = str(data.columns[-1])
     if date not in headers:
         col = len(df.columns) + 1
     else:
         col = headers.index(date) + 1
-    # Add a new column if necessary
+    # Add new column if necessary
     if sheet.column_count < col:
         sheet.add_cols(cols=1)
     date_cell = sheet.cell(row=1, col=col)
-    col = date_cell.address.replace(str(1), "")
+    col = date_cell.address.replace(str(1), "")  # get col letter(s)
 
-    # Check where to put the entries    --------------------------------------
-    new_entry = False  # To remember to add full new rows
-    address_dict = {}
-    # Filter the dictionary by the common columns
-    _df = df[
-        (df["Site"] == site)
-        & (df["Microscope"] == microscope)
-        & (df["Objective"] == objective)
-        & (df["Info"] == info)
-    ]
-    if line_header is not None:
-        # Filter by the line wavelength
-        # FIXME this assumes only one wavelength uploaded at once
-        #   currently need because identify_target_rows will raise error
-        #   for duplicate power entries across different wavelengths
-        if len(data_to_use) > 1:
-            raise NotImplementedError(
-                "Upload for multiple wavelength currently not possible. "
-                f"Wavelengths: {data_to_use.keys()}"
-            )
-        _df = _df[_df[line_header] == next(iter(data_to_use.keys()))]
-    # Get a dict {df-row-index : value}
-    entry_dict = identify_target_rows(_df, data_to_use, data_headers)
-    indices = list(entry_dict.keys())
-    # All indices are negative: all entries to the end of the sheet
-    if all(val < 0 for val in indices):
-        new_entry = True
-    # All indices are positvie: entries go to existing rows
-    elif all(val >= 0 for val in indices):
-        # Create the sorted address (offset row to 1-based index + header row)
-        rows = list(entry_dict.keys())
-        rows.sort()
-        for row in rows:
-            address_dict[f"{col}{row + 2}"] = entry_dict.get(row)
+    # Match the sheet table with the new data           ----------------------
+    # (Copy and) rename the index of the sheet (database)
+    dest_df = df.copy()[merge_headers].reset_index(names="match_index")
+    # "Merge" the 2 dataframes (keeps the new data df, adds match_index col)
+    dest_df = data.merge(dest_df, on=merge_headers, how="left")
+    # FIXME: possible `ValueError: You are trying to merge on str and int64 columns for key 'Power [%]'.`
+    #       when sheet and data dataframe columns not of the same type...
+
+    # Decrementally index rows that were not found
+    mask = dest_df["match_index"].isna()
+    dest_df.loc[mask, "match_index"] = -pd.RangeIndex(1, mask.sum() + 1)
+    # Make sure the matched index is integer
+    dest_df["match_index"] = dest_df["match_index"].astype(int)
+
+    # Get the list of target indices
+    indices = list(dest_df["match_index"])
+
+    print(dest_df)
+
+    # TODO continue here
+    new_entries = False
+    # All indices negative: entries go to end of the sheet
+    if all(i < 0 for i in indices):
+        new_entries = True
+        print("all new entries")
+    # All indices positive: entries go to existing rows
+    elif all(i >= 0 for i in indices):
+        pass
     else:
-        # Get a list of the missing entries
-        missing_entries = identify_target_rows(
-            _df, data_to_use, data_headers, table_out=True
-        )
-        missing_entries = missing_entries[missing_entries["match_index"] < 0]
+        missing_entries = dest_df[dest_df["match_index"] < 0]
         missing_entries = missing_entries.drop("match_index", axis=1)
-
         raise RuntimeError(
-            "The sheet does not seem to be ordered properly (alphabetically):"
-            " some row entries exist while others don't.\nThis requires "
-            "manual addition of the missing rows into the google sheet.\n"
-            f"\n{missing_entries}"
+            "Error: Not all the data could be matched to existing entries.\n"
+            "Manual curration in the google sheet is needed to add following "
+            f"missing rows. I.e.:\n\n{missing_entries}"
         )
 
-    # Adding entries            ----------------------------------------------
-    # Add entries to the existing rows
-    if not new_entry:
-        # Check if the addresses are continuous
-        if not check_if_sequence(address_dict.keys()):
+    # Adding entries                ------------------------------------------
+    # Add entries to existing rows
+    if not new_entries:
+        # Set indices off by 2 for the spread sheet
+        indices = [i + 2 for i in indices]
+        # Check if the indices are continuous (to write as a block)
+        if any(a + 1 != b for a, b in pairwise(indices)):
+            # if not check_if_sequence(indices): # old version using cell-addresses list
             raise NotImplementedError(
-                "Values to be written are not continuous. "
-                f"Data to be entered in cells: {address_dict.keys()}"
+                "Values cannot be uploaded: Value upload is supported only "
+                "if they can be added as a 'block'.\n"
+                f"Your values would end up in spreadsheet rows: {indices}, "
+                "which has gaps/missing rows."
             )
-        # Check if the cells for values are empty!
-        cell_addresses = list(address_dict.keys())
-        start_cell = cell_addresses[0]
-        end_cell = cell_addresses[-1]
+        # Create a list of value addresses
+        value_addresses = [f"{col}{i}" for i in indices]
+        start_cell = value_addresses[0]
+        end_cell = value_addresses[-1]
+        # Check if the cells for values are empty
         cells = sheet.get(f"{start_cell}:{end_cell}")
         if len(cells) != 0:
             filled_cells = []
             for i in range(len(cells)):
                 if len(cells[i]) != 0:
-                    filled_cells.append(cell_addresses[i])
+                    filled_cells.append(value_addresses[i])
             raise RuntimeError(
                 f"Following cells already contain values: {filled_cells}"
             )
-        # Enter the cell values
-        value_block = []
-        for v in address_dict.values():
-            value_block.append([v])
-
+        # Enter the values
+        value_block = [[i] for i in dest_df[date]]  # 2D array
         sheet.update(range_name=f"{start_cell}:{end_cell}", values=value_block)
         sheet.format(
             ranges=f"{start_cell}:{end_cell}", format=_updated_cell_format_
@@ -248,48 +163,28 @@ def make_sheet_entries(
 
     # Create new entries at the bottom of the sheet
     else:
-        table = nested_dict_to_table(
-            dict(sorted(data_to_use.items())), data_headers
-        )
-        new_block = []  # Block for the first columns
-        value_block = []  # Block for the values in the date column
-        for _idx, row in table.iterrows():
-            new_line = [site, microscope, objective, info]
-            # To add empty columns, not the index based on path entries
-            empty_col = []
-            if line_header is not None:
-                if line_header == "Laser Line [nm]":
-                    # To add empty column after the first entry
-                    empty_col.append(1)
-                else:
-                    # To add empty column before the first entry
-                    empty_col.append(0)
+        # Create 3D arrays for the "common block" and value block
+        common_block = dest_df[dest_df.columns[:-2]].to_numpy().tolist()
+        value_block = [[i] for i in dest_df[date]]
 
-            # Append further column entries (e.g. 'DAPI', 'FWHM-X')
-            for path_count, p in enumerate(data_headers):
-                # Insert empty columns
-                if path_count in empty_col:
-                    new_line.append("")
-                new_line.append(row[p])
-            new_block.append(new_line)
-            value_block.append([row["Value"]])
+        # Get start and end rows
         start_row = len(df) + 2
-        end_row = start_row + len(table) - 1
+        end_row = start_row + len(common_block) - 1
         # Add additional rows if necessary # TODO not checked...
         if sheet.row_count < end_row:
             sheet.add_rows(rows=end_row - sheet.row_count)
-        # Get column letter of the last column
-        last_col_letter = chr(ord("@") + len(new_block[0]))
-        # Write the common info block
+        # Create cell addresses
+        last_col_letter = chr(ord("@") + len(common_block[0]))
         block_range = f"A{start_row}:{last_col_letter}{end_row}"
-        sheet.update(range_name=block_range, values=new_block)
+        # Write the common block
+        sheet.update(range_name=block_range, values=common_block)
         sheet.format(ranges=block_range, format=_updated_cell_format_)
         # Write the values
         val_range = f"{col}{start_row}:{col}{end_row}"
         sheet.update(range_name=val_range, values=value_block)
         sheet.format(ranges=val_range, format=_updated_cell_format_)
 
-    # Finally also add the date to the sheet if not there
+    # Add date if necessary
     if date_cell.value is None:
         sheet.update_acell(label=date_cell.address, value=date)
         sheet.format(
@@ -297,39 +192,68 @@ def make_sheet_entries(
         )
 
 
+def prepare_data_for_entry(
+    data: Union[dict, pd.DataFrame],
+    data_headers: list[str],
+    site: str,
+    microscope: str,
+    objective: str,
+    info: str,
+    date: str,
+) -> pd.DataFrame:
+    """
+    Create a dataframe similar to spreadsheet table.
+
+    :param data: dict, (nested) e.g. {
+            "C1" : {'FWHM-X': 911.0, 'FWHM-Y': 852.0, 'FWHM-Z': 1260.0},
+            ...
+        }
+        if it is a DF...
+    :param data_headers: list[str], nested dict headers, excluding value column.
+        e.g. ["Channel", "FWHM"]
+    """
+    if isinstance(data, dict):
+        # Convert the nested (data) dict to a table
+        df = nested_dict_to_table(data, data_headers, date)
+    else:
+        # Check if headers are OK
+        df = pd.DataFrame(data)
+        cur_headers = list(df.columns)
+        # Check that the number of columns is correct
+        if len(cur_headers) != len(data_headers) + 1:
+            raise RuntimeError(
+                f"Expected a dataframe with {len(data_headers) + 1} columns, "
+                f"but got {len(cur_headers)} columns."
+            )
+        # Check if the needed headers are in the current dataframe
+        for h in data_headers:
+            if h not in cur_headers:
+                raise RuntimeError(
+                    f"The current data is missing a needed header: {h}."
+                )
+        # Check the value header
+        if str(cur_headers[-1]) != date:
+            if str(cur_headers[-1]) == "Value":
+                # Replace value with the date
+                new_headers = data_headers.copy()
+                new_headers.append(date)
+                df.columns = new_headers
+            else:
+                raise RuntimeError(
+                    "Provided data value column header is not recognised: "
+                    f"{cur_headers[-1]}"
+                )
+    # Create the common columns
+    common_df = {
+        "Site": [site] * len(df),
+        "Microscope": [microscope] * len(df),
+        "Objective": [objective] * len(df),
+        "Info": [info] * len(df),
+    }
+    common_df = pd.DataFrame.from_dict(common_df)
+    # Join the dataframes
+    return pd.concat([common_df, df], axis=1)
+
+
 if __name__ == "__main__":
     pass
-    # sheet = get_gspread(sheet_name=__gspread_names__.get("PSF"))
-    # # #sheet = get_gspread(sheet_name="testing")
-
-    # # FIXME need to change the keys to e.g. DAPI...
-    # data1 = {
-    #     "C1" : {'FWHM-X': 911.0, 'FWHM-Y': 852.0, 'FWHM-Z': 1260.0},
-    #     "C2" : {'FWHM-X': 651.0, 'FWHM-Y': 643.0, 'FWHM-Z': 860.0},
-    #     "C3" : {'FWHM-X': 823.0, 'FWHM-Y': 876.0, 'FWHM-Z': 1020.0},
-    #     "C4" : {'FWHM-X': 898.0, 'FWHM-Y': 954.0, 'FWHM-Z': 1142.0},
-    # }
-    # data = {
-    #     "DAPI" : {'FWHM-X': 911.0, 'FWHM-Y': 852.0, 'FWHM-Z': 1260.0},
-    #     "GFP" : {'FWHM-X': 651.0, 'FWHM-Y': 643.0, 'FWHM-Z': 860.0},
-    #     "Cy3" : {'FWHM-X': 823.0, 'FWHM-Y': 876.0, 'FWHM-Z': 1020.0},
-    #     "Cy5" : {'FWHM-X': 898.0, 'FWHM-Y': 954.0, 'FWHM-Z': 1142.0},
-    # }
-
-    # make_sheet_entries(
-    #     sheet=sheet,
-    #     site="TestSite",
-    #     microscope="TestMic",
-    #     objective="TestObj",
-    #     info="TestInfo",
-    #     date="19991212",
-    #     fwhm_data=data
-    # )
-    # print(">>>>done!")
-
-    # # df = pd.DataFrame(sheet.get_all_records())
-    # # df = ensure_numeric_data(df, first_column=4) # 4 for power, 6 for psf
-
-    # # make_sheet_entry(
-    # #     sheet=sheet, value=123.4, site="Hebelstrasse", microscope="BSL2", objective="11x/0.3", info="fake"
-    # # )
