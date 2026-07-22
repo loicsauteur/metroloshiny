@@ -14,7 +14,7 @@ __sheet_names__ = {
     "Power": "laser_power_measurements",
     "PSF": "psf_measurements",
     "Objectives": "objective_db",
-    "Field_Uniformity": "field_dist_uni",
+    "Uniformity": "field_dist_uni",
     "Test": "test_sheet",
 }
 

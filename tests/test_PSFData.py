@@ -1,5 +1,7 @@
 """Test PSFData object."""
 
+import pandas as pd
+
 from metroloshiny.data_objects.PSFData import PSFData
 
 omero_4ch_multi_roi_full_kv = {
@@ -338,6 +340,50 @@ def test_data_injection():
     mod_val = ch4.get_shift_data()["C1"]["Shift-Y"]
     ori_val = ch4_dup.get_shift_data()["C1"]["Shift-Y"]
     assert mod_val == ori_val == "Reference-Y"
+
+
+def test_from_dataframe():
+    """Test the class-method from_dataframe."""
+    # Create a dataframe from a dict
+    df = pd.DataFrame(
+        omero_4ch_multi_roi_full_kv.items(), columns=["Key", "Value"]
+    )
+    # Create PSFData object from dataframe
+    ch4 = PSFData.from_dataframe(df)
+    # Create PSFData object from dict
+    ch4_old = PSFData(omero_4ch_multi_roi_full_kv)
+
+    # Check that the values are the same for both
+    ch4_data = ch4.get_fwhm_data()
+    ch4_data_old = ch4_old.get_fwhm_data()
+    for ch in ch4_data_old.keys():
+        msg = f"{ch} missing in PSFData from_dataframe"
+        assert ch in ch4_data.keys(), msg
+    for ch, ch_val in ch4_data_old.items():
+        for k, _v in ch_val.items():
+            msg = f"{k} missing in PSFData from_dataframe"
+            assert k in ch4_data[ch].keys(), msg
+    for ch, ch_val in ch4_data_old.items():
+        for k, v in ch_val.items():
+            msg = f"{ch} - {k} value does not match for PSFData from_dataframe"
+            assert v == ch4_data[ch].get(k), msg
+
+
+def test_get_dataframes():
+    """Test the getters for getting the data as dataframe."""
+    # Create a dataframe from a dict
+    df = pd.DataFrame(
+        omero_4ch_multi_roi_full_kv.items(), columns=["Key", "Value"]
+    )
+    # Create PSFData object from dataframe
+    ch4 = PSFData.from_dataframe(df)
+
+    # Here some very simple tests
+    fwhm = ch4.get_fwhm_dataframe()
+    shift = ch4.get_shift_dataframe()
+    assert isinstance(fwhm, pd.DataFrame)
+    assert isinstance(shift, pd.DataFrame)
+    assert len(fwhm) == len(shift)
 
 
 if __name__ == "__main__":

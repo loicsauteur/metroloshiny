@@ -3,6 +3,8 @@
 import warnings
 from typing import Optional
 
+import pandas as pd
+
 from metroloshiny.utils.common_utils import get_today
 
 
@@ -35,6 +37,23 @@ class PSFData:
         self._parse_data_()
         self._set_final_fwhm_data_()
 
+    @classmethod
+    def from_dataframe(cls, df: pd.DataFrame):
+        """Create PSF data object from a DataFrame."""
+        # Sanity checks
+        if "Key" not in df.columns and "Value" not in df.columns:
+            raise KeyError(
+                "Only dataframes with 'Key' and 'Value' columns are supported."
+            )
+        if len(list(df.columns)) != 2:
+            raise KeyError(
+                "Only dataframes with (exactly) 'Key' and 'Value' columns are supported."
+            )
+        # Convert the dataframe to a dict
+        data = dict(zip(df["Key"], df["Value"], strict=True))
+        # Return the PSFData class (from dict)
+        return cls(data)
+
     # Getters / Setters     --------------------------------------------------
 
     def get_fwhm_data(self) -> dict[str, dict[str, float]]:
@@ -48,6 +67,28 @@ class PSFData:
     def get_acquisition_date(self) -> Optional[str]:
         """Getter for the acquisition date."""
         return self.acquisition_date
+
+    def get_fwhm_dataframe(self) -> pd.DataFrame:
+        """Getter for FWHM data as dataframe."""
+        # Create a 2D array of the values
+        rows = []
+        for ch, ch_vals in sorted(self.fwhm_data.items()):
+            for k, v in ch_vals.items():
+                rows.append([ch, k, v])
+        # Convert the 2D array to dataframe
+        df = pd.DataFrame(rows, columns=["Channel", "FWHM", "Value"])
+        return df
+
+    def get_shift_dataframe(self) -> pd.DataFrame:
+        """Getter for shift data as dataframe."""
+        # Create a 2D array of the values
+        rows = []
+        for ch, ch_vals in sorted(self.shift_data.items()):
+            for k, v in ch_vals.items():
+                rows.append([ch, k, v])
+        # Convert the 2D array to dataframe
+        df = pd.DataFrame(rows, columns=["Channel", "FWHM", "Value"])
+        return df
 
     def inject_channel_names(self, ch_names: list):
         """Overwrite channel names with supplied ones."""

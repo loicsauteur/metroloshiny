@@ -2,6 +2,7 @@
 
 from typing import Any, Callable, Optional
 
+import pandas as pd
 from omero.gateway import (
     BlitzGateway,
     FileAnnotationWrapper,
@@ -9,6 +10,182 @@ from omero.gateway import (
 )
 
 from metroloshiny.utils.read_file import get_private_data
+
+# Dictionary matching upload category to metric to look for.
+__metrics__ = {
+    "PSF": "FWHM",
+}
+
+# FIXME: here are several deprecated functions -> TODO clean up!
+
+
+def get_image_voxelsize_channel_names(
+    image_id: int,
+    username: Optional[str] = None,
+    passwd: Optional[str] = None,
+    host: Optional[str] = None,
+    port: Optional[int] = None,
+    path_private_data: Optional[str] = None,
+):
+    """
+    Get voxel size and channel names for an Image ID.
+
+    :param image_id: int OMERO dataset ID
+    :param username: str OMERO user name.
+                If None, will get it from private_data.csv
+    :param passwd: str OMERO user password.
+                If None, will get it from private_data.csv
+    :param host: str OMERO host.
+                If None, will get it from private_data.csv
+    :param port: str OMERO port.
+                If None, will get it from private_data.csv
+    :param path_private_data: str path to private_data.csv.
+                If None takes default path "./data/private_data.csv"
+
+    :return: tuple[
+        Optional[list[float]],  XYZ voxel size
+        Optional[list[str]],    channel names on OMERO
+    ]
+    """
+    # Get the connection details from file
+    username, passwd, host, port = get_cred(
+        path_private_data, username, passwd, host, port
+    )
+    # Init result variables
+    channel_names = None
+    voxel_size = None
+
+    # Connect to OMERO
+    try:
+        conn = BlitzGateway(
+            username=username, passwd=passwd, host=host, port=port, secure=True
+        )
+        conn.connect()
+        # Get the image channel name list
+        channel_names = get_channel_names(
+            conn=conn, datatype="Image", id=image_id
+        )
+        # Get the image voxel sizes
+        voxel_size = get_voxel_size(conn=conn, datatype="Image", id=image_id)
+
+    finally:
+        conn.c.closeSession()
+    # Return results (may be none)
+    return voxel_size, channel_names
+
+
+def get_images_for_metric(
+    dataset_id: int,
+    metric_id: str,
+    username: Optional[str] = None,
+    passwd: Optional[str] = None,
+    host: Optional[str] = None,
+    port: Optional[int] = None,
+    path_private_data: Optional[str] = None,
+):
+    """
+    Get images from a dataset which have the metric of interest.
+
+    :param dataset_id: int OMERO dataset ID
+    :param metric_id: metric to look for in OMERO.
+    :param username: str OMERO user name.
+                If None, will get it from private_data.csv
+    :param passwd: str OMERO user password.
+                If None, will get it from private_data.csv
+    :param host: str OMERO host.
+                If None, will get it from private_data.csv
+    :param port: str OMERO port.
+                If None, will get it from private_data.csv
+    :param path_private_data: str path to private_data.csv.
+                If None takes default path "./data/private_data.csv"
+
+    :return: tuple[dict, dict]
+        - dict[int, str] with
+            key = image ID
+            value = f"image ID: image name"
+        - dict[int, pd.DataFrame] with
+            key = image ID
+            value = key-value table with columns ["Key", "Value"] for OMERO key-value pairs
+            # FIXME check/improve for tables...
+
+    """
+    # Get the connection details from file
+    username, passwd, host, port = get_cred(
+        path_private_data, username, passwd, host, port
+    )
+    # Check the metric value to look for        ##############################
+    if metric_id not in __metrics__.values():
+        if metric_id not in __metrics__.keys():
+            raise NotImplementedError(
+                f"The metric <{metric_id}> is not supported."
+            )
+        try:
+            metric_id = str(__metrics__.get(metric_id))
+        except Exception as err:
+            raise RuntimeError(f"Error: {err!s}") from err
+
+    # Init dict {id: name} for IDs that have metrics
+    id_name_dict = {}
+    # Init dict {id: df} for IDs that have metrics
+    id_df_dict = {}
+
+    # Connect to OMERO
+    try:
+        conn = BlitzGateway(
+            username=username, passwd=passwd, host=host, port=port, secure=True
+        )
+        conn.connect()
+
+        # Get a dict of all image in dataset {image_id: image_name}
+        image_ids = get_images_in_dataset(conn=conn, dataset_id=dataset_id)
+
+        for id, name in image_ids.items():
+            cur_data = get_metric_data(
+                conn=conn, image_id=id, metric=metric_id
+            )
+            if isinstance(cur_data, pd.DataFrame):
+                id_name_dict[id] = f"{id}: {name}"
+                id_df_dict[id] = cur_data
+
+        # print("id with metric:")
+        # for k, v in id_name_dict.items():
+        #     print(k, v)
+
+        # print("id without metrics:")
+        # count = 0
+        # for k in image_ids.keys():
+        #     if k not in id_name_dict.keys():
+        #         count += 1
+        #         print(k)
+
+        # print("total images in dataset", len(image_ids.keys()))
+        # print("total images with metric", len(id_name_dict.keys()))
+        # print("images without metric", count)
+    finally:
+        conn.c.closeSession()
+    return id_name_dict, id_df_dict
+
+
+def get_images_in_dataset(conn: BlitzGateway, dataset_id: int) -> dict:
+    """
+    Get a of all image IDs (with their names) for a dataset ID.
+
+    :param conn: BlitzGateway
+    :param dataset_id: int
+
+    :return: dict {image_id: image_name}
+    """
+    dataset = conn.getObject("dataset", dataset_id)
+    # Images is None if it is not a dataset ID
+    if dataset is None:
+        raise RuntimeError(f"<{dataset_id}> does not seem to be a dataset ID.")
+    if dataset.countChildren() == 0:
+        raise RuntimeError(f"There are no images for dataset: <{dataset_id}>")
+    # Get the images form the dataset
+    images = dataset.listChildren()
+
+    id_name_dict = {i.getId(): i.getName() for i in images}
+    return id_name_dict
 
 
 def omero_operation(
@@ -52,6 +229,8 @@ def omero_operation(
         path_private_data, username, passwd, host, port
     )
     data_dict = None
+    channel_names = None
+    voxel_size = None
 
     # Connect to OMERO
     try:
@@ -185,7 +364,28 @@ def omero_key_value_to_dict(kv_pair: list[list]) -> dict:
     return dict_out
 
 
-def omero_table_to_dict(
+def omero_table_to_dict(table) -> dict:
+    """
+    Already loaded OMERO.table to dict.
+
+    :param table: OMERO table data object (already loaded)
+
+    :return: dict
+    """
+    n_headers = len(table.getHeaders())
+    n_rows = table.getNumberOfRows()
+    data = table.read(range(n_headers), start=0, stop=n_rows)
+    dict_out = {}
+    for col in data.columns:
+        if col.name in dict_out.keys():
+            raise RuntimeError(
+                f"OMERO table contains headers with same name: {col.name}"
+            )
+        dict_out[col.name] = col.values
+    return dict_out
+
+
+def omero_table_to_dict_old(
     ann: FileAnnotationWrapper, conn: BlitzGateway
 ) -> dict:
     """
@@ -205,17 +405,7 @@ def omero_table_to_dict(
             f"Could not open table. "
             f"Input type was {ann.getFile().getMimetype()}"
         ) from err
-    n_headers = len(table.getHeaders())
-    n_rows = table.getNumberOfRows()
-    data = table.read(range(n_headers), start=0, stop=n_rows)
-    dict_out = {}
-    for col in data.columns:
-        if col.name in dict_out.keys():
-            raise RuntimeError(
-                f"OMERO table contains headers with same name: {col.name}"
-            )
-        dict_out[col.name] = col.values
-    return dict_out
+    return omero_table_to_dict(table)
 
 
 def find_metrics(
@@ -270,16 +460,89 @@ def find_metrics(
                     break
     # If found in both, return the table
     if kv_item is not None and table_item is not None:
-        return omero_table_to_dict(table_item, conn=conn)
+        return omero_table_to_dict_old(table_item, conn=conn)
     if kv_item is not None:
         return omero_key_value_to_dict(kv_item)
     if table_item is not None:
-        return omero_table_to_dict(table_item, conn=conn)
+        return omero_table_to_dict_old(table_item, conn=conn)
     if kv_item is None and table_item is None:
         raise RuntimeError(
             f"Could not find <{metric}> in key-value "
             f"pairs or table of the {datatype}."
         )
+
+
+def get_metric_data(
+    conn: BlitzGateway, image_id: int, metric: str
+) -> Optional[pd.DataFrame]:
+    """
+    Get the metric data from the OMERO image.
+
+    Finds the first OMERO.table or kv-pair that contains the metric of interest.
+    Prefers kv-pair over OMERO.table.
+    Checks OMERO.table headers if any of them contain the metric.
+    Checks kv pair keys for metric (excludes "Profile_length_for_FWHM")
+
+    :param conn: BlitzGateway
+    :param image_id: int, OMERO image ID
+    :param metric: str, metric to find, e.g. FWHM
+
+    :return: None, if the metric was not found in the image
+        pd.DataFrame
+    """
+    # Collect all kv-paris and omero.tables
+    kv_pairs = []
+    tables = []
+    # Get Omero image
+    image = conn.getObject("image", image_id)
+    if image is None:
+        raise RuntimeError(f"ID <{image_id} does not seem to be an Image ID.")
+    # Loop over annotation objects to get kv-paris or table
+    res = conn.c.sf.sharedResources()
+    for ann in image.listAnnotations():
+        # Check for tables
+        if isinstance(ann, FileAnnotationWrapper):
+            try:
+                # It's a table if it can be opened
+                table = res.openTable(ann.getFile()._obj)
+                tables.append(table)
+            except Exception:
+                # Not a table - skip
+                pass
+        elif isinstance(ann, MapAnnotationWrapper):
+            kv_pairs.append(ann.getValue())
+
+    # Check if the metric of interest is somewhere
+    final_kv_pair = None
+    final_table = None
+
+    # Get the first table that has the metric
+    for table in tables:
+        for col in table.getHeaders():
+            if metric in col.name:
+                final_table = table
+                break
+
+    # Get the first kv-pair that contains the metric
+    for kv in kv_pairs:
+        # loop over the tuples of length 2,
+        for k, _v in kv:
+            # Check if the first item (key) contains the metric
+            if metric in k and "Profile_length_for_FWHM" not in k:
+                final_kv_pair = kv
+                break
+
+    if final_kv_pair is None and final_table is None:
+        return None
+    if final_kv_pair is not None:
+        # kv_item = list[list[key, value]]
+        return pd.DataFrame(final_kv_pair, columns=["Key", "Value"])
+    else:
+        # FIXME definitively should check how this looks. Probably better to return a table directly instead of converting to a dict...!
+        final_table = omero_table_to_dict(final_table)
+        # Convert to dict for pandas
+        final_table = {k: [v] for k, v in final_table.items()}
+        return pd.DataFrame.from_dict(final_table)
 
 
 def get_tables_and_kv_paris(
@@ -413,7 +676,7 @@ def find_omero_table(conn: BlitzGateway):
             f"OMERO object contains multiple OMERO.tables -> "
             f"{len(tables)} tables!"
         )
-    return omero_table_to_dict(tables[0], conn=conn)
+    return omero_table_to_dict_old(tables[0], conn=conn)
 
 
 def render_dict(d: dict):
@@ -449,4 +712,9 @@ if __name__ == "__main__":
     # Dataset ID: 78303
     #     Image ID: 2832822
     # """
+
+    # Test for get_images_for_metric (on metrology dataset (from myself))
+    # ds_id = 81080
+    # #ds_id = 78303
+    # get_images_for_metric(ds_id, "PSF")
     pass

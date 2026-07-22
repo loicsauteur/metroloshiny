@@ -16,7 +16,7 @@ __gspread_names__ = {
     "Power": "laser_power_measurements",
     "PSF": "psf_measurements",
     "Objectives": "objective_db",
-    "Field_Uniformity": "field_dist_uni",
+    "Uniformity": "field_dist_uni",
     "Test": "test_sheet",
 }
 
@@ -40,6 +40,10 @@ def make_entries(
 ):
     """
     Upload data to a google spread sheet.
+
+    Note: I ran into an error (Range ('psf_measurements!U1) exceeds grid limits.'),
+        when I deleted the last column and retried upload (it did not add, a new
+        column as expected). Restarting the app, made it work...
 
     :param sheet: gs.Worksheet reference
     :param data: pd.DataFrame, should have the same columns as in the sheet.
@@ -85,6 +89,7 @@ def make_entries(
         col = headers.index(date) + 1
     # Add new column if necessary
     if sheet.column_count < col:
+        # Note: I get a google error if I delete last col I just added...
         sheet.add_cols(cols=1)
     date_cell = sheet.cell(row=1, col=col)
     col = date_cell.address.replace(str(1), "")  # get col letter(s)
@@ -106,14 +111,11 @@ def make_entries(
     # Get the list of target indices
     indices = list(dest_df["match_index"])
 
-    print(dest_df)
-
-    # TODO continue here
+    # Check if new entries or not or mix        ------------------------------
     new_entries = False
     # All indices negative: entries go to end of the sheet
     if all(i < 0 for i in indices):
         new_entries = True
-        print("all new entries")
     # All indices positive: entries go to existing rows
     elif all(i >= 0 for i in indices):
         pass
@@ -212,6 +214,9 @@ def prepare_data_for_entry(
     :param data_headers: list[str], nested dict headers, excluding value column.
         e.g. ["Channel", "FWHM"]
     """
+    # Sainity check
+    if not isinstance(data_headers, list):
+        raise RuntimeError("Data headers are not a list!")
     if isinstance(data, dict):
         # Convert the nested (data) dict to a table
         df = nested_dict_to_table(data, data_headers, date)
@@ -243,6 +248,9 @@ def prepare_data_for_entry(
                     "Provided data value column header is not recognised: "
                     f"{cur_headers[-1]}"
                 )
+    # Reset the df index
+    df = df.reset_index(drop=True)
+
     # Create the common columns
     common_df = {
         "Site": [site] * len(df),
