@@ -31,6 +31,13 @@ _updated_date_cell_format_ = {  # For date entries
 }
 _updated_cell_format_ = _updated_date_cell_format_.copy()  # For all entries
 _updated_cell_format_["horizontalAlignment"] = "LEFT"
+_white_cell_format_ = _updated_cell_format_.copy()
+_white_cell_format_["backgroundColor"] = {
+    # White
+    "red": 1.0,
+    "green": 1.0,
+    "blue": 1.0,
+}
 # updated_cell_format["textFormat"]["bold"] = False # Not working...
 
 
@@ -88,11 +95,18 @@ def make_entries(
     else:
         col = headers.index(date) + 1
     # Add new column if necessary
+    new_col_added = False
     if sheet.column_count < col:
-        # Note: I get a google error if I delete last col I just added...
+        # Note (FIXME?): I get a google error if I delete last col I just added...
         sheet.add_cols(cols=1)
+        # Adjusting the format (e.g. highlight) is done once the col letter is known
+        new_col_added = True
+
     date_cell = sheet.cell(row=1, col=col)
     col = date_cell.address.replace(str(1), "")  # get col letter(s)
+    if new_col_added:
+        # Make sure that cells are not highlighted initially
+        sheet.format(ranges=f"{col}:{col}", format=_white_cell_format_)
 
     # Match the sheet table with the new data           ----------------------
     # (Copy and) rename the index of the sheet (database)

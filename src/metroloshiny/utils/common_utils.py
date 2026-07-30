@@ -197,6 +197,23 @@ def get_today() -> str:
     return today
 
 
+def check_if_date(date: str) -> bool:
+    """
+    Check if a string can be converted to a date.
+
+    Expects date string in format YYYYmmdd.
+
+    :param date: str, of possible date
+
+    :return: bool, True if it can be a date
+    """
+    try:
+        datetime.datetime.strptime(date, "%Y%m%d")
+        return True
+    except ValueError:
+        return False
+
+
 def check_duplicate_dict_values(
     d: dict[str, str], exclude: Optional[str] = "None"
 ) -> Optional[dict]:

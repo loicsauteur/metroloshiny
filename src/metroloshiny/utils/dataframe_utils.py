@@ -433,7 +433,7 @@ def convert_power_column(df: pd.DataFrame) -> pd.DataFrame:
     Used for parsing csv files from thorlabs power meter.
 
     :param df: pd.DataFrame, containing column e.g. "Power (W)",
-        i.e. column tat stats with "Power"
+        i.e. column that stats with "Power"
 
     :return: pd.DataFrame with column changed to "Power (mW)"
     """
@@ -465,7 +465,10 @@ def convert_power_column(df: pd.DataFrame) -> pd.DataFrame:
     df_copy = df.copy()
     try:
         df_copy[cols[0]] = round(
-            df[cols[0]].str.replace(",", ".", regex=False).astype(float)
+            df[cols[0]]
+            .astype(str)
+            .str.replace(",", ".", regex=False)
+            .astype(float)
             * power_factor,
             6,
         )

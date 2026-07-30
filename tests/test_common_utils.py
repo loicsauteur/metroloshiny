@@ -106,6 +106,10 @@ def test_list_duplicates():
     assert 3 in bad
     assert 5 in bad2
     assert "a" in bad2
+    # Test also list taken from dataframe
+    df = pd.DataFrame.from_dict({"P": ["5", "5", "10", "12", "12"]})
+    a = list(df["P"])
+    assert len(cu.list_duplicates(a)) == 2
 
 
 def test_create_css_color_dict():
@@ -202,6 +206,18 @@ def test_objective_db_functions():
         RuntimeError, match=r"The .*is not present in the objective database."
     ):
         cu.get_objective_na(df, "ID1-YZ")
+
+
+def test_check_if_date():
+    """Test the check_if_date function."""
+    date = "19991212"
+    assert cu.check_if_date(date)
+    date = "19992512"
+    assert not cu.check_if_date(date)
+    date = "2020-01-12"
+    assert not cu.check_if_date(date)
+    date = "random"
+    assert not cu.check_if_date(date)
 
 
 if __name__ == "__main__":
