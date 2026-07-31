@@ -39,12 +39,9 @@ use_dev_local_file = set_local_file()
 sheet_doc = load_doc(dev_local_file=use_dev_local_file)
 # wsheet_psf, df = get_sheet(sheet_doc, "PSF", dev_local_file=use_dev_local_file)
 
-# TODO-DONE: Choose dataset ID then have choices of IMAGE ID with needed metrics
-# TODO: Maybe a lucky shot multi objective table with single dataset ID??
+# TODO: maybe OMERO metrics via tags?
 #   TODO: PSF/bead images have tags = beads, psf
 #   TODO: Argolight images have tags = fwhm, argolight
-# TODO-DONE: Implement new site option
-# TODO: upload different power csvs!
 
 # Reactive values       ------------------------------------------------------
 sheet_reference = reactive.value(None)

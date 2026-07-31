@@ -1,4 +1,8 @@
-"""Write_gspread tests."""
+"""
+Write_gspread tests.
+
+Some test will not run in pytest, as they would write to gspread.
+"""
 
 import pytest
 
@@ -13,7 +17,7 @@ def test_make_entries():
     """
     Test the make_entries function.
 
-    Will never run in pytest.
+    Will never run in pytest, since it would write to gspread.
     """
     local_file = set_local_file()
     if local_file:
@@ -32,7 +36,7 @@ def test_make_entries():
     }
     h2 = ["LED Line [nm]", "Power [%]"]
     # h1 = ["Channel", "FWHM"]
-    date = "20260713"
+    date = "11110713"
     data = wg.prepare_data_for_entry(
         data=data2,
         data_headers=h2,
@@ -46,13 +50,17 @@ def test_make_entries():
 
 
 def test_prepare_data_for_entry():
-    """Test prepare_data_for_entry function."""
+    """
+    Test prepare_data_for_entry function.
+
+    Does not write to gspread.
+    """
     data = {
         "C1": {"FWHM-X": 911.0, "FWHM-Y": 852.0, "FWHM-Z": 1260.0},
         "C2": {"FWHM-X": 800.0, "FWHM-Y": 810.0, "FWHM-Z": 1000.0},
     }
     h1 = ["Channel", "FWHM"]
-    date = "20260713"
+    date = "11110713"
     # Create dataframe from dict
     df1 = wg.prepare_data_for_entry(
         data=data,
@@ -145,4 +153,4 @@ def test_prepare_data_for_entry():
 
 
 if __name__ == "__main__":
-    test_make_entries()
+    pass

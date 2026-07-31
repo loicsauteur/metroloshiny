@@ -55,9 +55,18 @@ def get_private_data(key: str, data_path: Optional[str] = None) -> str:
                 # the path absolute path
                 data_path = __linux_private_data_path__
 
+    # Only allow csv files
+    if not data_path.endswith(".csv"):
+        raise IOError("Only .csv files are allowed.")
     # Ensure the file exists
     if not os.path.exists(data_path):
         raise FileExistsError(f"File does not exist: {data_path}")
+    # Check that the csv file is in expected format (first row= "Key, Value")
+    with open(data_path, "r", encoding="utf-8") as f:
+        header = f.readline().strip().replace(" ", "")
+        if header != "Key,Value":
+            raise ValueError("Wrong private_data.csv file format.")
+
     # Load csv with Key column as index column
     df = pd.read_csv(data_path, index_col="Key")
 

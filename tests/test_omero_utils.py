@@ -1,27 +1,37 @@
 """
-Tests for omero utils.
+Tests for OMERO utils.
 
-FIXME
-These test should not be added to git, since omero credntials are not included.
+Most tests will not run in pytest,
+as they require login credentials and connection to an OMERO instance.
 """
 
-# def test_test():
-#     username, pwd, host, port = ou.get_cred(None, None, None, None, None)
-#     print(username, pwd, host, port)
+import pytest
 
-#     # Connect
-#     try:
-#         conn = BlitzGateway(username=username, passwd=pwd, host=host, port=port, secure=True)
-#         conn.connect()
-#         print("connected to OMERO")
-
-#         ou.get_voxel_size(conn=conn, datatype="Image", id=3273552)
+import metroloshiny.utils.omero_utils as ou
 
 
-#     finally:
-#         conn.c.closeSession()
-#         print("closed OMERO session")
+def test_get_cred():
+    """Test get_cred function with example private_data.csv."""
+    # Test on example file
+    name, pwd, host, port = ou.get_cred(
+        path_private_data="./example_files/private_data_example.csv"
+    )
+    assert name == "user"
+    assert pwd == "password"
+    assert host == "omero.idr.com"
+    assert isinstance(port, int)
+    assert port == 4064
+
+    # Test on file that does not exisist
+    with pytest.raises(FileExistsError, match=r"File does not *"):
+        ou.get_cred(path_private_data="example_files/example.csv")
+
+    # Test on wrong file
+    with pytest.raises(ValueError, match=r"Wrong private_data.csv file*"):
+        ou.get_cred(
+            path_private_data="./example_files/example_thorlabs_powermeter_linearity-DAPI.csv"
+        )
+
 
 if __name__ == "__main__":
-    # test_test()
     pass
