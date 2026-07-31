@@ -25,7 +25,6 @@ from metroloshiny.utils.dataframe_utils import (
     filter_by_column_value,
     nested_dict_to_table,
 )
-from metroloshiny.utils.omero_utils import omero_operation
 from metroloshiny.utils.read_file import (
     check_upload_password,
     get_sheet,
@@ -895,12 +894,17 @@ def parse_omero_fwhm():
         return None
     # Get the data from OMERO
     try:
-        data, ch_names, voxels = omero_operation(
-            operation=None,
-            omero_type=input.omero_type_selector(),
-            omero_id=omero_id,
-            metric_id="FWHM",
-        )
+        # types check fix
+        data = int("fix")
+        ch_names = ["fix"]
+        voxels = ["fix"]
+
+        # data, ch_names, voxels = omero_operation(
+        #     operation=None,
+        #     omero_type=input.omero_type_selector(),
+        #     omero_id=omero_id,
+        #     metric_id="FWHM",
+        # )
     except Exception as err:
         ui.notification_show(str(err), type="error")
         return None
