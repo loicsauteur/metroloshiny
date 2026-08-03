@@ -220,5 +220,48 @@ def test_check_if_date():
     assert not cu.check_if_date(date)
 
 
+def test_point_2d_point_distance():
+    """Test the point_2_point_distance function."""
+    # Check expected inputs (diagonal)
+    p1 = (0, 0)
+    p2 = [3.0, 4.0]
+    dist = cu.point_2d_point_distance(p1, p2)
+    assert dist == 5
+    # Zero distance
+    assert 0 == cu.point_2d_point_distance(p2, p2)
+    # Horizontal line
+    p1 = [1, 2]
+    p2 = [4, 2]
+    assert 3 == cu.point_2d_point_distance(p1, p2)
+    # Vertical line (& test string numbers)
+    p1 = ("2", 1)
+    p2 = (2, "5")
+    assert 4 == cu.point_2d_point_distance(p1, p2)
+    # Negative points
+    p1 = (-2, -1)
+    p2 = (-27, -26)
+    assert 35.4 == round(cu.point_2d_point_distance(p1, p2), 1)
+
+    # Check wrong inputs (wrong number of coordinates)
+    p1 = [1.1]
+    p2 = [0]
+    with pytest.raises(ValueError, match=r"The point list do not have XY *"):
+        cu.point_2d_point_distance(p1, p2)
+    with pytest.raises(ValueError, match=r"The point list do not have XY *"):
+        cu.point_2d_point_distance(p1 * 5, p2 * 3)
+    with pytest.raises(ValueError, match=r"The point list do not have XY *"):
+        cu.point_2d_point_distance([], p2 * 3)
+
+    # Check 3D point distance (not implemented)
+    with pytest.raises(
+        NotImplementedError, match=r"3D point distance is not impleme*"
+    ):
+        cu.point_2d_point_distance((1, 2, 3), (4, 5, 6))
+
+    # Check non-numeric points
+    with pytest.raises(ValueError, match=r"Could not parse points <*"):
+        cu.point_2d_point_distance([1, 2], ["r", 5])
+
+
 if __name__ == "__main__":
     pass

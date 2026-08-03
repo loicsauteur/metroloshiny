@@ -564,5 +564,40 @@ def get_objective_mag(df: pd.DataFrame, id: str) -> Optional[int]:
     return x
 
 
+def point_2d_point_distance(
+    p1: Union[tuple[float, float], list[float]],
+    p2: Union[tuple[float, float], list[float]],
+) -> float:
+    """
+    Calculate the distance between 2 points.
+
+    :param p1: XY of point 1
+    :param p2: XY of point 2
+
+    :return: float, distance
+    """
+    # 3D points not implemented
+    if len(p1) == 3 and len(p2) == 3:
+        raise NotImplementedError("3D point distance is not implemented.")
+    # Sanity test
+    if 2 != len(p1) or len(p2) != 2:
+        raise ValueError(
+            "The point list do not have XY coordinates (!= len = 2)"
+        )
+    try:
+        x = float(p1[0])
+        y = float(p1[1])
+        p1 = (x, y)
+        x = float(p2[0])
+        y = float(p2[1])
+        p2 = (x, y)
+    except ValueError as err:
+        raise ValueError(
+            f"Could not parse points <{p1}; {p2}> to numbers."
+        ) from err
+    # Calculate the distance
+    return ((p2[0] - p1[0]) ** 2 + (p2[1] - p1[1]) ** 2) ** 0.5
+
+
 if __name__ == "__main__":
     pass

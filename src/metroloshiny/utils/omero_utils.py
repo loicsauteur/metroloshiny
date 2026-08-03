@@ -1,14 +1,16 @@
 """Utils for getting OMERO data."""
 
-from typing import Optional
+from typing import Any, Optional, Union
 
 import pandas as pd
 from omero.gateway import (
     BlitzGateway,
     FileAnnotationWrapper,
     MapAnnotationWrapper,
+    TagAnnotationI,  # same if imported from omero.model
 )
 
+from metroloshiny.utils.common_utils import point_2d_point_distance
 from metroloshiny.utils.read_file import get_private_data
 
 # Dictionary matching upload category to metric to look for.
@@ -149,6 +151,64 @@ def get_images_for_metric(
     finally:
         conn.c.closeSession()
     return id_name_dict, id_df_dict
+
+
+def get_images_in_dataset_by_tag(
+    conn: BlitzGateway, dataset_id: int, tag_names: list[str]
+) -> dict:
+    """
+    Get a of all image form a dataset ID by tag annotation matching.
+
+    :param conn: BlitzGateway
+    :param dataset_id: int
+    :param tag_names: list[str], list of 1 or several tags to select images.
+
+    :return: dict {image_id: image_name}
+    """
+    # Sanity check
+    if not isinstance(tag_names, list):
+        raise ValueError("Tag names must be a list of str!")
+
+    dataset = conn.getObject("dataset", dataset_id)
+    # Images is None if it is not a dataset ID
+    if dataset is None:
+        raise RuntimeError(f"<{dataset_id}> does not seem to be a dataset ID.")
+    if dataset.countChildren() == 0:
+        raise RuntimeError(f"There are no images for dataset: <{dataset_id}>")
+    # Get the images form the dataset
+    images = dataset.listChildren()
+
+    id_name_dict = {}
+    # Check tags in each image
+    for img in images:
+        # Tags are annotation objects
+        anns = img.listAnnotations()
+        # Check if all tags in the annotations
+        if check_image_tags(anns=anns, tags=tag_names):
+            id_name_dict[img.getId()] = img.getName()
+    return id_name_dict
+
+
+def check_image_tags(anns: list, tags: list[str]) -> bool:
+    """
+    Check if annotation list contains all tags.
+
+    :param anns: list, OMERO Annotations
+    :param tags: list[str], tag names to check
+
+    :return: bool, True if all tags in annotation list
+    """
+    found_tags = []
+    # Check each searched tag in the annotations
+    for ann in anns:
+        if ann.OMERO_TYPE == TagAnnotationI:
+            for tag in tags:
+                if ann.getTextValue() == tag:
+                    found_tags.append(ann.getId())
+                    # (Stop => only one tag even if several with the same name)
+                    break
+    # Return True if all tags found
+    return len(found_tags) == len(tags)
 
 
 def get_images_in_dataset(conn: BlitzGateway, dataset_id: int) -> dict:
@@ -294,14 +354,18 @@ def get_metric_data(
     if final_kv_pair is None and final_table is None:
         return None
     if final_kv_pair is not None:
+        # Return the found key-value pair
         # kv_item = list[list[key, value]]
         return pd.DataFrame(final_kv_pair, columns=["Key", "Value"])
     else:
-        # FIXME definitively should check how this looks. Probably better to return a table directly instead of converting to a dict...!
-        final_table = omero_table_to_dict(final_table)
-        # Convert to dict for pandas
-        final_table = {k: [v] for k, v in final_table.items()}
-        return pd.DataFrame.from_dict(final_table)
+        # Return the OMERO table
+        # FIXME THIS part has not been tested
+        return omero_table_to_dataframe(conn, final_table)
+        # FIXME this is the previous version
+        # final_table = omero_table_to_dict(final_table)
+        # # Convert to dict for pandas
+        # final_table = {k: [v] for k, v in final_table.items()}
+        # return pd.DataFrame.from_dict(final_table)
 
 
 def get_channel_names(conn: BlitzGateway, datatype: str, id: int):
@@ -345,6 +409,226 @@ def get_voxel_size(conn: BlitzGateway, datatype: str, id: int):
         p.getPhysicalSizeZ().getValue(),
     ]
     return v
+
+
+def get_omero_ring_rois(
+    conn: BlitzGateway,
+    image_id: int,
+    roi_categories: Optional[list[str]] = None,
+) -> tuple[dict, dict]:
+    """
+    Get the OMERO field distortion ROIs for a specified image id.
+
+    see also: https://omero.readthedocs.io/en/v5.6.10/developers/Python.html#rois
+
+    :param conn: BlitzGateway
+    :param id: int, Image ID
+    :param tags: list[str], of roi categroies/names, must be a length of 2
+
+    :return: (dict, dict) for detected_rois and ideal_locations
+        each dict has keys "001" (roi number)
+        and value centroid (X, Y) in pixel units
+    """
+    image = conn.getObject("image", image_id)
+    # print("image:", image, image.getId(), type(image))
+    if image is None:
+        raise RuntimeError(f"ID <{image_id} does not seem to be an Image ID.")
+
+    # Get the ROI wrapper from the image
+    if roi_categories is None:
+        roi_categories = ["detected rings", "ideal locations"]
+    # Dict of detected rois {nr: (centroid)}
+    detected_rois = {}
+    ideal_rois = {}
+    for roi in image.getROIs():
+        # print("roiid:", roi.getId())
+        # print("n roi shapes:", len(roi.copyShapes()))
+
+        # Get the group name (?) e.g. "detected rings"
+        # print(roi.getName())
+        # Only get ROI if they are in the correct category
+        roi_category = roi.getName()
+        if roi_category in roi_categories:
+            # With copyShapes, the details of the ROIs can be retrieved
+            for s in roi.copyShapes():
+                # Get the name shown / comment shown in OMERO e.g. "detected rings_ROI-1"
+                roi_name = s.getTextValue().getValue()
+                # print(roi_name)
+                # Get the ROI number as string
+                try:
+                    n = int(roi_name.split("ROI-")[1])
+                    # Convert to e.g. "001"
+                    n = str(n).zfill(3)
+                except ValueError as err:
+                    raise ValueError(
+                        f"Could not parse ROI number for ROI name: {roi_name}."
+                    ) from err
+                # Get centroid as tuple
+                centroid = (s.getX().getValue(), s.getY().getValue())
+                # Add to the dicts
+                if roi_category == roi_categories[0]:
+                    detected_rois[n] = centroid
+                else:
+                    ideal_rois[n] = centroid
+    # Sanity test
+    if len(detected_rois) != len(ideal_rois):
+        raise RuntimeError(
+            f"The number of detected spots ({len(detected_rois)}) is not the same as the the ideal spots ({len(ideal_rois)})."
+        )
+    if len(detected_rois) == 0:
+        raise RuntimeError(
+            "No rois ('detected rings' or 'ideal location') found in image."
+        )
+    return detected_rois, ideal_rois
+
+
+def get_field_distortion(
+    detected: dict[str, tuple[float, float]],
+    ideal: dict[str, tuple[float, float]],
+) -> dict[str, float]:
+    """
+    Calculate the distance between detected points and ideal location.
+
+    :param detected: dict, with str point number and tuple XY coordinates
+    :param ideal: dict, with str point number and tuple XY coordinates
+
+    :return: dict, with str point number and distance
+    """
+    # Sanity check
+    if len(detected) != len(ideal):
+        raise ValueError(
+            "Cannot calculate field distortion when number of detected != ideal points."
+        )
+
+    dist = {}
+    for k in detected.keys():
+        dist[k] = point_2d_point_distance(detected.get(k), ideal.get(k))
+    return dist
+
+
+def get_omero_table(
+    conn: BlitzGateway, image_id: int, name_part: str
+) -> pd.DataFrame:
+    """
+    Get an OMERO table as dataframe.
+
+    INFO: image has 2 tables (files)
+    - "Field_distortion" with what looks like calibrated distances per channel (but how is the final ring position calculated?)
+    - "Field_uniformity" with intensities per channel e.g. "ch0"
+
+    :param conn: BlitzGateway
+    :param image_id: int, Image ID
+    :param name_part: str, substring of the table name, e.g.:
+        - "Field_distortion" for distortion table
+        - "Field_uniformity" for uniformity (intensity) table
+        -> Attention: if multiple tables contain the substring, only the first one will be returned.
+
+    :return: pd.DataFrame (Image, and Image_ID columns removed)
+    """
+    image = conn.getObject("image", image_id)
+    if image is None:
+        raise RuntimeError(f"ID <{image_id} does not seem to be an Image ID.")
+
+    # Find the OMERO tables (# FIXME: returns the first table that matches the substring)
+    for ann in image.listAnnotations():
+        # Check for tables
+        if isinstance(ann, FileAnnotationWrapper):
+            if name_part in ann.getFileName():
+                return omero_table_to_dataframe(conn, ann)
+
+    # Raise error if file not found
+    raise FileExistsError(
+        f"No '*{name_part}*' table could be found for image {image_id}: {image.getName()}"
+    )
+
+
+def omero_table_to_dataframe(
+    conn: BlitzGateway, ann: Union[FileAnnotationWrapper, Any]
+) -> pd.DataFrame:
+    """
+    Convert the OMERO table object to a dataframe.
+
+    Additionally:
+        - will convert the type of Ring_ID to 1-based integer (instead of float), if available.
+        - removes columns Image, Image_ID, if available.
+
+    See also: https://omero.readthedocs.io/en/stable/developers/Tables.html
+
+    :param: conn, BlitzGateway
+    :param ann: FileAnnotationWrapper or already opened OMERO table object
+
+    :return: pd.DataFrame
+    """
+    if isinstance(ann, FileAnnotationWrapper):
+        res = conn.c.sf.sharedResources()
+        try:
+            table = res.openTable(ann.getFile()._obj)
+        except Exception as err:
+            raise RuntimeError(
+                f"Could not open table: {ann.getFileName()}. Error: {err}"
+            ) from err
+    else:
+        table = ann
+    # Parse the table
+    headers = table.getHeaders()
+    n_rows = table.getNumberOfRows()
+    data = table.read((range(len(headers))), start=0, stop=n_rows)
+    # data is a collection of column objects (with name, values, etc.)
+
+    # Convert to dataframe
+    df = {col.name: col.values for col in data.columns}
+    df = pd.DataFrame().from_dict(df)
+
+    # Drop Image and Image_ID columns
+    cols = []
+    if "Image" in df.columns:
+        cols.append("Image")
+    if "Image_ID" in df.columns:
+        cols.append("Image_ID")
+    df = df.drop(columns=cols)
+
+    # Convert the "Ring_ID" column to int
+    if "Ring_ID" in df.columns:
+        df["Ring_ID"] = df["Ring_ID"].astype(int).add(1)
+    return df
+
+
+def get_field_of_ring_grid_size(
+    coords: dict[str, tuple[float, float]],
+) -> tuple[int, int]:
+    """
+    Calculate the number of detected rings in X and Y.
+
+    With the argolight slide, the middle ring is missing (there's a cross).
+
+    :param coords:, dict of str point number and XY coordinates
+
+    :return: tuple, ring count in x and y
+    """
+    # Get a list of only X and Y coordinates separately
+    x = [i[0] for i in coords.values()]
+    y = [i[1] for i in coords.values()]
+
+    x_count = 1
+    # Count the number of rings on the first row
+    for i in range(1, len(x)):
+        if x[i] > x[i - 1]:
+            x_count += 1
+        else:
+            break
+
+    y_count = 1
+    delta_x = (x[1] - x[0]) / 2
+    prev_y = y[0]
+    # Count the number of rings on the first column
+    for i in range(1, len(y)):
+        # Check only the first y coords (allow +/- half ring to ring distance)
+        if x[i] > x[0] - delta_x and x[i] < x[0] + delta_x:
+            if y[i] > prev_y:
+                y_count += 1
+                prev_y = y[i]
+
+    return x_count, y_count
 
 
 if __name__ == "__main__":
