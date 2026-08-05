@@ -22,6 +22,7 @@ from metroloshiny.utils.dataframe_utils import (
 from metroloshiny.utils.omero_utils import (
     get_image_voxelsize_channel_names,
     get_images_for_metric,
+    get_omero_dates,
 )
 from metroloshiny.utils.read_csv import get_power_measurement
 from metroloshiny.utils.read_file import (
@@ -46,7 +47,7 @@ sheet_doc = load_doc(dev_local_file=use_dev_local_file)
 # Reactive values       ------------------------------------------------------
 sheet_reference = reactive.value(None)
 dataframe = reactive.value(None)
-category_list = ["Power", "PSF"]  # "Uniformity" TODO once implemented
+category_list = ["Power", "PSF", "Uniformity/Distortion"]
 site_list = reactive.value([])
 microscope_list = reactive.value([])
 objective_list = reactive.value([])
@@ -111,9 +112,8 @@ with ui.nav_panel(title="Data Upload"):
                     message = warn_omero()
                     if message != "":
                         return message
-                    # Only for PSF category
-                    if input.category() == "PSF":
-                        return dataset_id_selector, image_id_selector
+                    # For any category that doesn't give a warn_omero msg
+                    return dataset_id_selector, image_id_selector
 
                 @render.ui
                 def update_omero_selections():
@@ -433,21 +433,22 @@ def update_patches_omero(
         return ori_patches
 
     # Specific actions for PSF data only
-    if input.category() == "PSF":
+    if input.category() in ["PSF", "Uniformity/Distortion"]:
         # Check the only patch
         row = patches[0]["row_index"]
         col = patches[0]["column_index"]
         val = patches[0]["value"]
 
-        # Sanity check
-        if df.columns[4] != "Channel":
-            raise RuntimeError(
-                "Expected the 5th column to be 'Channel' "
-                f"but was: <{df.columns[4]}>",
-            )
+        # Allow changes in the Channel column
+        try:
+            # Get the "Channel" column index
+            col_ch = df.columns.get_loc("Channel")
+        except KeyError:
+            # KeyError if "Channel" in columns
+            col_ch = None
 
-        # Allow changes only in column 4 (=Channel)
-        if col != 4:
+        # Allow changes only in the "Channel" column
+        if col != col_ch:
             ui.notification_show(
                 "You can only change channel names in the 'Channel' column.",
                 type="warning",
@@ -485,36 +486,32 @@ def create_omero_table_style() -> Optional[list[dict]]:
     if df.empty:
         return None
 
-    if input.category() == "PSF":
-        # # Sanity check
-        # if df.columns[4] != "Channel":  # FIXME: probably not necessary
-        #     # Currently no notification warning
-        #     return None
-        style = []  # Init list of style dicts
+    style = []  # Init list of style dicts
+    # Highlight columns that need to be specified (cells starting with 'Please')
+    for i in range(len(list(df.columns[:4]))):
+        col = df.columns[i]
+        if df[col].astype(str).str.startswith("Please", na=False).any():
+            style.append(
+                {
+                    "cols": [i],
+                    "style": {"background-color": "yellow"},
+                }
+            )
 
-        # Highlight columns that need to be specified
-        for i in range(len(list(df.columns[:4]))):
-            col = df.columns[i]
-            if df[col].astype(str).str.startswith("Please", na=False).any():
-                style.append(
-                    {
-                        "cols": [i],
-                        "style": {"background-color": "yellow"},
-                    }
-                )
-
-        # Highlight the column 4 (Channel)
+    # Highlight the "Channel" column
+    if input.category() in ["PSF", "Uniformity/Distortion"]:
         style.append(
             {
                 # No 'row' = all rows
-                "cols": [4],
+                "cols": [df.columns.get_loc("Channel")],
                 "style": {"background-color": "yellow", "font-weight": "bold"},
             }
         )
-        return style
     else:
         # TODO implement for other categories
         return None  # Currently return None
+    # Finally return the style
+    return style
 
 
 # Reactive functions    ------------------------------------------------------
@@ -852,8 +849,8 @@ def upload_omero_data():
         # This should not happen as the upload button is only shown when there is a table
         raise RuntimeError("There is no patched table data for upload")
 
-    # For PSF upload
-    if input.category() == "PSF":
+    # For PSF & Uniformity upload
+    if input.category() in ["PSF", "Uniformity/Distortion"]:
         # Ensure that the common columns have valid values  ##################
         common_df = df[df.columns[0:4]]
         faulty_cols = common_df.columns[
@@ -906,6 +903,37 @@ def upload_omero_data():
 
 
 @reactive.calc
+def create_uniformity_omero_dataframe() -> pd.DataFrame:
+    """Create dataframe part for field distortion/uniformity."""
+    # Get the dataframe associated with the image ID
+    cur_id = input.image_id_selector()
+    the_check = check_dataset_id()
+    if the_check is None:
+        return pd.DataFrame()
+    # Get the channel names
+    _, ch_names = get_image_voxelsize_channel_names(int(cur_id))
+    # Get the acquisition date!
+    acqui_date, import_date = get_omero_dates(int(cur_id))
+    if acqui_date is None:
+        ui.notification_show(
+            "Could not identify the data acquisition date! Set to OMERO import date!",
+            type="warning",
+            duration=10,
+        )
+        acqui_date = import_date
+    # Update the date override selector
+    ui.update_date("override_date_omero", value=acqui_date)
+
+    # create date frame (very simple, only "Channel" & "Date" columns)
+    df = {
+        "Channel": ch_names,
+        # Include the omero-channel names, as this may be lost # FIXME check how omero table looks like for ND2 file (i.e. ch0 = ???)
+        "Value": [f"omero{cur_id}_ch-{ch}" for ch in ch_names],
+    }
+    return pd.DataFrame().from_dict(df)
+
+
+@reactive.calc
 def create_pfs_dataframe() -> pd.DataFrame:
     """Load and calibrate the PSF data."""
     # Get the dataframe associated with the image ID
@@ -929,6 +957,7 @@ def create_pfs_dataframe() -> pd.DataFrame:
     # Change the "Value" column to the date
     acquisition_date = psfdata.get_acquisition_date()
     if acquisition_date is None:
+        # FIXME could get the import date instead??
         acquisition_date = get_today()
         ui.notification_show(
             "Could not identify the data acquisition date! Set to today!",
@@ -1014,26 +1043,31 @@ def create_omero_table() -> pd.DataFrame:
     if input.category() == "PSF":
         # Create the dataframe from the OMERO values
         df = create_pfs_dataframe()
-        # If df.empty, then wrong inputs -> return empty df
-        if df.empty:
-            return pd.DataFrame()
-        override_date_omero = input.override_date_omero()
-
-        # Get the values for the common columns
-        _site, _mic, _obj, _info = get_common_column_values()
-        # Create the dataframe to be uploaded
-        df = prepare_data_for_entry(
-            data=df,
-            data_headers=list(df.columns)[:2],
-            site=_site,
-            microscope=_mic,
-            objective=_obj,
-            info=_info,
-            date=override_date_omero.strftime("%Y%m%d"),
-        )
+    elif input.category() == "Uniformity/Distortion":
+        # Create the dataframe from the OMERO values
+        df = create_uniformity_omero_dataframe()
     else:
         # TODO implement also other categories
         pass
+
+    # Create full dataframe: common columns + data columns      ##############
+    # If df.empty, then wrong inputs -> return empty df
+    if df.empty:
+        return pd.DataFrame()
+    override_date_omero = input.override_date_omero()
+
+    # Get the values for the common columns
+    _site, _mic, _obj, _info = get_common_column_values()
+    # Create the dataframe to be uploaded
+    df = prepare_data_for_entry(
+        data=df,
+        data_headers=list(df.columns)[:2],
+        site=_site,
+        microscope=_mic,
+        objective=_obj,
+        info=_info,
+        date=override_date_omero.strftime("%Y%m%d"),
+    )
     return df
 
 
@@ -1087,7 +1121,7 @@ def check_dataset_id() -> Optional[tuple[dict, dict]]:
 
     else:
         cat = input.category()
-        if cat == "PSF":
+        if cat in ["PSF", "Uniformity/Distortion"]:
             try:
                 img_id_name_dict, img_id_metric_df = get_images_for_metric(
                     dataset_id=dataset_id,
@@ -1111,6 +1145,7 @@ def check_dataset_id() -> Optional[tuple[dict, dict]]:
             else:
                 # Update the image selection drop-down
                 ui.update_select("image_id_selector", choices=img_id_name_dict)
+                # FYI: for "Uniformity/Distortion" the img_id_metric_df is empty
                 return img_id_name_dict, img_id_metric_df
         else:
             ui.notification_show(
@@ -1144,7 +1179,7 @@ def warn_omero() -> str:
     :return: str, message if warning; empty str if no warning
     """
     cat = input.category()
-    if cat not in ["PSF", "Uniformity"]:
+    if cat not in ["PSF", "Uniformity/Distortion"]:
         message = f"{cat} upload from OMERO is not implemented!"
         ui.notification_show(message, type="warning")
         return message
@@ -1294,7 +1329,7 @@ def check_channel_names_provided(df: pd.DataFrame) -> bool:
         return True
 
     # Get the ori_df channel names and the entered ones
-    ori_ch_names = list(np.unique(np.asarray(ori_df["Channel"])))
+    ori_ch_names = list(np.unique(np.asarray(ori_df["Channel"].astype(str))))
     entered_ch_names = list(np.unique(np.asarray(df["Channel"])))
 
     # Intermediate check if channel name was entere twice

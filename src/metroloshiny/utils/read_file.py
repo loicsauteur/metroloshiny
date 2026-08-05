@@ -14,7 +14,7 @@ __sheet_names__ = {
     "Power": "laser_power_measurements",
     "PSF": "psf_measurements",
     "Objectives": "objective_db",
-    "Uniformity": "field_dist_uni",
+    "Uniformity/Distortion": "field_dist_uni",
     "Test": "test_sheet",
 }
 
@@ -150,14 +150,15 @@ def get_sheet(
             sheet = doc.worksheet(__sheet_names__.get(kind))
         except gspread.exceptions.WorksheetNotFound as err:
             raise RuntimeError(f"The Worksheet doesn't exist: {err}") from err
-        df = pd.DataFrame(sheet.get_all_records())
+        # Get all records and explicitly specify columns, allowing empty dataframe
+        df = pd.DataFrame(sheet.get_all_records(), columns=sheet.row_values(1))
     # Ensure numeric data
     if kind == "Power":
         df = ensure_numeric_data(df, first_column=4)
     elif kind == "PSF":
         df = ensure_numeric_data(df, first_column=6)
-    elif kind in ["Objectives", "Test"]:
-        # Do not ensure numeric data for the objective_db
+    elif kind in ["Objectives", "Uniformity/Distortion", "Test"]:
+        # Do not ensure numeric data (just make the dataframe as is)
         df = pd.DataFrame(df)
     else:
         raise NotImplementedError(

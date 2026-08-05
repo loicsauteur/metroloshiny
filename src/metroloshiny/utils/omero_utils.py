@@ -15,10 +15,61 @@ from metroloshiny.utils.read_file import get_private_data
 
 # Dictionary matching upload category to metric to look for.
 __metrics__ = {
+    # PSF: key-value-pair substring
     "PSF": "FWHM",
+    # Uni./Distortion: tags to find
+    "Uniformity/Distortion": ["field_uniformity", "field_distortion"],
 }
 
 # FIXME: here are several deprecated functions -> TODO clean up!
+
+
+def get_omero_dates(
+    image_id: int,
+    username: Optional[str] = None,
+    passwd: Optional[str] = None,
+    host: Optional[str] = None,
+    port: Optional[int] = None,
+    path_private_data: Optional[str] = None,
+):
+    """
+    Get the acquisition and import date from OMERO.
+
+    :param image_id: int OMERO dataset ID
+    :param username: str OMERO user name.
+                If None, will get it from private_data.csv
+    :param passwd: str OMERO user password.
+                If None, will get it from private_data.csv
+    :param host: str OMERO host.
+                If None, will get it from private_data.csv
+    :param port: str OMERO port.
+                If None, will get it from private_data.csv
+    :param path_private_data: str path to private_data.csv.
+                If None takes default path "./data/private_data.csv"
+
+    :return: tuple[
+        Optional[str],    acquisition date (may be None if not set)
+        str,              import date
+    ]
+    """
+    # Get the connection details from file
+    username, passwd, host, port = get_cred(
+        path_private_data, username, passwd, host, port
+    )
+
+    # Connect to OMERO
+    try:
+        conn = BlitzGateway(
+            username=username, passwd=passwd, host=host, port=port, secure=True
+        )
+        conn.connect()
+        # Get the dates
+        acquisition_date, import_date = get_dates(conn=conn, image_id=image_id)
+
+    finally:
+        conn.c.closeSession()
+    # Return results
+    return acquisition_date, import_date
 
 
 def get_image_voxelsize_channel_names(
@@ -65,10 +116,12 @@ def get_image_voxelsize_channel_names(
         conn.connect()
         # Get the image channel name list
         channel_names = get_channel_names(
-            conn=conn, datatype="Image", id=image_id
+            conn=conn, datatype="Image", image_id=image_id
         )
         # Get the image voxel sizes
-        voxel_size = get_voxel_size(conn=conn, datatype="Image", id=image_id)
+        voxel_size = get_voxel_size(
+            conn=conn, datatype="Image", image_id=image_id
+        )
 
     finally:
         conn.c.closeSession()
@@ -115,6 +168,8 @@ def get_images_for_metric(
     username, passwd, host, port = get_cred(
         path_private_data, username, passwd, host, port
     )
+    # Remember the original metric input
+    ori_metric_id = metric_id
     # Check the metric value to look for        ##############################
     if metric_id not in __metrics__.values():
         if metric_id not in __metrics__.keys():
@@ -122,6 +177,7 @@ def get_images_for_metric(
                 f"The metric <{metric_id}> is not supported."
             )
         try:
+            # convert the metric_id to be the value of the __metrics__ key/values
             metric_id = str(__metrics__.get(metric_id))
         except Exception as err:
             raise RuntimeError(f"Error: {err!s}") from err
@@ -138,16 +194,44 @@ def get_images_for_metric(
         )
         conn.connect()
 
-        # Get a dict of all image in dataset {image_id: image_name}
-        image_ids = get_images_in_dataset(conn=conn, dataset_id=dataset_id)
+        # For PSF       ######################################################
+        if metric_id == "PSF":
+            # Get a dict of all image in dataset {image_id: image_name}
+            image_ids = get_images_in_dataset(conn=conn, dataset_id=dataset_id)
 
-        for id, name in image_ids.items():
-            cur_data = get_metric_data(
-                conn=conn, image_id=id, metric=metric_id
+            for cur_id, name in image_ids.items():
+                cur_data = get_metric_data(
+                    conn=conn, image_id=cur_id, metric=metric_id
+                )
+                if isinstance(cur_data, pd.DataFrame):
+                    # Create dict like {image_id: "image_id: image_name"}
+                    id_name_dict[cur_id] = f"{cur_id}: {name}"
+                    id_df_dict[cur_id] = cur_data
+
+        # For Uniformity/Distortion       ####################################
+        # Careful: i converted the metric_id to the str value of __metrics__
+        elif ori_metric_id == "Uniformity/Distortion":
+            # Get the {image_id: image:name}
+            image_ids = get_images_in_dataset_by_tag(
+                conn=conn,
+                dataset_id=dataset_id,
+                tag_names=__metrics__.get(ori_metric_id),
             )
-            if isinstance(cur_data, pd.DataFrame):
-                id_name_dict[id] = f"{id}: {name}"
-                id_df_dict[id] = cur_data
+            # Ignore the id_df_dict (will be empty dict)
+            # Check if ROIs and both tables in image
+            for cur_id, name in image_ids.items():
+                try:
+                    # Check for the ROIs
+                    get_omero_ring_rois(conn=conn, image_id=cur_id)
+                    get_omero_table(conn, cur_id, "Field_distortion")
+                    get_omero_table(conn, cur_id, "Field_uniformity")
+                    # Add the image to the output dict
+                    # Convert to dict like: {image_id: "image_id: image_name"}
+                    id_name_dict[cur_id] = f"{cur_id}: {name}"
+                except Exception:
+                    pass
+        else:
+            raise NotImplementedError(f"{metric_id} is not implemented!")
     finally:
         conn.c.closeSession()
     return id_name_dict, id_df_dict
@@ -368,47 +452,85 @@ def get_metric_data(
         # return pd.DataFrame.from_dict(final_table)
 
 
-def get_channel_names(conn: BlitzGateway, datatype: str, id: int):
+def get_dates(conn: BlitzGateway, image_id: int) -> tuple[Optional[str], str]:
+    """
+    Get the acquisition and import date from OMERO.
+
+    :param conn: BlitzGateway
+    :param id: int, Image ID
+
+    :return: tuple[acquisition, import], str dates in YYYYmmdd format
+        - acquisition date may be None (if not set)
+        - import date should never be None
+    """
+    image = conn.getObject("image", image_id)
+    if image is None:
+        raise RuntimeError(f"ID <{image_id} does not seem to be an Image ID.")
+
+    # Get the dates as datetime objects
+    acqui_date = image.getAcquisitionDate()  # datetime object
+    import_date = image.creationEventDate()
+    # image.getDate() # Returns the object's acquisitionDate, or creation date (details.creationEvent.time)
+
+    # Convert dates to string in YYYYmmdd format
+    if acqui_date is not None:
+        # Acquisition date may be None
+        acqui_date = acqui_date.strftime("%Y%m%d")
+    # Import data should never be None
+    import_date = import_date.strftime("%Y%m%d")
+    return acqui_date, import_date
+
+
+def get_channel_names(conn: BlitzGateway, datatype: str, image_id: int):
     """
     Get the channel names stored for an image on OMERO.
 
     :param conn: BlitzGateway
     :param datatype: str, if not "Image" returns empty list
-    :param id: int, Image ID
+    :param image_id: int, Image ID
 
     :return: list of channel names (empty if datatype != Image)
     """
     if datatype != "Image":
         return []
     # Get image object
-    img = conn.getObject(datatype, id)
+    img = conn.getObject(datatype, image_id)
     # Return list of channel names
     return img.getChannelLabels()
 
 
-def get_voxel_size(conn: BlitzGateway, datatype: str, id: int):
+def get_voxel_size(
+    conn: BlitzGateway, datatype: str, image_id: int
+) -> list[float]:
     """
     Get the voxel sizes stored for an image on OMERO.
 
     :param conn: BlitzGateway
     :param datatype: str, if not "Image" returns empty list
-    :param id: int, Image ID
+    :param image_id: int, Image ID
 
     :return: list of XYZ voxel size (empty if datatype != Image)
     """
     if datatype != "Image":
         return []
     # Get image object
-    img = conn.getObject(datatype, id)
+    img = conn.getObject(datatype, image_id)
     # Get pixel information
     p = img.getPrimaryPixels()
     # Get the XYZ values
-    v = [
-        p.getPhysicalSizeX().getValue(),
-        p.getPhysicalSizeY().getValue(),
-        p.getPhysicalSizeZ().getValue(),
-    ]
-    return v
+    try:
+        x = p.getPhysicalSizeX().getValue()
+        y = p.getPhysicalSizeY().getValue()
+    except AttributeError as err:
+        raise RuntimeError(
+            f"The image <{image_id}> is not calibrated or not a microscopy image."
+        ) from err
+    try:
+        # 2D images may not have a Z value, set it to 1.0 if so
+        z = p.getPhysicalSizeZ().getValue()
+    except AttributeError:
+        z = 1.0
+    return [x, y, z]
 
 
 def get_omero_ring_rois(
@@ -424,6 +546,7 @@ def get_omero_ring_rois(
     :param conn: BlitzGateway
     :param id: int, Image ID
     :param tags: list[str], of roi categroies/names, must be a length of 2
+        Default (if None)= ["detected rings", "ideal locations"]
 
     :return: (dict, dict) for detected_rois and ideal_locations
         each dict has keys "001" (roi number)

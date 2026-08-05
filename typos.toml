@@ -21,7 +21,7 @@ extend-ignore-identifiers-re = []   # default
 extend-ignore-words-re = []         # default
 
 [default.extend-words]
-# <typo> = "<correction>"
+ND = "ND"
 
 [default.extend-identifiers]
 # <typo> = "<correction>"

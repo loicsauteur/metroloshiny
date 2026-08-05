@@ -16,7 +16,7 @@ __gspread_names__ = {
     "Power": "laser_power_measurements",
     "PSF": "psf_measurements",
     "Objectives": "objective_db",
-    "Uniformity": "field_dist_uni",
+    "Uniformity/Distortion": "field_dist_uni",
     "Test": "test_sheet",
 }
 
@@ -55,8 +55,8 @@ def make_entries(
     :param sheet: gs.Worksheet reference
     :param data: pd.DataFrame, should have the same columns as in the sheet.
     """
-    # Get the sheet dataframe
-    df = pd.DataFrame(sheet.get_all_records())
+    # Get the sheet dataframe (explicitly specify columns for empty tables)
+    df = pd.DataFrame(sheet.get_all_records(), columns=sheet.row_values(1))
 
     # Check that all data columns (except last) are also in the sheet cols
     for c in data.columns[:-2]:
@@ -109,8 +109,12 @@ def make_entries(
         sheet.format(ranges=f"{col}:{col}", format=_white_cell_format_)
 
     # Match the sheet table with the new data           ----------------------
+    # Convert a possible "Channel" columns to str, which allows mix of number/string entries
+    dest_df = df.copy()
+    if "Channel" in dest_df.columns:
+        dest_df["Channel"] = dest_df["Channel"].astype(str)
     # (Copy and) rename the index of the sheet (database)
-    dest_df = df.copy()[merge_headers].reset_index(names="match_index")
+    dest_df = dest_df[merge_headers].reset_index(names="match_index")
     # "Merge" the 2 dataframes (keeps the new data df, adds match_index col)
     dest_df = data.merge(dest_df, on=merge_headers, how="left")
     # FIXME: possible `ValueError: You are trying to merge on str and int64 columns for key 'Power [%]'.`
@@ -138,7 +142,7 @@ def make_entries(
         missing_entries = missing_entries.drop("match_index", axis=1)
         raise RuntimeError(
             "Error: Not all the data could be matched to existing entries.\n"
-            "Manual curration in the google sheet is needed to add following "
+            "Manual curation in the google sheet is needed to add following "
             f"missing rows. I.e.:\n\n{missing_entries}"
         )
 
@@ -154,7 +158,7 @@ def make_entries(
                 "Values cannot be uploaded: Value upload is supported only "
                 "if they can be added as a 'block'.\n"
                 f"Your values would end up in spreadsheet rows: {indices}, "
-                "which has gaps/missing rows."
+                "which has gaps/missing rows, or is unordered."
             )
         # Create a list of value addresses
         value_addresses = [f"{col}{i}" for i in indices]

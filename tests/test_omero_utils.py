@@ -44,14 +44,14 @@ def test_get_images_in_dataset_by_tag():
     Does not run in pytest.
 
     Uniformity / distortion
-    sara's datasetID: 79006
-    with imageID: 3021627
+    Metrology test dataset: 82171
+    with imageID: 3454869
     """
     # Skip pytest if on local file
     if set_local_file():
         return
 
-    ds_id = 79006
+    ds_id = 82171
     tag_uni = "field_uniformity"
     tag_dist = "field_distortion"
 
@@ -113,14 +113,14 @@ def test_get_omero_ring_rois():
     Does not run in pytest.
 
     Uniformity / distortion
-    sara's datasetID: 79006
-    with imageID: 3021627
+    Metrology test dataset: 82171
+    with imageID: 3454869
     """
     # Skip pytest if on local file
     if set_local_file():
         return
 
-    ds_id = 79006
+    ds_id = 82171
     tags = ["field_uniformity", "field_distortion"]
 
     try:
@@ -179,5 +179,95 @@ def test_get_omero_ring_rois():
         conn.c.closeSession()
 
 
+def test_get_dates():
+    """
+    Test the get_dates function.
+
+    Does not run in pytest.
+
+    ImageID with acquisition date: 3454869
+        acquisition date =  2026-02-26 08:55:41
+        import date =       2026-08-05 08:37:27
+    ImageID w/o  acquisition date: 3454870
+        import date =       2026-08-05 08:37:43
+    """
+    # Skip pytest if on local file
+    if set_local_file():
+        return
+
+    try:
+        usr, pwd, host, port = ou.get_cred()
+        conn = BlitzGateway(
+            username=usr, passwd=pwd, host=host, port=port, secure=True
+        )
+        conn.connect()
+
+        # Object with both dates
+        image_id = 3454869
+        d1, d2 = ou.get_dates(conn, image_id)
+        assert d1 == "20260226"
+        assert d2 == "20260805"
+
+        # Object with only import date
+        image_id = 3454870
+        d1, d2 = ou.get_dates(conn, image_id)
+        assert d1 is None
+        assert d2 == "20260805"
+
+    finally:
+        conn.c.closeSession()
+
+
+def test_get_voxel_and_channel_names():
+    """
+    Test the get_dates function.
+
+    Does not run in pytest.
+
+    Leica ImageID: 3454869
+    Nikon ImageID: 3454870
+    """
+    # Skip pytest if on local file
+    if set_local_file():
+        return
+
+    # Leica Image
+    image_id = 3454869
+    voxels, ch_names = ou.get_image_voxelsize_channel_names(image_id=image_id)
+    assert round(voxels[0], 2) == 0.21
+    assert round(voxels[1], 2) == 0.21
+    assert round(voxels[2], 2) == 1
+    assert ch_names == ["0", "1", "2", "3"]
+
+    # Nikon image
+    image_id = 3454870
+    voxels, ch_names = ou.get_image_voxelsize_channel_names(image_id=image_id)
+    assert round(voxels[0], 2) == 0.06
+    assert round(voxels[1], 2) == 0.06
+    assert round(voxels[2], 2) == 0.17
+    assert ch_names == ["DAPI", "GFP", "Cy3", "Cy5"]
+
+    # A non-microscope image
+    image_id = 3454874
+    with pytest.raises(
+        RuntimeError,
+        match=f"The image <{image_id}> is not calibrated or not a microscopy image.",
+    ):
+        ou.get_image_voxelsize_channel_names(image_id=image_id)
+
+
 if __name__ == "__main__":
-    test_get_omero_ring_rois()
+    # Uniformity / distortion
+    #     Metrology test dataset: 82171
+    #     with imageID: 3454869
+    # PSF
+    #     Metrology test dataset: 82170
+    #     with imageID: 3454870
+
+    # List of all the functions
+    # test_get_cred()
+    # test_get_images_in_dataset_by_tag()
+    # test_get_omero_ring_rois()
+    # test_get_dates()
+    # test_get_voxel_and_channel_names()
+    pass
