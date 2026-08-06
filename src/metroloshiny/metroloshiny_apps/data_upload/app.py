@@ -1061,7 +1061,8 @@ def create_omero_table() -> pd.DataFrame:
     # Create the dataframe to be uploaded
     df = prepare_data_for_entry(
         data=df,
-        data_headers=list(df.columns)[:2],
+        # Exclude the last column (Value) for data_headers
+        data_headers=list(df.columns)[:-1],
         site=_site,
         microscope=_mic,
         objective=_obj,

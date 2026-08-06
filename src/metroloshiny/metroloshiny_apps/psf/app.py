@@ -494,7 +494,7 @@ def get_objective_table() -> tuple[pd.DataFrame, list[dict]]:
 
     :return: pd.DataFrame
         DataFrame of available objectives
-    :return: list[dict]]
+    :return: list[dict]
         List of dict to be used to highlight row in DataGrid
     """
     # Make sure DF ready and selections valid

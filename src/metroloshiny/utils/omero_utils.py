@@ -650,7 +650,7 @@ def get_omero_table(
     """
     image = conn.getObject("image", image_id)
     if image is None:
-        raise RuntimeError(f"ID <{image_id} does not seem to be an Image ID.")
+        raise RuntimeError(f"ID <{image_id}> does not seem to be an Image ID.")
 
     # Find the OMERO tables (# FIXME: returns the first table that matches the substring)
     for ann in image.listAnnotations():
