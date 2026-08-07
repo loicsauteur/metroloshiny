@@ -6,14 +6,18 @@
 # analysis based on: https://github.com/BIOP/ArgoLight_analysis_tool/blob/988c4147822562c25c53a04ad20fad577798aeed/scripts/ARGO-SIM_analysis_code.groovy
 # check also this for adding ROI uploads: https://github.com/BIOP/ArgoLight_analysis_tool/blob/988c4147822562c25c53a04ad20fad577798aeed/src/main/java/ch/epfl/biop/processing/ArgoSlideProcessing.java
 # ---------
-# user Image ID = 3021627
+# user Image ID = 3021627 FIXME
 
+from typing import Optional
 
 import numpy as np
 import pandas as pd
+import plotly.express as px
 from shiny import reactive
 from shiny.express import input, render, ui
+from shinywidgets import render_widget
 
+from metroloshiny.data_objects.FieldData import FieldData
 from metroloshiny.utils.common_utils import (
     get_objective_mag,
     get_objective_na,
@@ -23,6 +27,7 @@ from metroloshiny.utils.common_utils import (
 from metroloshiny.utils.dataframe_utils import (
     filter_by_column_value,
 )
+from metroloshiny.utils.plot_utils import no_data_plotly
 from metroloshiny.utils.read_file import get_sheet, load_doc
 
 # Load Data
@@ -85,35 +90,120 @@ with ui.nav_panel(title=""):
                     df, styles = create_objective_db_table()
                     return render.DataGrid(df, styles=styles)
 
-        with ui.navset_card_underline(title="Some plot title"):  # FIXME
-            with ui.nav_panel(title="Plot"):
+        with ui.navset_card_underline(
+            title="Average Field Distortion & Uniformity"
+        ):
+            with ui.nav_panel(title="Plot Field Distortion"):
 
-                @render.ui
-                def test_2():
-                    """Construction in progress."""
-                    # FIXME
-                    get_omero_data()
-                    return "under construction"
+                @render_widget
+                def show_field_distortion_over_time_plot():
+                    """Show field distortion average over time plot."""
+                    data = get_omero_data()
+                    if data is None:
+                        return no_data_plotly()
+                    df_dist = data.get_distortion_over_time_melt()
+                    return create_plot_over_time(df_dist)
+
+            with ui.nav_panel(title="Plot Field Uniformity"):
+
+                @render_widget
+                def show_field_uniformity_over_time_plot():
+                    """Show field uniformity average over time plot."""
+                    data = get_omero_data()
+                    if data is None:
+                        return no_data_plotly()
+                    df_unif = data.get_uniformity_over_time_melt()
+                    return create_plot_over_time(df_unif)
 
             with ui.nav_panel(title="Table"):
 
-                @render.ui
-                def test_3():
-                    """Construction in progress."""
-                    return "under construction"
+                @render.data_frame
+                def show_uni_dist_avg_over_time_table():
+                    """Show table of distortion/uniformity average over time."""
+                    data = get_omero_data()
+                    # Show no dataframe if no data loaded yet
+                    if data is None:
+                        return pd.DataFrame()
+                    # Merge uniformity and distortion dataframes
+                    df_dist = data.get_distortion_over_time_melt()
+                    df_unif = data.get_uniformity_over_time_melt()
+                    df = df_dist.merge(df_unif, on=["Date", "Channel"])
+                    # Sort the dataframe properly
+                    df = df.sort_values(by=["Date", "Channel"])
+                    return df
+
+                # TODO Next create fake images?!
+
+
+# Plot creation             --------------------------------------------------
+
+
+def create_plot_over_time(df: pd.DataFrame):
+    """
+    Create plot for average metrics over time.
+
+    Line of the column that contains "Average",
+    with STD of column that contains "STD"
+
+    :param df: pd.DataFrame with columns:
+        Date, Channel, Average**, STD**
+
+    :return: plotly.express plot (use in @render_widget)
+    """
+    if df.empty:
+        return no_data_plotly()
+
+    # Create line plot for Average with STD
+    average = next(x for x in df.columns if "Average" in x)
+    std = next(x for x in df.columns if "STD" in x)
+    plot = px.line(
+        data_frame=df,
+        x="Date",
+        y=average,
+        color="Channel",
+        error_y=std,
+        markers=True,
+        # hover_data={
+        #     "Date": True,
+        #     average: ":.f ± :.2f"
+        # }
+    )
+    # Update the layout
+    plot.update_layout(
+        template="simple_white",
+        margin={"r": 200},
+        # legend={ # not really necessary
+        #     "yanchor": "top",
+        #     "y": 1,
+        #     "xanchor": "left",
+        #     "x": 1.02,
+        # },
+    )
+    # Rotate x-axis labels
+    plot.update_xaxes(
+        tickangle=45,
+        # Reduce number of displayed ticks
+        nticks=10,
+        showgrid=False,
+        title="",
+    )
+    # Update y-axis
+    plot.update_yaxes(showgrid=True, gridcolor="lightgrey")
+    return plot
 
 
 # Reactive calcs            --------------------------------------------------
 
 
 @reactive.calc
-def get_omero_data():  # FIXME define output type
+def get_omero_data() -> Optional[FieldData]:
     """
     Load all the data from OMERO, but only once selections are ready.
 
-    TODO describe output
+    Reminder distortion values are actually um (if gotten from tables)
+
+    :return: FieldData object, with metrics loaded from OMERO
     """
-    print("get omero data executed")
     df = get_sidebar_filtered_dataframe()
     if df.empty:
         return None
@@ -122,16 +212,9 @@ def get_omero_data():  # FIXME define output type
     df = df.replace("", np.nan)
     df = df.dropna(axis="columns")
 
-    print("--> df")
-    print(df)
-    # TODO
-    # - drop nan columns
-    # - identify unique OMERO IDs
-    # - if they do not start with omero -> not implemented
-    # - create omero_utils function to load all image IDs,
-    #   and associate the channel with the OMERO channel
-
-    # Reminder distortion values are actually um (if gotten from tables)
+    # Create and load data
+    data = FieldData(df, retrieve_omero=True)
+    return data
 
 
 @reactive.calc

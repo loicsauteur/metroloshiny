@@ -122,16 +122,25 @@ def test_basics():
 
     # Check dataframe create for visualisation
     df = data.get_distortion_over_time()
-    mean_488 = df.loc[df["Date"] == "20260101", "488"].iloc[0]
+    mean_488 = df.loc[df["Date"] == "20260101", "488-AVG"].iloc[0]
     std_dapi = df.loc[df["Date"] == "20260101", "DAPI-STD"].iloc[0]
     assert round(mean_488, 3) == 0.507
     assert round(std_dapi, 3) == 0.181
 
+    # Melted dataframe
+    df_melt = data.get_distortion_over_time_melt()
+    # len(melt) should be number of dates * n-channels (channel columns / 2)
+    assert len(df_melt) == len(df) * (len(df.columns) - 1) / 2
+
     df = data.get_uniformity_over_time()
-    mean_561 = df.loc[df["Date"] == "20260101", "561"].iloc[0]
+    mean_561 = df.loc[df["Date"] == "20260101", "561-AVG"].iloc[0]
     std_647 = df.loc[df["Date"] == "20260101", "Alexa 647-STD"].iloc[0]
     assert round(mean_561, 1) == 1167.2
     assert round(std_647, 1) == 76.7
+
+    # Melted dataframe
+    df_melt = data.get_uniformity_over_time_melt()
+    assert len(df_melt) == len(df) * (len(df.columns) - 1) / 2
 
 
 if __name__ == "__main__":

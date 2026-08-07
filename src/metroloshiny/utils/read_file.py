@@ -48,7 +48,8 @@ def get_private_data(key: str, data_path: Optional[str] = None) -> str:
                 Path(Path(__file__).parents[3], "data/private_data.csv")
             )
             if os.path.exists(data_path):
-                print("found file relative to this file")
+                pass
+                # FIXME print("found file relative to this file")
 
             if not os.path.exists(data_path) and platform.system() == "Linux":
                 # Check if is running on the server and set

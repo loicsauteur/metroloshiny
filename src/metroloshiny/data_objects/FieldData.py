@@ -99,7 +99,7 @@ class FieldData:
         Calculate average and STD distoriotn per channel per date.
 
         return: pd.DataFrame with columns:
-            Date, ch_name1, ch_name1-STD, ...
+            Date, ch_name1-AVG, ch_name1-STD, ...
         """
         # Use getter to make sure the data is set
         try:
@@ -117,7 +117,7 @@ class FieldData:
 
         headers = ["Date"]
         for ch in self.channel_names:
-            headers.append(ch)
+            headers.append(ch + "-AVG")
             headers.append(ch + "-STD")
         df = pd.DataFrame(columns=headers)
 
@@ -129,19 +129,57 @@ class FieldData:
                 # Create a dict for a row
                 row = {"Date": date}
                 for ch in date_df.columns[1:]:
-                    row[ch] = np.average(date_df[ch])
-                    row[ch + "-STD"] = np.std(date_df[ch])
+                    # Average rounded to 3-digits
+                    row[ch + "-AVG"] = round(np.average(date_df[ch]), 3)
+                    # STD rounded to 3-digits
+                    row[ch + "-STD"] = round(np.std(date_df[ch]), 3)
                 # Create a df from the dict and concat with the previous one
                 row = pd.DataFrame([row])
                 df = pd.concat([df, row], ignore_index=True)
         return df
+
+    def get_distortion_over_time_melt(self) -> pd.DataFrame:
+        """
+        Get the distortion over time melted.
+
+        Same data but with columns:
+            Date, Channel, Average*, STD*
+
+        :return: pd.DataFrame
+        """
+        df = self.get_distortion_over_time()
+        # Change the dataframe layout to have columns: date, channel, avg, std
+        avg_df = df.melt(
+            id_vars="Date",
+            value_vars=[c for c in df.columns if c.endswith("-AVG")],
+            var_name="Channel",
+            value_name="Average Distortion [um]",
+        )
+        # Remove -AVG from channel names
+        avg_df["Channel"] = avg_df["Channel"].str.replace(
+            "-AVG", "", regex=False
+        )
+        # Same also for STD
+        std_df = df.melt(
+            id_vars="Date",
+            value_vars=[c for c in df.columns if c.endswith("-STD")],
+            var_name="Channel",
+            value_name="STD Distortion",
+        )
+        std_df["Channel"] = std_df["Channel"].str.replace(
+            "-STD", "", regex=False
+        )
+
+        # Combine the two dataframes
+        df_long = avg_df.merge(std_df, on=["Date", "Channel"])
+        return df_long
 
     def get_uniformity_over_time(self) -> pd.DataFrame:
         """
         Calculate average and STD uniformity per channel per date.
 
         return: pd.DataFrame with columns:
-            Date, ch_name1, ch_name1-STD, ...
+            Date, ch_name1-AVG, ch_name1-STD, ...
         """
         # Use getter to make sure the data is set
         try:
@@ -159,7 +197,7 @@ class FieldData:
 
         headers = ["Date"]
         for ch in self.channel_names:
-            headers.append(ch)
+            headers.append(ch + "-AVG")
             headers.append(ch + "-STD")
         df = pd.DataFrame(columns=headers)
 
@@ -171,12 +209,50 @@ class FieldData:
                 # Create a dict for a row
                 row = {"Date": date}
                 for ch in date_df.columns[1:]:
-                    row[ch] = np.average(date_df[ch])
-                    row[ch + "-STD"] = np.std(date_df[ch])
+                    # Average rounded to 1-digits
+                    row[ch + "-AVG"] = round(np.average(date_df[ch]), 1)
+                    # STD rounded to 1-digits
+                    row[ch + "-STD"] = round(np.std(date_df[ch]), 1)
                 # Create a df from the dict and concat with the previous one
                 row = pd.DataFrame([row])
                 df = pd.concat([df, row], ignore_index=True)
         return df
+
+    def get_uniformity_over_time_melt(self) -> pd.DataFrame:
+        """
+        Get the uniformity over time melted.
+
+        Same data but with columns:
+            Date, Channel, Average*, STD*
+
+        :return: pd.DataFrame
+        """
+        df = self.get_uniformity_over_time()
+        # Change the dataframe layout to have columns: date, channel, avg, std
+        avg_df = df.melt(
+            id_vars="Date",
+            value_vars=[c for c in df.columns if c.endswith("-AVG")],
+            var_name="Channel",
+            value_name="Average Uniformity [AU]",
+        )
+        # Remove -AVG from channel names
+        avg_df["Channel"] = avg_df["Channel"].str.replace(
+            "-AVG", "", regex=False
+        )
+        # Same also for STD
+        std_df = df.melt(
+            id_vars="Date",
+            value_vars=[c for c in df.columns if c.endswith("-STD")],
+            var_name="Channel",
+            value_name="STD Uniformity",
+        )
+        std_df["Channel"] = std_df["Channel"].str.replace(
+            "-STD", "", regex=False
+        )
+
+        # Combine the two dataframes
+        df_long = avg_df.merge(std_df, on=["Date", "Channel"])
+        return df_long
 
     # Functions for data setting           ###################################
 
