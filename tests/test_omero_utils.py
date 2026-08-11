@@ -141,7 +141,7 @@ def test_get_omero_ring_rois():
         for i in detected.keys():
             assert i in ideal.keys()
 
-        # Calculate the number of X/Y rings
+        # Calculate the number of X/Y rings FIXME deprecated!
         x_rings, y_rings = ou.get_field_of_ring_grid_size(detected)
         n_rings = x_rings * y_rings
         # assert n_detected rings == x * y (optional -1, since center ring may be missing)

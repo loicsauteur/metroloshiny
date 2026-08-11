@@ -65,13 +65,23 @@ class FieldData:
 
     # Getters/Setters           ##############################################
     def get_distortion(self) -> dict[str, Optional[pd.DataFrame]]:
-        """Getter for the distortion data."""
+        """
+        Getter for the distortion data.
+
+        :return: dict of str date with pd.DataFrame
+            DataFrame with columns: Ring_ID & Channels
+        """
         if not self.distortion_tables:
             raise RuntimeError("Distortion data is not set yet.")
         return self.distortion_tables
 
     def get_uniformity(self) -> dict[str, Optional[pd.DataFrame]]:
-        """Getter for the uniformity data."""
+        """
+        Getter for the uniformity data.
+
+        :return: dict of str date with pd.DataFrame
+            DataFrame with columns: Ring_ID & Channels
+        """
         if not self.uniformity_tables:
             raise RuntimeError("Uniformity data is not set yet.")
         return self.uniformity_tables
@@ -93,6 +103,128 @@ class FieldData:
         return self.roi_ideal
 
     # Functions for data visualisation      ##################################
+
+    def get_heat_map_dataframe(
+        self, date: str, data_dict: dict[str, pd.DataFrame], test: bool = False
+    ) -> pd.DataFrame:
+        """
+        Create heat-map dataframe for a date and a metric (distortion or uniformity).
+
+        Calculates also the missing middle value (4-connected (+) average)
+
+        :param date: str, date to create the heatmap for
+        :param data_dict: e.g. distortion_tables or uniformity_tables
+        :param test: bool, option only for testing. Should always be Default = False
+
+        :return: pd.DataFrame, with columns:
+            - Ring_ID,
+            - Channels* values
+            - X (1-based tile index)
+            - Y (1-based tile idnex)
+        """
+        if not data_dict:
+            raise RuntimeError("The OMERO data seems not to be loaded yet.")
+        # Check
+        if date not in data_dict.keys():
+            raise ValueError(
+                f"There is no data associated with the date {date}."
+            )
+        if not test and date not in self.roi_detected.keys():
+            raise RuntimeError(f"There is no ROI information for date {date}.")
+
+        if not test:
+            # Calculate the number of XY tiles
+            x, y = self.get_field_of_rings_grid_size(date=date)
+
+            # Get the ROIs
+            rois = self.roi_detected.get(date)
+            if x * y == len(rois):
+                # There is no missing ring!
+                raise RuntimeError(
+                    f"Expected a missing center ROI. There are {x} X & {y} Y "
+                    f"tiles = {x * y}, and {len(rois)} detected rings!"
+                )
+        else:
+            # Specific XY tiles for test
+            x = 5
+            y = 5
+
+        # Calculate the middle position(s)
+        df = data_dict.get(date).copy()
+        # Quick check
+        if "Ring_ID" not in df.columns:
+            raise KeyError(
+                f"Expected an 'Ring_ID' column, found only: {df.columns}"
+            )
+
+        middleTile = len(df) // 2  # 0-based index
+        # middleValues = [middleTile + 1] # like a row: Ring_ID, ch-middle-values
+        middleValues = {"Ring_ID": [middleTile + 1]}
+        for col in df.columns[1:]:
+            col_ids = df.columns.get_loc(col)
+            average = df.iloc[middleTile - 5, col_ids]
+            average = average + df.iloc[middleTile - 1, col_ids]
+            average = average + df.iloc[middleTile, col_ids]
+            average = average + df.iloc[middleTile + 4, col_ids]
+            average = average / 4
+            # middleValues.append(average)
+            middleValues[col] = [average]
+
+        before = df.iloc[:middleTile]
+        middle = pd.DataFrame().from_dict(middleValues)
+        after = df.iloc[middleTile:]
+        after = after.copy()
+        after["Ring_ID"] = after["Ring_ID"] + 1
+        df_out = pd.concat([before, middle, after], ignore_index=True)
+
+        # Add columns for X and Y positions (1-based)
+        x_arr = list(range(1, x + 1)) * y
+        y_arr = np.repeat(list(range(1, y + 1)), x)
+
+        df_out["X"] = x_arr
+        df_out["Y"] = y_arr
+
+        return df_out
+
+    def get_field_of_rings_grid_size(self, date: str):
+        """
+        Calculate the number of dtected rings in X and Y.
+
+        With the argolight slide, the middle ring is missing (there's a cross).
+
+        :param date: str, date for the rings
+
+        :return: tuple, ring count in x and y
+        """
+        # Sanity check
+        if date not in self.roi_detected.keys():
+            raise ValueError(f"There is no ROI information for date {date}.")
+
+        coords = self.roi_detected.get(date)
+        # Get a list of only X and Y coordinates separately
+        x = [i[0] for i in coords.values()]
+        y = [i[1] for i in coords.values()]
+
+        x_count = 1
+        # Count the number of rings on the first row
+        for i in range(1, len(x)):
+            if x[i] > x[i - 1]:
+                x_count += 1
+            else:
+                break
+
+        y_count = 1
+        delta_x = (x[1] - x[0]) / 2
+        prev_y = y[0]
+        # Count the number of rings on the first column
+        for i in range(1, len(y)):
+            # Check only the first y coords (allow +/- half ring to ring distance)
+            if x[i] > x[0] - delta_x and x[i] < x[0] + delta_x:
+                if y[i] > prev_y:
+                    y_count += 1
+                    prev_y = y[i]
+
+        return x_count, y_count
 
     def get_distortion_over_time(self) -> pd.DataFrame:
         """

@@ -612,6 +612,8 @@ def get_field_distortion(
     """
     Calculate the distance between detected points and ideal location.
 
+    FIXME probably never used (Deprecated)!
+
     :param detected: dict, with str point number and tuple XY coordinates
     :param ideal: dict, with str point number and tuple XY coordinates
 
@@ -721,6 +723,8 @@ def get_field_of_ring_grid_size(
 ) -> tuple[int, int]:
     """
     Calculate the number of detected rings in X and Y.
+
+    FIXME Deprecated / moved to FieldData class. Remove also from test...
 
     With the argolight slide, the middle ring is missing (there's a cross).
 

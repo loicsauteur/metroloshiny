@@ -142,7 +142,75 @@ def test_basics():
     df_melt = data.get_uniformity_over_time_melt()
     assert len(df_melt) == len(df) * (len(df.columns) - 1) / 2
 
+    # Test grid size of field of rings
+    with pytest.raises(
+        ValueError, match=r"There is no ROI information for date*"
+    ):
+        data.get_field_of_rings_grid_size(date="19991212")
+    x, y = data.get_field_of_rings_grid_size(date="20260101")
+    assert x == 13
+    assert y == 13
+    # There should be XY tiles - the center tile of detected ROIs
+    assert x * y - 1 == len(data.get_detected_rois().get("20260101"))
+
+
+def test_heat_mapping():
+    """Test function related to heat map creation."""
+    _df = _create_mock_omero_df_()
+
+    fake_range = [x * x // 5 for x in range(1, 26)]
+    # Array:
+    # 0    0    1    3    5
+    # 7    9    12   16   20
+    # 24   28   33   39   45
+    # 51   57   64   72   80
+    # 88   96   105  115  125
+    # Remove the middle element
+    fake_range.remove(33)
+    # 4-connected average of the middle would be 35.75
+
+    df_fake_uniformity = pd.DataFrame().from_dict(
+        {"Ring_ID": [x + 1 for x in range(len(fake_range))], "GFP": fake_range}
+    )
+    # print(df_fake_uniformity)
+    fake_uniformity_table = {"20260101": df_fake_uniformity}
+    data = FieldData(_df, retrieve_omero=False)
+
+    # Test with fake data dict
+    # Wrong date (not present)
+    with pytest.raises(
+        ValueError, match=r"There is no data associated with the date*"
+    ):
+        data.get_heat_map_dataframe(
+            date="19991212", data_dict=fake_uniformity_table
+        )
+    # Roi data has no match for date
+    with pytest.raises(
+        RuntimeError, match=r"There is no ROI information for date*"
+    ):
+        data.get_heat_map_dataframe(
+            date="20260101", data_dict=fake_uniformity_table
+        )
+    # Data not yet retrieved from OMERO yet
+    with pytest.raises(
+        RuntimeError, match="The OMERO data seems not to be loaded yet\\."
+    ):
+        data.get_heat_map_dataframe(
+            date="20260101", data_dict=data.uniformity_tables
+        )
+
+    df = data.get_heat_map_dataframe(
+        date="20260101", data_dict=fake_uniformity_table, test=True
+    )
+    assert len(df.columns) == 4
+    # Assert row 13 (remember 0-based index) col GFP expected average value
+    assert df.iloc[len(df) // 2, 1] == 35.75
+
+    # Load data for real tests
+    # data._set_data_()
+
 
 if __name__ == "__main__":
     # test_basics()
+    # test_heat_mapping()
     pass

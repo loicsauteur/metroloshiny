@@ -27,7 +27,7 @@ from metroloshiny.utils.common_utils import (
 from metroloshiny.utils.dataframe_utils import (
     filter_by_column_value,
 )
-from metroloshiny.utils.plot_utils import no_data_plotly
+from metroloshiny.utils.plot_utils import no_data_plotly, no_data_seaborn
 from metroloshiny.utils.read_file import get_sheet, load_doc
 
 # Load Data
@@ -69,8 +69,8 @@ with ui.nav_panel(title=""):
             with ui.nav_panel(title="Options"):
 
                 @render.ui
-                def test_1():
-                    """Construction in progress."""
+                def render_plotting_options():
+                    """FIXME: Construction in progress."""
                     return "under construction"
 
             with ui.nav_panel(title="Objective information"):
@@ -102,6 +102,7 @@ with ui.nav_panel(title=""):
                     if data is None:
                         return no_data_plotly()
                     df_dist = data.get_distortion_over_time_melt()
+                    # TODO check for "problems" and give some warnings!
                     return create_plot_over_time(df_dist)
 
             with ui.nav_panel(title="Plot Field Uniformity"):
@@ -113,6 +114,7 @@ with ui.nav_panel(title=""):
                     if data is None:
                         return no_data_plotly()
                     df_unif = data.get_uniformity_over_time_melt()
+                    # TODO check for "problems" and give some warnings!
                     return create_plot_over_time(df_unif)
 
             with ui.nav_panel(title="Table"):
@@ -120,6 +122,7 @@ with ui.nav_panel(title=""):
                 @render.data_frame
                 def show_uni_dist_avg_over_time_table():
                     """Show table of distortion/uniformity average over time."""
+                    # TODO date_range_selector (setting min/max in get_omero_data function)
                     data = get_omero_data()
                     # Show no dataframe if no data loaded yet
                     if data is None:
@@ -132,10 +135,40 @@ with ui.nav_panel(title=""):
                     df = df.sort_values(by=["Date", "Channel"])
                     return df
 
-                # TODO Next create fake images?!
+        # TODO Next create fake images?!
+        with ui.navset_card_underline(title="something new"):
+            with ui.nav_panel(title="Plot"):
+
+                @render.plot
+                def test_1():
+                    data = get_omero_data()
+                    if data is None:
+                        return no_data_seaborn()
+
+                    # FIXME probably need to create the dataframe directly in the heatmap function? to avoid errors?
+                    uni_data = data.get_uniformity()
+                    first_date = next(iter(uni_data))
+                    df = data.get_heat_map_dataframe(first_date, uni_data)
+
+                    return create_fake_heatmap(df)
 
 
 # Plot creation             --------------------------------------------------
+
+
+def create_fake_heatmap(df: pd.DataFrame):
+    """
+    TODO.
+
+    :param df: TODO
+    """
+    if df.empty:
+        return no_data_seaborn()
+
+    print(df)
+
+    # current fixme
+    return no_data_seaborn()
 
 
 def create_plot_over_time(df: pd.DataFrame):
