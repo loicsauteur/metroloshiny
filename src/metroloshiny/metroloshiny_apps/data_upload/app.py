@@ -1140,7 +1140,7 @@ def check_dataset_id() -> Optional[tuple[dict, dict]]:
                     "image_id_selector", choices=["No images available"]
                 )
                 ui.notification_show(
-                    "No images with PSF metrics could be found for the dataset.",
+                    f"No images with {cat} metrics could be found for the dataset.",
                     type="warning",
                 )
             else:

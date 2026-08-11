@@ -256,6 +256,59 @@ def test_get_voxel_and_channel_names():
         ou.get_image_voxelsize_channel_names(image_id=image_id)
 
 
+def test_getting_metric_functions():
+    """
+    Test the functions related to getting metric data.
+
+    Does not run in pytest.
+
+    Uniformity/distortion ImageID: 3454869
+        Should not return any DF
+    PSF ImageID: 3454870
+        Should return DF with Key, Value columns
+
+    """
+    # Skip pytest if on local file
+    if set_local_file():
+        return
+
+    try:
+        usr, pwd, host, port = ou.get_cred()
+        conn = BlitzGateway(
+            username=usr, passwd=pwd, host=host, port=port, secure=True
+        )
+        conn.connect()
+
+        # Testing get_metric_data function          --------------------------
+        # This function should be deprecated (FIXME)
+        # PSF image
+        image_id = 3454870
+        df = ou.get_metric_data(conn, image_id=image_id, metric="FWHM")
+        assert df is not None
+        assert "Key" in df.columns
+
+        # Uniformity/Distortion image
+        image_id = 3454869
+        df = ou.get_metric_data(conn, image_id=image_id, metric="FWHM")
+        assert df is not None
+
+        # Testing get_fwhm_metric_data              --------------------------
+        # PSF image
+        image_id = 3454870
+        df = ou.get_fwhm_metric_data(conn, image_id, "FWHM")
+        assert df is not None
+        assert "Key" in df.columns
+        assert "Value" in df.columns
+
+        # Uniformity/Distortion image
+        image_id = 3454869
+        df = ou.get_fwhm_metric_data(conn, image_id, "FWHM")
+        assert df is None
+
+    finally:
+        conn.c.closeSession()
+
+
 if __name__ == "__main__":
     # Uniformity / distortion
     #     Metrology test dataset: 82171
@@ -270,4 +323,4 @@ if __name__ == "__main__":
     # test_get_omero_ring_rois()
     # test_get_dates()
     # test_get_voxel_and_channel_names()
-    pass
+    test_getting_metric_functions()

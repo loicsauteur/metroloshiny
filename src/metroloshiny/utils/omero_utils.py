@@ -195,12 +195,12 @@ def get_images_for_metric(
         conn.connect()
 
         # For PSF       ######################################################
-        if metric_id == "PSF":
+        if ori_metric_id == "PSF":
             # Get a dict of all image in dataset {image_id: image_name}
             image_ids = get_images_in_dataset(conn=conn, dataset_id=dataset_id)
 
             for cur_id, name in image_ids.items():
-                cur_data = get_metric_data(
+                cur_data = get_fwhm_metric_data(
                     conn=conn, image_id=cur_id, metric=metric_id
                 )
                 if isinstance(cur_data, pd.DataFrame):
@@ -375,11 +375,61 @@ def omero_table_to_dict(table) -> dict:
     return dict_out
 
 
+def get_fwhm_metric_data(
+    conn: BlitzGateway, image_id: int, metric: str
+) -> Optional[pd.DataFrame]:
+    """
+    Get the FWHM metric data from the OMERO image key-value pairs.
+
+    Checks kv pair keys for metric (excludes "Profile_length_for_FWHM").
+    Picks the first instance of key-value pairs that if finds.
+
+    :param conn: BlitzGateway
+    :param image_id: int, OMERO image ID
+    :param metric: str, metric to find, e.g. FWHM
+
+    :return: None, if the metric was not found in the image
+        pd.DataFrame
+    """
+    # Get Omero image
+    image = conn.getObject("image", image_id)
+    if image is None:
+        raise RuntimeError(f"ID <{image_id} does not seem to be an Image ID.")
+
+    kv_pairs = []
+    # Loop over annotation objects to get kv-paris or table
+    for ann in image.listAnnotations():
+        # Check for key value pairs
+        if isinstance(ann, MapAnnotationWrapper):
+            kv_pairs.append(ann.getValue())
+
+    # Check if the metric is present in the keys
+    # Get the first kv-pair that contains the metric
+    for kv in kv_pairs:
+        df = pd.DataFrame(kv, columns=["Key", "Value"])
+        # Check if the correct key is present
+        right = df["Key"].str.contains(metric, na=False).any()
+        # Make sure the wrong key is NOT present
+        wrong = (
+            df["Key"].str.contains("Profile_length_for_FWHM", na=False).any()
+        )
+
+        # Only consider a good dataframe if only the right is presnet
+        if right and not wrong:
+            return df
+
+    # Return None as nothing was found
+    return None
+
+
 def get_metric_data(
     conn: BlitzGateway, image_id: int, metric: str
 ) -> Optional[pd.DataFrame]:
     """
     Get the metric data from the OMERO image.
+
+    FIXME: I want to deprecate this function, it may return dataframes when not expected.
+        e.g. when looking for FWHM data in a uniformity/distortion image.
 
     Finds the first OMERO.table or kv-pair that contains the metric of interest.
     Prefers kv-pair over OMERO.table.
@@ -442,14 +492,9 @@ def get_metric_data(
         # kv_item = list[list[key, value]]
         return pd.DataFrame(final_kv_pair, columns=["Key", "Value"])
     else:
-        # Return the OMERO table
-        # FIXME THIS part has not been tested
+        # Return the full OMERO table
+        # FIXME THIS part has not been tested (just returns the full)
         return omero_table_to_dataframe(conn, final_table)
-        # FIXME this is the previous version
-        # final_table = omero_table_to_dict(final_table)
-        # # Convert to dict for pandas
-        # final_table = {k: [v] for k, v in final_table.items()}
-        # return pd.DataFrame.from_dict(final_table)
 
 
 def get_dates(conn: BlitzGateway, image_id: int) -> tuple[Optional[str], str]:
