@@ -206,11 +206,18 @@ def read_nis_job_xlsx(path: str) -> pd.DataFrame:
         # Get the Date              ##########################################
         # Date is the column headers (col H / 8th col)
         date = df.columns[7]
-        if date.startswith("da"):
+        # The date may be read already as date time object
+        if str(date).startswith("da"):
             # Date is missing...
+            date = "date-missing"
+        # If date is already a datetime object - DONT trust it
+        # FIXME it is not really reliable how excel writes date formats
+        elif isinstance(date, datetime):
+            # I saw that month and day may be switched
             date = "date-missing"
         else:
             # Convert the date string from dd-mm-yyyy to YYYYmmdd
+            # Attention the string format may be different per PC (found dd/mm/YY) currently not checked
             try:
                 date = datetime.strptime(date, "%d-%m-%Y").strftime("%Y%m%d")
             except ValueError:
