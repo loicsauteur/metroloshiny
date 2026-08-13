@@ -1,8 +1,23 @@
 """Function for plotting."""
 
 import matplotlib.pyplot as plt
+import numpy as np
 import pandas as pd
 import plotly.express as px
+
+
+def normalize_percentile(values, low: int = 1, high: int = 99) -> list:
+    """
+    Normalise percitenile.
+
+    :param values: list, np.array, df, of values
+    :param low: int, bottom percentile
+    :param high: int, top percentile
+
+    :return: list, normalised values
+    """
+    vmin, vmax = np.nanpercentile(values, q=[low, high])
+    return np.clip((values - vmin) / (vmax - vmin), a_min=0, a_max=1)
 
 
 def no_data_seaborn(message: str = "No data to visualise!"):

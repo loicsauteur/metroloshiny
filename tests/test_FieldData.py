@@ -206,11 +206,17 @@ def test_heat_mapping():
     # Assert row 13 (remember 0-based index) col GFP expected average value
     assert df.iloc[len(df) // 2, 1] == 35.75
 
+    # Test relying on OMERO data            ##################################
+    if set_local_file():
+        # Skip tests on local file (i.e. when in pytest)
+        return
+
+    # Test get_distortion_dataframe (for arrows and magnitude)
     # Load data for real tests
-    # data._set_data_()
+    data._set_data_()
+    data.get_distortion_dataframe("20260101")
 
 
 if __name__ == "__main__":
     # test_basics()
-    # test_heat_mapping()
-    pass
+    test_heat_mapping()

@@ -10,6 +10,7 @@
 
 from typing import Optional
 
+import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import plotly.express as px
@@ -19,15 +20,18 @@ from shinywidgets import render_widget
 
 from metroloshiny.data_objects.FieldData import FieldData
 from metroloshiny.utils.common_utils import (
-    get_objective_mag,
-    get_objective_na,
+    get_nice_objective_name,
     get_version,
     set_local_file,
 )
 from metroloshiny.utils.dataframe_utils import (
     filter_by_column_value,
 )
-from metroloshiny.utils.plot_utils import no_data_plotly, no_data_seaborn
+from metroloshiny.utils.plot_utils import (
+    no_data_plotly,
+    no_data_seaborn,
+    normalize_percentile,
+)
 from metroloshiny.utils.read_file import get_sheet, load_doc
 
 # Load Data
@@ -90,21 +94,10 @@ with ui.nav_panel(title=""):
                     df, styles = create_objective_db_table()
                     return render.DataGrid(df, styles=styles)
 
+        #   Field Distortion and Uniformity - average metrics   ##############
         with ui.navset_card_underline(
             title="Average Field Distortion & Uniformity"
         ):
-            with ui.nav_panel(title="Plot Field Distortion"):
-
-                @render_widget
-                def show_field_distortion_over_time_plot():
-                    """Show field distortion average over time plot."""
-                    data = get_omero_data()
-                    if data is None:
-                        return no_data_plotly()
-                    df_dist = data.get_distortion_over_time_melt()
-                    # TODO check for "problems" and give some warnings!
-                    return create_plot_over_time(df_dist)
-
             with ui.nav_panel(title="Plot Field Uniformity"):
 
                 @render_widget
@@ -116,6 +109,18 @@ with ui.nav_panel(title=""):
                     df_unif = data.get_uniformity_over_time_melt()
                     # TODO check for "problems" and give some warnings!
                     return create_plot_over_time(df_unif)
+
+            with ui.nav_panel(title="Plot Field Distortion"):
+
+                @render_widget
+                def show_field_distortion_over_time_plot():
+                    """Show field distortion average over time plot."""
+                    data = get_omero_data()
+                    if data is None:
+                        return no_data_plotly()
+                    df_dist = data.get_distortion_over_time_melt()
+                    # TODO check for "problems" and give some warnings!
+                    return create_plot_over_time(df_dist)
 
             with ui.nav_panel(title="Table"):
 
@@ -135,40 +140,169 @@ with ui.nav_panel(title=""):
                     df = df.sort_values(by=["Date", "Channel"])
                     return df
 
+        # Distortion & Uniformity - Heat-map like plots     ##################
         # TODO Next create fake images?!
-        with ui.navset_card_underline(title="something new"):
+        with ui.navset_card_underline(title="Field Uniformity"):
             with ui.nav_panel(title="Plot"):
+                # Add 2 columns for date comparison selections
+                with ui.layout_column_wrap(width=1 / 2):
+
+                    @render.ui
+                    def uni_date_sel_1():
+                        data = get_omero_data()
+                        if data is None:
+                            choices = []
+                        else:
+                            choices = data.get_uniformity().keys()
+                        uni_date_selector_1 = ui.input_select(
+                            "uni_date_selector_1",
+                            "Select a date",
+                            choices=list(choices),
+                        )
+                        return uni_date_selector_1
+
+                    @render.ui
+                    def uni_date_sel_2():
+                        data = get_omero_data()
+                        if data is None:
+                            choices = []
+                        else:
+                            choices = data.get_uniformity().keys()
+                            choices = list(choices)
+                        uni_date_selector_2 = ui.input_select(
+                            "uni_date_selector_2",
+                            "Select a date",
+                            choices=choices,
+                            selected=(
+                                None if len(choices) == 0 else choices[-1]
+                            ),
+                        )
+                        # FIXME maybe I can set selected to the last date already??
+                        return uni_date_selector_2
+
+                @render.ui
+                def uniformity_channel_selector():
+                    """Show a channel selector."""
+                    channels = get_common_uniformity_channels()
+                    uni_ch_selector = ui.input_select(
+                        "uni_ch_selector", "Display channel", choices=channels
+                    )
+                    return uni_ch_selector
+
+                # How to plot
+                # Drop down channel selector
+                # layout_column_warp with 2 drop-down date selectors
+                # Plot with 2 figures to compare side by side (per channel only)
 
                 @render.plot
-                def test_1():
-                    data = get_omero_data()
-                    if data is None:
-                        return no_data_seaborn()
+                def plot_field_uniformity():
+                    """Plot field uniformity of 2 dates side by side."""
+                    return create_uniformity_plot()
 
-                    # FIXME probably need to create the dataframe directly in the heatmap function? to avoid errors?
-                    uni_data = data.get_uniformity()
-                    first_date = next(iter(uni_data))
-                    df = data.get_heat_map_dataframe(first_date, uni_data)
 
-                    return create_fake_heatmap(df)
+# Ideas:
+# Uniformity        --------------
+# heat map: normalised -- DONE!
+# Line profiles (averages?) in different directions (also diagonal?) ???
+
+
+# Distortion        ------------
+# Heat-map showing strongest ∆
+# Arrow w/ length map, using matplotlib quiver function (should be possible for different colors)
+# From Chat
+# ------->if df ~:
+# x     y     channel    dx      dy
+# 100   100   red        0.4    -0.2
+# 200   100   red        0.7    -0.3
+# 100   100   green      0.1     0.2
+# 200   100   green      0.3     0.1
+# ...
+# -------> Code:
+# colors = {
+#     "red": "red",
+#     "green": "limegreen",
+#     "blue": "blue",
+# }
+
+# fig, ax = plt.subplots(figsize=(8, 8))
+
+# scale = 50
+
+# for channel, color in colors.items():
+
+#     d = df[df["channel"] == channel]
+
+#     ax.quiver(
+#         d["x"],
+#         d["y"],
+#         d["dx"] * scale,
+#         d["dy"] * scale,
+#         color=color,
+#         angles="xy",
+#         scale_units="xy",
+#         scale=1,
+#         width=0.003,
+#         alpha=0.8,
+#         label=channel
+#     )
+
+# ax.set_aspect("equal")
+# ax.legend()
+# plt.show()
 
 
 # Plot creation             --------------------------------------------------
 
 
-def create_fake_heatmap(df: pd.DataFrame):
+@reactive.calc
+def create_uniformity_plot():
     """
-    TODO.
+    Create a heat-map like plot for the Filed Uniformity between 2 dates.
 
-    :param df: TODO
+    :return: matplotlib plot
     """
-    if df.empty:
+    # Get the date selections and channel selection
+    channel = input.uni_ch_selector()
+    date1 = input.uni_date_selector_1()
+    date2 = input.uni_date_selector_2()
+    omero_data = get_omero_data()
+    if channel is None or date1 is None or date2 is None or omero_data is None:
         return no_data_seaborn()
 
-    print(df)
+    # Get the data (convert unidata for heatmap)
+    uni_data = omero_data.get_uniformity()
+    df_1 = omero_data.get_heat_map_dataframe(date=date1, data_dict=uni_data)
+    df_2 = omero_data.get_heat_map_dataframe(date=date2, data_dict=uni_data)
 
-    # current fixme
-    return no_data_seaborn()
+    # Pivot the dfs for given channel (-> XY-table)
+    df_1 = df_1.pivot(index="Y", columns="X", values=channel)
+    df_2 = df_2.pivot(index="Y", columns="X", values=channel)
+    # Normalise the values (individually for each df)
+    df_1 = normalize_percentile(df_1).to_numpy()
+    df_2 = normalize_percentile(df_2).to_numpy()
+
+    # Create plot
+    fig, axes = plt.subplots(1, 2)
+    # Interpolation = bicubic for smooth interpolation
+    axes[0].imshow(
+        df_1, interpolation="bicubic", origin="upper", cmap="viridis"
+    )
+    axes[0].set_title(f"{date1} - {channel}")
+    axes[1].imshow(
+        df_2, interpolation="bicubic", origin="upper", cmap="viridis"
+    )
+    axes[1].set_title(f"{date2} - {channel}")
+
+    for ax in axes:
+        ax.axis("off")
+
+    mic = input.microscope()
+    obj = input.objective()
+    obj = get_nice_objective_name(objective_df, obj)
+    info = input.info()
+    fig.suptitle(f"Field Uniformity: {mic} {obj} ({info})")
+
+    return fig
 
 
 def create_plot_over_time(df: pd.DataFrame):
@@ -229,6 +363,56 @@ def create_plot_over_time(df: pd.DataFrame):
 
 
 @reactive.calc
+def get_valid_uniformity_dataframes() -> dict[str, pd.DataFrame]:
+    """
+    Get the uniformity tables, excluding the dates are None.
+
+    :return: dict, same as get_uniformity() but date always has a pd.DataFrame
+    """
+    uni = get_omero_data().get_uniformity()
+    return {k: v for k, v in uni.items() if v is not None}
+
+
+@reactive.calc
+def get_common_uniformity_channels() -> list[str]:
+    """
+    Get a list of common uniformity channels (between 2 dats).
+
+    Reacts on inputs uni_date_selector_1 & uni_date_selector_2
+
+    :return: list[str] of channels or empty list
+    """
+    # Get the date strings
+    date1 = input.uni_date_selector_1()
+    date2 = input.uni_date_selector_2()
+    # Return empty list if there is no selection
+    if date1 is None or date2 is None:
+        return []
+    # Get the data
+    data = get_omero_data()
+    # Sanity check
+    if data is None:
+        return []
+    # Column headers to exclude
+    default_cols = ["Ring_ID", "X", "Y"]
+    # Get channel names for date 1 & 2
+    date1_chs = get_valid_uniformity_dataframes().get(date1)
+    date1_chs = [x for x in date1_chs.columns if x not in default_cols]
+    date2_chs = get_valid_uniformity_dataframes().get(date2)
+    date2_chs = [x for x in date2_chs.columns if x not in default_cols]
+    # Get the common channels
+    common_chs = list(set(date1_chs).intersection(date2_chs))
+    # Warn if some channels are not available for both dates
+    if len(common_chs) != len(date1_chs) or len(common_chs) != len(date2_chs):
+        ui.notification_show(
+            "Some channels are not available for both dates",
+            type="warning",
+            id="uni_ch_warn",
+        )
+    return common_chs
+
+
+@reactive.calc
 def get_omero_data() -> Optional[FieldData]:
     """
     Load all the data from OMERO, but only once selections are ready.
@@ -247,6 +431,21 @@ def get_omero_data() -> Optional[FieldData]:
 
     # Create and load data
     data = FieldData(df, retrieve_omero=True)
+
+    # Check if there is really data associated
+    try:
+        data.get_distortion()
+        data.get_uniformity()
+        data.get_detected_rois()
+    except RuntimeError:
+        # If RuntimeError -> no data associated -> warn
+        ui.notification_show(
+            "There is no Field Uniformity/Distortion data for the current selection!",
+            type="warning",
+            id="no_data",
+        )
+        data = None
+
     return data
 
 
@@ -339,27 +538,8 @@ def update_objective_choices():
     # Get a list of unique objective choices
     o = np.unique(np.asarray(df_filtered["Objective"]))
     # Create a dictionary with adapted names for IDs
-    o_dict = {}
-    for i in o:
-        # keys=input values, values=shown to user
-        if i.startswith("ID"):
-            try:
-                na = get_objective_na(objective_df, i)
-                if na is None:
-                    # in case of parsing error
-                    na = "?"
-            except RuntimeError:
-                # in case not in objective_db
-                na = "?"
-            try:
-                mag = get_objective_mag(objective_df, i)
-                if mag is None:
-                    mag = "?"
-            except RuntimeError:
-                mag = "?"
-            o_dict[i] = f"{mag!s}x/{na} ({i})"
-        else:
-            o_dict[i] = i
+    o_dict = {i: get_nice_objective_name(objective_df, i) for i in o}
+
     # Update the ui selection
     ui.update_select("objective", choices=o_dict)
     # Update the objective choices

@@ -262,6 +262,8 @@ def test_getting_metric_functions():
 
     Does not run in pytest.
 
+    TODO would be nice to have parameterized functions
+
     Uniformity/distortion ImageID: 3454869
         Should not return any DF
     PSF ImageID: 3454870
@@ -310,6 +312,9 @@ def test_getting_metric_functions():
 
 
 if __name__ == "__main__":
+    # TODO would be nice to have parameterized functions
+    # TODO python file i could run manually to check all functions that do not run in pytest?!
+
     # Uniformity / distortion
     #     Metrology test dataset: 82171
     #     with imageID: 3454869
@@ -323,4 +328,5 @@ if __name__ == "__main__":
     # test_get_omero_ring_rois()
     # test_get_dates()
     # test_get_voxel_and_channel_names()
-    test_getting_metric_functions()
+    # test_getting_metric_functions()
+    pass

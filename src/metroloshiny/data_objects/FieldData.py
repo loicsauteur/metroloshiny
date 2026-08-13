@@ -162,10 +162,10 @@ class FieldData:
         middleValues = {"Ring_ID": [middleTile + 1]}
         for col in df.columns[1:]:
             col_ids = df.columns.get_loc(col)
-            average = df.iloc[middleTile - 5, col_ids]
+            average = df.iloc[middleTile - x, col_ids]
             average = average + df.iloc[middleTile - 1, col_ids]
             average = average + df.iloc[middleTile, col_ids]
-            average = average + df.iloc[middleTile + 4, col_ids]
+            average = average + df.iloc[middleTile + x - 1, col_ids]
             average = average / 4
             # middleValues.append(average)
             middleValues[col] = [average]
@@ -178,15 +178,123 @@ class FieldData:
         df_out = pd.concat([before, middle, after], ignore_index=True)
 
         # Add columns for X and Y positions (1-based)
-        x_arr = list(range(1, x + 1)) * y
-        y_arr = np.repeat(list(range(1, y + 1)), x)
+        # x_arr = list(range(1, x + 1)) * y  # FIXME (remove)
+        x_arr = [i for _ in range(y) for i in range(1, x + 1)]
+        # y_arr = np.repeat(list(range(1, y + 1)), x)  # FIXME (remove)
+        y_arr = [i for i in range(1, y + 1) for _ in range(x)]
 
         df_out["X"] = x_arr
         df_out["Y"] = y_arr
 
         return df_out
 
-    def get_field_of_rings_grid_size(self, date: str):
+    def get_distortion_dataframe(self, date: str) -> pd.DataFrame:
+        """
+        Create distortion dataframe for visualisation.
+
+        Per ring get ∆x, ∆y, and magnitude (absolute distance).
+        Averages in 4-connected manner the middle (missing) ring.
+
+        :param date: str, date to calculate the df from
+
+        :return: pd.DataFame with columns:
+            - Channel, x, y, dx, dy, magnitude
+        """
+        # Sanity checks
+        if not self.distortion_tables:
+            raise RuntimeError("The OMERO data seems not to be loaded yet.")
+        # FIXME probably not necessary! -> but i'd prefer using that for all the channels (TODO)
+        # if not date in self.distortion_tables.keys():
+        #     raise ValueError(
+        #         f"There is no distortion data associated with the date {date}."
+        #     )
+        if date not in self.roi_ideal.keys():
+            raise ValueError(
+                f"There are no ideal ROIs associated with the date {date}."
+            )
+        if date not in self.roi_detected.keys():
+            raise ValueError(
+                f"There are no detected ROIs associated with the date {date}."
+            )
+
+        # Get the ROIs {str(Ring_ID): tuple[x, y]}
+        n_x, n_y = self.get_field_of_rings_grid_size(date=date)
+        detected = self.roi_detected.get(date)
+        ideal = self.roi_ideal.get(date)
+        if len(detected) > 999:
+            raise NotImplementedError("More than 1000 Rings not supported!")
+        if n_x * n_y - 1 != len(detected):
+            raise RuntimeError(
+                f"Expected a missing center ROI. There are {n_x} X & {n_y} Y "
+                f"tiles = {n_x * n_y}, and {len(detected)} detected rings!"
+            )
+        if n_x * n_y % 2 == 0:
+            raise NotImplementedError(
+                "Only implemented for center Ring missing!"
+            )
+        # FIXME this is only for one channel (the last)
+        # Get the index of the middle
+        middle_idx = len(detected) // 2 + 1
+        # Idxs for 4-connected Rings before adding middle
+        four_1 = middle_idx - n_x
+        four_2 = middle_idx - 1
+        four_3 = middle_idx
+        four_4 = middle_idx + n_x - 1
+        fours = []
+        for f in [four_1, four_2, four_3, four_4]:
+            cur = []
+            cur.append(detected.get(str(f).zfill(3)))
+            cur.append(ideal.get(str(f).zfill(3)))
+            fours.append(cur)
+        # Calculate the average between the x and y coordinates
+        x_detected_avg = [x[0][0] for x in fours]
+        y_detected_avg = [x[0][1] for x in fours]
+        x_ideal_avg = [x[1][0] for x in fours]
+        y_ideal_avg = [x[1][1] for x in fours]
+        fours_avg = [
+            (np.average(x_detected_avg), np.average(y_detected_avg)),
+            (np.average(x_ideal_avg), np.average(y_ideal_avg)),
+        ]
+
+        # FIXME commit temp fix
+        fours_avg = fours_avg * 2
+
+        # Create dict for final dataframe
+        df_dict = {
+            # "Channel": ??, not yet (at the end...)
+            "x": [],  # tile position
+            "y": [],
+            "dx": [],
+            "dy": [],
+            "Magnitude": [],
+        }
+        # Currently not for channel
+        # FIXME continue here -> or better with something else until we have a better Table...
+        for k, _v in sorted(detected.items()):
+            x_tile = 1
+            y_tile = 1
+            x_tile = x_tile + 1  # FIXME commit temp fix
+            cur_ring = int(k)
+            if cur_ring % n_x:
+                x_tile = 1
+                y_tile = y_tile + 1
+            if cur_ring == middle_idx:
+                # add middle element before adding cur_ring as is
+                # increase also xy tile
+                df_dict["x"].append(1)
+                df_dict["y"].append(1)
+                df_dict["dx"].append(1)
+                df_dict["dy"].append(1)
+                df_dict["Magnitude"].append(1)
+
+            # Add element as is (including middle one)
+
+        # for k, v in sorted(detected.items()):
+        #     print(k)
+        # FIXME commit temp fix
+        return pd.DataFrame()
+
+    def get_field_of_rings_grid_size(self, date: str) -> tuple[float, float]:
         """
         Calculate the number of dtected rings in X and Y.
 

@@ -213,6 +213,7 @@ def read_nis_job_xlsx(path: str) -> pd.DataFrame:
         # If date is already a datetime object - DONT trust it
         # FIXME it is not really reliable how excel writes date formats
         elif isinstance(date, datetime):
+            # Reading dateformat may be wrong in most cases (day and month switched)
             # I saw that month and day may be switched
             date = "date-missing"
         else:

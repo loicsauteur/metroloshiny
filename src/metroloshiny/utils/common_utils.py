@@ -564,6 +564,39 @@ def get_objective_mag(df: pd.DataFrame, id: str) -> Optional[int]:
     return x
 
 
+def get_nice_objective_name(df: Optional[pd.DataFrame], id_name: str) -> str:
+    """
+    Get a nice name for an objective in the database.
+
+    Returns e.g. 40x/1.25 (ID1)
+        if id_name not in database, returns ?x/? (ID1)
+        if id_name does not start with "ID", returns input id_name
+
+    :param df: pd.DataFrame, of the objective database
+    :param id_name: str, objective ID
+
+    :return: str, e.g. "40x/1.25 (ID1)"
+    """
+    if not id_name.startswith("ID"):
+        return id_name
+    # Sanity check -> return input name if there is no dataframe
+    if df is None or df.empty:
+        return id_name
+    try:
+        mag = get_objective_mag(df, id_name)
+    except RuntimeError:
+        mag = None
+    try:
+        na = get_objective_na(df, id_name)
+    except RuntimeError:
+        na = None
+    if mag is None:
+        mag = "?"
+    if na is None:
+        na = "?"
+    return f"{mag}x/{na} ({id_name})"
+
+
 def point_2d_point_distance(
     p1: Union[tuple[float, float], list[float]],
     p2: Union[tuple[float, float], list[float]],
