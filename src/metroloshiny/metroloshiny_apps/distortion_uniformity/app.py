@@ -18,7 +18,7 @@ from shiny import reactive
 from shiny.express import input, render, ui
 from shinywidgets import render_widget
 
-from metroloshiny.data_objects.FieldData import FieldData
+from metroloshiny.data_objects.field_data import FieldData
 from metroloshiny.utils.common_utils import (
     get_nice_objective_name,
     get_version,
@@ -149,6 +149,7 @@ with ui.nav_panel(title=""):
 
                     @render.ui
                     def uni_date_sel_1():
+                        """Show date selection for 1st unifomrity figure."""
                         data = get_omero_data()
                         if data is None:
                             choices = []
@@ -163,6 +164,7 @@ with ui.nav_panel(title=""):
 
                     @render.ui
                     def uni_date_sel_2():
+                        """Show date selection for 2nd unifomrity figure."""
                         data = get_omero_data()
                         if data is None:
                             choices = []
@@ -432,6 +434,8 @@ def get_omero_data() -> Optional[FieldData]:
     # Create and load data
     data = FieldData(df, retrieve_omero=True)
 
+    # FIXME: report possible errors (other than the ones below...)
+    #   with the list data.problems
     # Check if there is really data associated
     try:
         data.get_distortion()

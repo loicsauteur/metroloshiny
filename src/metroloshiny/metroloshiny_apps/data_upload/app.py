@@ -8,7 +8,7 @@ from shiny.express import input, render, ui
 if TYPE_CHECKING:
     from shiny.types import FileInfo
 
-from metroloshiny.data_objects.PSFData import PSFData
+from metroloshiny.data_objects.psf_data import PSFData
 from metroloshiny.utils.common_utils import (
     check_if_date,
     get_nice_objective_name,

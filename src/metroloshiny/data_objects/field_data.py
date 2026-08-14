@@ -157,6 +157,7 @@ class FieldData:
                 f"Expected an 'Ring_ID' column, found only: {df.columns}"
             )
 
+        # FIXME middle should be calculated using XY tile numbers
         middleTile = len(df) // 2  # 0-based index
         # middleValues = [middleTile + 1] # like a row: Ring_ID, ch-middle-values
         middleValues = {"Ring_ID": [middleTile + 1]}
@@ -234,6 +235,7 @@ class FieldData:
             )
         # FIXME this is only for one channel (the last)
         # Get the index of the middle
+        # FIXME this should be calculated using XY tile numbers
         middle_idx = len(detected) // 2 + 1
         # Idxs for 4-connected Rings before adding middle
         four_1 = middle_idx - n_x

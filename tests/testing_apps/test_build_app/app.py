@@ -83,12 +83,14 @@ with ui.nav_panel(title="Data Upload"):
                     # Column 1 for drop-down selection
                     @render.ui
                     def mic_col_1():
+                        """Show drop down selections."""
                         return microscope, objective, info
                         # return ui.input_select("test", "test", choices=["a", "b"])
 
                     # Column 2 for "new" text entries
                     @render.ui
                     def mic_col_2():
+                        """Show 'new' entry text inputs."""
                         return new_mic_name, new_obj_name, new_info_name
                         # return ui.input_text("test2", "test2", value="test-val")
 

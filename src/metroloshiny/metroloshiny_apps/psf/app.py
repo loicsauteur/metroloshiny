@@ -173,6 +173,7 @@ with ui.nav_panel(title="PSF"):
 
                 @render_widget
                 def show_fwhm_plot():
+                    """Show the FWHM plot."""
                     _, df_plot = add_theoretical_fwhm()
                     return create_plot(
                         df_plot, y_range=[-10, psf_max_val.get()]
@@ -182,6 +183,7 @@ with ui.nav_panel(title="PSF"):
 
                 @render.data_frame
                 def show_fwhm_table():
+                    """Show the FWHM table."""
                     df_table, _ = add_theoretical_fwhm()
                     return df_table
 
@@ -191,11 +193,13 @@ with ui.nav_panel(title="PSF"):
 
                 @render.text
                 def show_ref_channel():
+                    """Inform about the reference channel."""
                     _, ref_channel = check_shift_ref_ch()
                     return f"Reference channel: {ref_channel}"
 
                 @render_widget
                 def show_shift_plot():
+                    """Show the chromatic shift over time plot."""
                     _, df_plot = get_shift_data()
                     return create_plot(df_plot)
 
@@ -203,11 +207,13 @@ with ui.nav_panel(title="PSF"):
 
                 @render.text
                 def show_ref_channel_xy():
+                    """Inform about the reference channel."""
                     _, ref_channel = check_shift_ref_ch()
                     return f"Reference channel: {ref_channel}"
 
                 @render.ui
                 def show_xy_date_selection():
+                    """Show the date selection for XY shift plot."""
                     df_table, _ = get_shift_data()
                     dates = df_table.columns[2:]
                     return ui.input_select(
@@ -217,6 +223,7 @@ with ui.nav_panel(title="PSF"):
                 @render.plot
                 @reactive.event(input.date_selection, input.ch_selection)
                 def show_xy_shift_plot():
+                    """Show the XY chromatic shift plot."""
                     df_table, _ = get_shift_data()
                     return create_xy_shift_plot(
                         df_table, input.date_selection()
@@ -226,6 +233,7 @@ with ui.nav_panel(title="PSF"):
 
                 @render.data_frame
                 def show_shift_table():
+                    """Show the chromatic shift table."""
                     df, _ = get_shift_data()
                     return df
 
@@ -857,6 +865,7 @@ def filter_by_sidebar_selections():
 @reactive.effect
 @reactive.event(df_data)
 def update_date_range_ui():
+    """Update the date range selection based on available dates."""
     df = df_data.get()
     if df is None or df.empty:
         return

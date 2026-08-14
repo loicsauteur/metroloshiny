@@ -41,6 +41,7 @@ with ui.nav_panel(title="Data Upload"):
 
                 @render.data_frame
                 def render_csv():
+                    """Render the csv file."""
                     # print("The selected file is:", input.csv_selection())
                     return render.DataGrid(parse_csv(), editable=True)
 
@@ -87,6 +88,7 @@ def update_patch(
 
 @reactive.calc
 def parse_csv():
+    """Parse a csv file."""
     csv: Optional[list[FileInfo]] = input.csv_selection()
     if csv is None:
         return pd.DataFrame()

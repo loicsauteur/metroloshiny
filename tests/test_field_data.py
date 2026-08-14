@@ -3,7 +3,7 @@
 import pandas as pd
 import pytest
 
-from metroloshiny.data_objects.FieldData import FieldData
+from metroloshiny.data_objects.field_data import FieldData
 from metroloshiny.utils.common_utils import set_local_file
 
 

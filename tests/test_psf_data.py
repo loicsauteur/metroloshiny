@@ -2,7 +2,7 @@
 
 import pandas as pd
 
-from metroloshiny.data_objects.PSFData import PSFData
+from metroloshiny.data_objects.psf_data import PSFData
 
 omero_4ch_multi_roi_full_kv = {
     "C1_FWHM_Axial_X_ROI_0277-0168-0137": 0,

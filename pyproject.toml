@@ -119,8 +119,15 @@ ignore = [
 ]
 
 [tool.ruff.lint.per-file-ignores]
-"__init__.py" = ["F401", "F403"]
-"**/app.py" = ["D100", "D103"] # Ignore missing docstring for app.py files
+"__init__.py" = [
+    "D104", # undocumented-public-package
+    "F401", # unused-import
+    "F403", # undefined-local-with-import-star
+]
+"**/app.py" = [
+    "D100", # undocumented-public-module
+    # "D103", # undocumented-public-function
+] # Ignore missing docstring for app.py files
 
 [tool.ruff.lint.pydocstyle]
 convention = "numpy"
