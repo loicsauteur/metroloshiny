@@ -1,4 +1,4 @@
-from typing import TYPE_CHECKING, Optional
+from typing import TYPE_CHECKING, Optional, Union
 
 import numpy as np
 import pandas as pd
@@ -11,6 +11,7 @@ if TYPE_CHECKING:
 from metroloshiny.data_objects.PSFData import PSFData
 from metroloshiny.utils.common_utils import (
     check_if_date,
+    get_nice_objective_name,
     get_today,
     get_version,
     list_duplicates,
@@ -41,16 +42,17 @@ sheet_doc = load_doc(dev_local_file=use_dev_local_file)
 # wsheet_psf, df = get_sheet(sheet_doc, "PSF", dev_local_file=use_dev_local_file)
 
 # TODO: maybe OMERO metrics via tags?
-#   TODO: PSF/bead images have tags = beads, psf
-#   TODO: Argolight images have tags = fwhm, argolight
+#       - PSF/bead images have tags = beads, psf
+#       - Argolight images have tags = fwhm, argolight
 
 # Reactive values       ------------------------------------------------------
 sheet_reference = reactive.value(None)
 dataframe = reactive.value(None)
+objective_df = reactive.value(None)
 category_list = ["Power", "PSF", "Uniformity/Distortion"]
 site_list = reactive.value([])
 microscope_list = reactive.value([])
-objective_list = reactive.value([])
+objective_list = reactive.value({})
 info_list = reactive.value([])
 
 # Build the GUI     items       ----------------------------------------------
@@ -1197,6 +1199,13 @@ def get_data():
     )
     sheet_reference.set(wsheet)
     dataframe.set(df)
+    # Load objectives dataframe conditionally
+    obj_df = None
+    if df["Objective"].str.startswith("ID").any():
+        _, obj_df = get_sheet(
+            sheet_doc, "Objectives", dev_local_file=use_dev_local_file
+        )
+    objective_df.set(obj_df)
 
 
 @reactive.effect
@@ -1238,8 +1247,10 @@ def update_objectives_selection():
     df = filter_by_column_value(df, "Microscope", input.microscope())
     # Update selection choices
     objs = list(np.unique(np.asarray(df["Objective"])))
-    objs.append("* New objective *")
-    objective_list.set(objs)
+    # Crate a dictionary with adapted names for IDs
+    o_dict = {i: get_nice_objective_name(objective_df.get(), i) for i in objs}
+    o_dict["* New objective *"] = "* New objective *"
+    objective_list.set(o_dict)
     ui.update_select("objective", choices=objective_list.get())
 
 
@@ -1397,18 +1408,24 @@ def check_similar_entries(existing: list[str], cur: str) -> bool:
 
 
 def check_new_text_entry(
-    cur_sel: str, cur_entry: str, existing: list[str], id: str
+    cur_sel: str,
+    cur_entry: str,
+    existing: Union[list[str], dict[str, str]],
+    id: str,
 ) -> str:
     """
     Check new text entries.
 
     :param cur_sel: str, of the drop-down selection
     :param cur_entry: str, of the text field
-    :param existing: list[str], list of drop-down choices
+    :param existing: list[str] or dict, list of drop-down choices (FYI dict for objectives)
     :param id: str, drop-down category (e.g. site, microscope, ...) for notifications
 
     :return: str, "final choice" or what needs to be entered into the table.
     """
+    # Convert existing to list if dict
+    if isinstance(existing, dict):
+        existing = list(existing.keys())
     # Check if drop-down requires text entry
     if cur_sel.startswith("*"):
         # Check if text was entered
