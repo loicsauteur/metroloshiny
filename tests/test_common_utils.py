@@ -197,7 +197,7 @@ def test_objective_db_functions():
     # Check "sub-functions"
     assert cu.get_objective_na(df, "ID1") == 0.2
     assert cu.get_objective_ri(df, "ID19") == 1.518
-    assert cu.get_objective_mag(df, "ID4") == 40
+    assert cu.get_objective_mag(df, "ID4 some information") == 40
     with pytest.raises(
         RuntimeError, match=r"The .*is not present in the objective database."
     ):
@@ -206,6 +206,8 @@ def test_objective_db_functions():
         RuntimeError, match=r"The .*is not present in the objective database."
     ):
         cu.get_objective_na(df, "ID1-YZ")
+    nice_name = cu.get_nice_objective_name(df, "IDN2 some info")
+    assert nice_name == "10x/0.45 (IDN2)"
 
 
 def test_check_if_date():

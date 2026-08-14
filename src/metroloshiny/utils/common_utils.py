@@ -461,13 +461,13 @@ def create_css_color_dict(
 
 
 def get_objective_info(
-    df: pd.DataFrame, id: str, info: str
+    df: pd.DataFrame, id_name: str, info: str
 ) -> Union[str, int, float]:
     """
     Load any of the values from the objective database for an objective.
 
     :param df: pd.DataFrame, of the objecive database
-    :param id: str, objective id number, e.g. ID17,
+    :param id_name: str, objective id number, e.g. "ID17" or "ID17 40x/1.3",
         Should/must always start with "ID"
     :param info: str, any of the column headers of the objecitve database
 
@@ -484,28 +484,31 @@ def get_objective_info(
             f"<{info}> is not a valid key for the objective database. "
             f"Please use: {df.columns[1:]}"
         )
+    # Allow IDs with spaces (ID1 40x/0.5)
+    if " " in id_name:
+        id_name = id_name.split(" ", maxsplit=1)[0]
     # Check that the requested ID is in the df
-    if id not in df["ID"].values:
+    if id_name not in df["ID"].values:
         raise ValueError(
-            f"The ID <{id}> is not present in the objective database."
+            f"The ID <{id_name}> is not present in the objective database."
         )
 
-    return df.loc[df["ID"] == id, info].iloc[0]
+    return df.loc[df["ID"] == id_name, info].iloc[0]
 
 
-def get_objective_na(df: pd.DataFrame, id: str) -> Optional[float]:
+def get_objective_na(df: pd.DataFrame, id_name: str) -> Optional[float]:
     """
     Get the NA for objective in the database.
 
     :param df: pd.DataFrame, of the objecive database
-    :param id: str, objective id number, e.g. ID17,
+    :param id_name: str, objective id number, e.g. "ID17" or "ID17 40x/1.3",
         Should/must always start with "ID"
 
     :return: float, NA of the objective, or None if parsing error
     """
     # Get the NA of the objective
     try:
-        na = get_objective_info(df, id, "NA")
+        na = get_objective_info(df, id_name, "NA")
     except ValueError as err:
         # Objective not in database
         raise RuntimeError(str(err)) from err
@@ -517,18 +520,18 @@ def get_objective_na(df: pd.DataFrame, id: str) -> Optional[float]:
     return na
 
 
-def get_objective_ri(df: pd.DataFrame, id: str) -> Optional[float]:
+def get_objective_ri(df: pd.DataFrame, id_name: str) -> Optional[float]:
     """
     Get the refractive index for objective in the database.
 
     :param df: pd.DataFrame, of the objecive database
-    :param id: str, objective id number, e.g. ID17,
+    :param id_name: str, objective id number, e.g. "ID17" or "ID17 40x/1.3",
         Should/must always start with "ID"
 
     :return: float, RI of the objective, or None if parsing error
     """
     try:
-        ri = get_objective_info(df, id, "Refractive Index")
+        ri = get_objective_info(df, id_name, "Refractive Index")
     except ValueError as err:
         # Objective not in database
         raise RuntimeError(str(err)) from err
@@ -540,18 +543,18 @@ def get_objective_ri(df: pd.DataFrame, id: str) -> Optional[float]:
     return ri
 
 
-def get_objective_mag(df: pd.DataFrame, id: str) -> Optional[int]:
+def get_objective_mag(df: pd.DataFrame, id_name: str) -> Optional[int]:
     """
     Get the magnification for objective in the database.
 
     :param df: pd.DataFrame, of the objecive database
-    :param id: str, objective id number, e.g. ID17,
+    :param id_name: str, objective id number, e.g. "ID17" or "ID17 40x/1.3",
         Should/must always start with "ID"
 
     :return: int, magnification of the objective, or None if parsing error
     """
     try:
-        x = get_objective_info(df, id, "Magnification")
+        x = get_objective_info(df, id_name, "Magnification")
     except ValueError as err:
         # Objective not in database
         raise RuntimeError(str(err)) from err
@@ -577,6 +580,9 @@ def get_nice_objective_name(df: Optional[pd.DataFrame], id_name: str) -> str:
 
     :return: str, e.g. "40x/1.25 (ID1)"
     """
+    # Allow inputs with more than just the ID number
+    if " " in id_name:
+        id_name = id_name.split(" ", maxsplit=1)[0]
     if not id_name.startswith("ID"):
         return id_name
     # Sanity check -> return input name if there is no dataframe
