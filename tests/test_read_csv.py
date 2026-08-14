@@ -84,4 +84,4 @@ def test_read_nis_job_xlsx():
 
 
 if __name__ == "__main__":
-    test_read_nis_job_xlsx()
+    pass

@@ -51,11 +51,11 @@ def _create_mock_omero_df_() -> pd.DataFrame:
     return pd.DataFrame().from_dict(_df)
 
 
-def test_basics():
+def test_fielddata_pytest():
     """
-    Do some basic tests on the FieldData object.
+    Test basic functionality of the FieldData object.
 
-    Tests that depend on getting OMERO data are skipped in pytest.
+    Does not rely on OMERO and runs in pytest.
     """
     # Create mock data
     df = _create_mock_omero_df_()
@@ -87,12 +87,46 @@ def test_basics():
     with pytest.raises(RuntimeError, match=pytest_match):
         data.get_ideal_rois()
 
-    # Test relying on OMERO data            ##################################
-    if set_local_file():
-        # Skip tests on local file (i.e. when in pytest)
-        return
 
-    # Load the OMERO data to the object
+@pytest.mark.manual
+def test_fielddata():
+    """
+    Test the FieldData object with OMERO connection.
+
+    Does only run in "pytest -m manual"
+    Repeats test also from test_fielddata_pytest function.
+    """
+    # Create mock data
+    df = _create_mock_omero_df_()
+    # Create data object WITH loading from OMERO
+    data = FieldData(base_df=df, retrieve_omero=False)
+
+    # Basic tests without OMERO data
+    assert len(data.base_df) == 4
+    assert len(data.base_df.columns) == 6
+    # Check the channel map function
+    ch_map = data._map_channel_names_(date="20260101")
+    assert ch_map.get("ch0") == "DAPI"
+    assert ch_map.get("ch1") == "488"
+    assert ch_map.get("ch2") == "561"
+    assert ch_map.get("ch3") == "Alexa 647"
+
+    # Sanity test
+    for ch_name in data.channel_names:
+        msg = f"{ch_name} not in {list(df['Channel'])}"
+        assert df["Channel"].astype(str).eq(ch_name).any(), msg
+
+    pytest_match = r".* data is not set yet."
+    with pytest.raises(RuntimeError, match=pytest_match):
+        data.get_distortion()
+    with pytest.raises(RuntimeError, match=pytest_match):
+        data.get_uniformity()
+    with pytest.raises(RuntimeError, match=pytest_match):
+        data.get_detected_rois()
+    with pytest.raises(RuntimeError, match=pytest_match):
+        data.get_ideal_rois()
+
+    # Load the OMERO data to the object         ##############################
     data._set_data_()
 
     # Check data
@@ -206,6 +240,7 @@ def test_heat_mapping():
     # Assert row 13 (remember 0-based index) col GFP expected average value
     assert df.iloc[len(df) // 2, 1] == 35.75
 
+    # TODO move this section to pytest.mark.manual decorated function
     # Test relying on OMERO data            ##################################
     if set_local_file():
         # Skip tests on local file (i.e. when in pytest)
@@ -213,10 +248,12 @@ def test_heat_mapping():
 
     # Test get_distortion_dataframe (for arrows and magnitude)
     # Load data for real tests
+    # TODO not finished yet
     data._set_data_()
     data.get_distortion_dataframe("20260101")
 
 
 if __name__ == "__main__":
     # test_basics()
-    test_heat_mapping()
+    # test_heat_mapping()
+    pass

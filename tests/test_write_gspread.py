@@ -21,7 +21,7 @@ def test_make_entries():
     """
     local_file = set_local_file()
     if local_file:
-        # Prevent running on local file
+        # Prevent running on local file (i.e. pytest)
         return
 
     doc = load_doc(dev_local_file=local_file)

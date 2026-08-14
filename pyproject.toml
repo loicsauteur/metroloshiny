@@ -35,6 +35,7 @@ types = { cmd="ty check ." }
 black = { cmd="black ." }
 spell = { cmd="typos ." }
 test = { cmd="pytest" }
+manual = { cmd="pytest -m manual"}
 all = { depends-on = ["fmt", "lint", "types", "black", "spell", "test"] }
 
 [tool.pixi.feature.dev.dependencies]
@@ -129,6 +130,12 @@ convention = "numpy"
 invalid-argument-type = "warn" # shiny reactive values setting causes this
 not-subscriptable = "warn" #
 unresolved-attribute = "warn" # thrown by omero API
+
+[tool.pytest.ini_options]
+markers = [
+    "manual: tests that are run explicitly rather than during normal pytest runs",
+]
+addopts = "-m 'not manual'"
 
 #[tool.pytest.ini_options]
 #testpaths = ["hooks"]

@@ -9,9 +9,6 @@ import pytest
 from omero.gateway import BlitzGateway
 
 import metroloshiny.utils.omero_utils as ou
-from metroloshiny.utils.common_utils import (
-    set_local_file,
-)
 
 
 def test_get_cred():
@@ -37,20 +34,17 @@ def test_get_cred():
         )
 
 
+@pytest.mark.manual
 def test_get_images_in_dataset_by_tag():
     """
     Test get_images_in_dataset_by_tag function.
 
-    Does not run in pytest.
+    Does only run in "pytest -m manual"
 
     Uniformity / distortion
     Metrology test dataset: 82171
     with imageID: 3454869
     """
-    # Skip pytest if on local file
-    if set_local_file():
-        return
-
     ds_id = 82171
     tag_uni = "field_uniformity"
     tag_dist = "field_distortion"
@@ -99,6 +93,7 @@ def test_get_images_in_dataset_by_tag():
         conn.c.closeSession()
 
 
+@pytest.mark.manual
 def test_get_omero_ring_rois():
     """
     Test field uniformity and distortion function.
@@ -110,16 +105,12 @@ def test_get_omero_ring_rois():
 
     TODO: maybe check several ROI related functions.
 
-    Does not run in pytest.
+    Does only run in "pytest -m manual"
 
     Uniformity / distortion
     Metrology test dataset: 82171
     with imageID: 3454869
     """
-    # Skip pytest if on local file
-    if set_local_file():
-        return
-
     ds_id = 82171
     tags = ["field_uniformity", "field_distortion"]
 
@@ -179,11 +170,12 @@ def test_get_omero_ring_rois():
         conn.c.closeSession()
 
 
+@pytest.mark.manual
 def test_get_dates():
     """
     Test the get_dates function.
 
-    Does not run in pytest.
+    Does only run in "pytest -m manual"
 
     ImageID with acquisition date: 3454869
         acquisition date =  2026-02-26 08:55:41
@@ -191,10 +183,6 @@ def test_get_dates():
     ImageID w/o  acquisition date: 3454870
         import date =       2026-08-05 08:37:43
     """
-    # Skip pytest if on local file
-    if set_local_file():
-        return
-
     try:
         usr, pwd, host, port = ou.get_cred()
         conn = BlitzGateway(
@@ -218,19 +206,16 @@ def test_get_dates():
         conn.c.closeSession()
 
 
+@pytest.mark.manual
 def test_get_voxel_and_channel_names():
     """
     Test the get_dates function.
 
-    Does not run in pytest.
+    Does only run in "pytest -m manual"
 
     Leica ImageID: 3454869
     Nikon ImageID: 3454870
     """
-    # Skip pytest if on local file
-    if set_local_file():
-        return
-
     # Leica Image
     image_id = 3454869
     voxels, ch_names = ou.get_image_voxelsize_channel_names(image_id=image_id)
@@ -256,11 +241,12 @@ def test_get_voxel_and_channel_names():
         ou.get_image_voxelsize_channel_names(image_id=image_id)
 
 
+@pytest.mark.manual
 def test_getting_metric_functions():
     """
     Test the functions related to getting metric data.
 
-    Does not run in pytest.
+    Does only run in "pytest -m manual"
 
     TODO would be nice to have parameterized functions
 
@@ -270,10 +256,6 @@ def test_getting_metric_functions():
         Should return DF with Key, Value columns
 
     """
-    # Skip pytest if on local file
-    if set_local_file():
-        return
-
     try:
         usr, pwd, host, port = ou.get_cred()
         conn = BlitzGateway(

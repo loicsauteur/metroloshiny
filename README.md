@@ -188,7 +188,14 @@ pixi install --all
 > pixi clean cache
 > pixi install --all
 > ```
-
+<!--
+To bump the version:
+- update the version in the index.html
+- commit the change
+- add a tag
+- push
+Follow the install instructions before ! I am not sure if local pixi env update is necessary for the push !
+-->
 
 ## Testing locally
 
@@ -197,6 +204,10 @@ Playwright must be installed in the dev environment before running tests (shiny 
 ```bash
 pixi run playwright
 ```
+
+There are 2 different kind of tests:
+1. General pytest executed with `pixi run test` (or during committing)
+2. Manual test executed with `pixi run manual` (**not** during committing), for tests that rely on e.g. connecting to OMERO.
 
 <!--
 Commit changes:
@@ -392,6 +403,9 @@ Keep pixi up to date:
 `pixi self-update`
 
 Update as follows (using deployment automation):
+<!--
+'clean' and 'clean cache' will ensure proper version display
+-->
 
 ```bash
 git pull
@@ -400,3 +414,12 @@ pixi clean cache
 pixi install
 pixi run deploy
 ```
+
+
+<!--
+Random notes:
+- Get the total line count in project with:
+git ls-files | grep "\.py$" | xargs wc -l
+   - or together with the word count:
+git ls-files | grep "\.py$" | xargs wc -lw
+-->
