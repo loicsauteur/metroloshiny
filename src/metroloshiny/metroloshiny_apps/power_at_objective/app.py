@@ -9,6 +9,7 @@ from shinywidgets import render_widget
 
 from metroloshiny.utils.common_utils import (
     create_css_color_dict,
+    get_nice_objective_name,
     get_version,
     set_local_file,
 )
@@ -30,6 +31,12 @@ sheet_doc = load_doc(dev_local_file=use_dev_local_file)
 wsheet_psf, dataframe = get_sheet(
     sheet_doc, "Power", dev_local_file=use_dev_local_file
 )
+# Load objectives dataframe conditionally
+objective_df = None
+if dataframe["Objective"].str.startswith("ID").any():
+    _, objective_df = get_sheet(
+        sheet_doc, "Objectives", dev_local_file=use_dev_local_file
+    )
 
 # FIXME: on line 466 - not sure how: UserWarning: Ignoring `palette` because no `hue` variable has been assigned.
 
@@ -54,7 +61,9 @@ with ui.nav_panel(title="Light Source Power"):
             ui.input_select("info", "Filter by info column", choices=[])
             ui.input_select("kind", "Select light source kind", choices=[])
             ui.input_select("line", "Select a wavelength [nm]", choices=[])
-            ui.input_select("power", "Select power [%]", choices=[])
+            ui.input_select(
+                "power", "Select power [%]", choices=[], multiple=True
+            )
 
         # Plot linearity        ----------------------------------------------
         with ui.navset_card_underline(title="Power linearity"):
@@ -104,12 +113,7 @@ with ui.nav_panel(title="Light Source Power"):
                 def plot_power_stability():
                     """Render the power stability plot."""
                     df = create_power_stability_table()
-                    # Check line and power selections, and df has data
-                    line = input.line()
-                    prct = input.power()
-                    if None in [line, prct] or len(df.columns) < 3:
-                        # Show no plot if line or power is None
-                        return create_power_stability_plot(pd.DataFrame())
+                    # Plot creation takes care of all checks
                     return create_power_stability_plot(df)
 
             with ui.nav_panel(title="Table"):
@@ -287,8 +291,10 @@ def update_objective_choices():
     df = filter_by_column_value(df, "Microscope", input.microscope())
     # Get a list of unique objective choices
     o = np.unique(np.asarray(df["Objective"]))
+    # Create a dictionary with adapted names for IDs
+    o_dict = {i: get_nice_objective_name(objective_df, i) for i in o}
     # Update the ui selection
-    ui.update_select("objective", choices=list(o))
+    ui.update_select("objective", choices=o_dict)
 
 
 @reactive.effect
@@ -375,10 +381,9 @@ def update_power_choices():
     if len(p) == 0:
         ui.update_select("power", choices=[])
         return
-    # Append entry for "All"
+    # Update all choices and select the first one
     p = [str(i) for i in p]
-    p.append("All")
-    ui.update_select("power", choices=p)
+    ui.update_select("power", choices=p, selected=p[0])
 
 
 # General functions         --------------------------------------------------
@@ -448,59 +453,37 @@ def create_power_stability_plot(df: pd.DataFrame):  # -> sns.lineplot:
 
     :return: sns.lineplot
     """
-    # Do not show a plot if both power and line are set to "All"
+    # Show not plot if there is no or not enough data
+    if df.empty or len(df.columns) < 3:
+        return no_data_fig()
     line = input.line()
     prct = input.power()
-    if line == "All" and prct == "All":
-        return no_data_fig("Cannot show all lines at all powers!")
-    # Show not plot if there is no data
-    if df.empty:
-        return no_data_fig()
+    # Make sure that a power is selected
+    if prct is None or len(prct) == 0:
+        return no_data_fig("Please select Power % values")
+    # Do not show a plot if both line is set to "All" and multiple powers
+    if line == "All" and len(prct) > 1:
+        return no_data_fig(
+            "Cannot show all lines for multiple power selections!"
+        )
 
     # Merge line/power columns and pivot the table
     line = None if line == "All" else float(line)
-    prct = None if prct == "All" else float(prct)
+    # Filter df by all selected prct values
+    prct = [float(p) for p in prct]
+    df = df.copy()
+    df = df[df["Power [%]"].isin(prct)]
+    # Set prct = None, for multi-power, because (see next comment)
+    prct = None if len(prct) > 1 else prct[0]
+    # line and power cannot be both None
     df = get_power_over_time_data(df=df, line=line, power_prct=prct)
 
-    # Create the plot #####################################
-    # Group the plot by power or line and colors accordingly
-    # plot = sns.lineplot(
-    #     data=df,
-    #     x="Date",
-    #     y="mW",
-    #     markers=True,
-    #     # ensure markers
-    #     style=df.columns[2] if input.power() == "All" else df.columns[1],
-    #     # keep solid lines
-    #     dashes=False,
-    #     # group by "Power [%]" if prct=all, else by "Line"
-    #     hue=df.columns[2] if input.power() == "All" else df.columns[1],
-    #     palette="turbo",
-    #     # adjust line colors
-    #     hue_norm=(0, 100) if input.power() == "All" else (380, 700),
-    #     # ensure precise line values
-    #     legend="full",
-    # )
-
-    # # Move legend to the right of the plot
-    # legend = ax.get_legend()
-    # if legend is not None:
-    #     legend.set_bbox_to_anchor((1.05, 1))
-    #     legend.set_loc("upper left")
-    # # X-labels adjustments
-    # plt.xticks(rotation=45, ha="right")  # rotate ticks
-    # ticks = ax.get_xticks()
-    # new_ticks = np.linspace(0, len(ticks) - 1, min(10, len(ticks)), dtype=int)
-    # ax.set_xticks(new_ticks)
-    # ax.set_xlabel("")
-    # fig.tight_layout()
-    # return plot
-
     # Create a plot with plotly
-    group_col = df.columns[2] if input.power() == "All" else df.columns[1]
+    group_col = df.columns[1] if input.line() == "All" else df.columns[2]
     wavelengths = np.unique(np.asarray(df[df.columns[1]]))
+    # Create a color map if selection is "All" for lines
     color_map = (
-        {} if input.power() == "All" else create_css_color_dict(wavelengths)
+        create_css_color_dict(wavelengths) if input.line() == "All" else {}
     )
 
     plot = px.line(
