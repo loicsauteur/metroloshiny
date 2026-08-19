@@ -30,6 +30,7 @@ from metroloshiny.utils.dataframe_utils import (
 from metroloshiny.utils.plot_utils import (
     no_data_plotly,
     no_data_seaborn,
+    normalize_df,
     normalize_percentile,
 )
 from metroloshiny.utils.read_file import get_sheet, load_doc
@@ -140,8 +141,7 @@ with ui.nav_panel(title=""):
                     df = df.sort_values(by=["Date", "Channel"])
                     return df
 
-        # Distortion & Uniformity - Heat-map like plots     ##################
-        # TODO Next create fake images?!
+        # Uniformity - Heat-map like plots                  ##################
         with ui.navset_card_underline(title="Field Uniformity"):
             with ui.nav_panel(title="Plot"):
                 # Add 2 columns for date comparison selections
@@ -155,6 +155,7 @@ with ui.nav_panel(title=""):
                             choices = []
                         else:
                             choices = data.get_uniformity().keys()
+                        # Unfortunately a slider does not work nicely
                         uni_date_selector_1 = ui.input_select(
                             "uni_date_selector_1",
                             "Select a date",
@@ -171,6 +172,7 @@ with ui.nav_panel(title=""):
                         else:
                             choices = data.get_uniformity().keys()
                             choices = list(choices)
+                        # Unfortunately a slider does not work nicely
                         uni_date_selector_2 = ui.input_select(
                             "uni_date_selector_2",
                             "Select a date",
@@ -179,7 +181,6 @@ with ui.nav_panel(title=""):
                                 None if len(choices) == 0 else choices[-1]
                             ),
                         )
-                        # FIXME maybe I can set selected to the last date already??
                         return uni_date_selector_2
 
                 @render.ui
@@ -191,21 +192,43 @@ with ui.nav_panel(title=""):
                     )
                     return uni_ch_selector
 
-                # How to plot
-                # Drop down channel selector
-                # layout_column_warp with 2 drop-down date selectors
-                # Plot with 2 figures to compare side by side (per channel only)
-
                 @render.plot
                 def plot_field_uniformity():
                     """Plot field uniformity of 2 dates side by side."""
                     return create_uniformity_plot()
 
+        # Distortion - Heat-map like plots                  ##################
+        with ui.navset_card_underline(title="Field Distortion"):
+            with ui.nav_panel(title="Plot"):
+
+                @render.text
+                def temp_1():
+                    """Show temp message."""
+                    # TODO try arrow plot with vectors calculated from ROIs
+                    return "Under construction"
+
+                @render.plot
+                def show_distortion_from_rois():
+                    """
+                    Plot distortion calculated from ROIs.
+
+                    # TODO will be replaced by table data, to show distortion for each channel
+                    """
+                    return create_distortion_plot()
+
+            with ui.nav_panel(title="Table"):
+                # FIXME not sure if there will be a table
+
+                @render.text
+                def temp_2():
+                    """Show temp message."""
+                    return "Under construction"
+
 
 # Ideas:
 # Uniformity        --------------
 # heat map: normalised -- DONE!
-# Line profiles (averages?) in different directions (also diagonal?) ???
+# Line profiles (averages?) in different directions (also diagonal?) ?? TODO?
 
 
 # Distortion        ------------
@@ -257,6 +280,98 @@ with ui.nav_panel(title=""):
 
 
 @reactive.calc
+def create_distortion_plot():
+    """
+    Create a distortion quiver plot.
+
+    TODO: maybe the coloring as heat-map background and arrows just one color?
+        Make a few different versions
+        - with background heat map
+        - arrows just the arrow head
+        - full arrows in one color or color map, etc.
+
+    TODO for comparing 2 dates, the coloring should be the same for the 2 plots,
+        i.e. normalise the 2 dataframes together?
+    """
+    omero_data = get_omero_data()
+    if omero_data is None:
+        return no_data_seaborn()
+
+    # Get the plotting data
+    df = omero_data.get_distortion_dataframe_from_rois(
+        "20260101"
+    )  # FIXME hard-coded date
+    # Set the XY tiles to 0-based index
+    df["x"] = df["x"] - 1
+    df["y"] = df["y"] - 1
+
+    # Create magnitude heat-map
+    df_heat = df.pivot(index="y", columns="x", values="Magnitude")
+
+    df_heat = df_heat.to_numpy()
+
+    # Create quiver plot
+    fig, axes = plt.subplots()
+    heat_map = axes.imshow(
+        df_heat, interpolation="bicubic", origin="upper", cmap="viridis"
+    )
+
+    # Quiver = arrows with long shaft...
+    # Normalize the dataframe values (for arrow lengths)
+    df = normalize_df(df, start_col=3)
+    axes.quiver(
+        df["x"],
+        df["y"],
+        df["dx"],
+        df["dy"],
+        # df["Magnitude"], # for coloring arrows in viridis
+        color="white",
+        angles="xy",
+        scale_units="xy",
+        scale=0.5,  # inversly scales the length of arrows (2 looks not bad)
+        # Need a way to scale more dynamically!
+        pivot="tail",  # default = "tail", arrow anchoring part to xy tile
+        # width=0.003,  # default
+        alpha=1,
+        # label="test-label",
+        headwidth=5,  # default 3, Head width as multiple of shaft width.
+        headlength=7,  # default 5, Head length as multiple of shaft width.
+        headaxislength=5,  # default 4.5, Head length at shaft intersection as multiple of shaft width
+        minshaft=0.5,  # default 1, Length below which arrow scales, in units of head length - DONT use
+        # minlength=0.0001,  # doesnt really do anything
+        # width=0.0001,
+    )
+
+    # Add arrows heads which point to the center of the tile
+    # for _, row in df.iterrows():
+    #     ax.add_patch(
+    #         FancyArrowPatch(
+    #             (row["x"] - row["dx"], row["y"] - row["dy"]),
+    #             (row["x"], row["y"]),
+    #             arrowstyle="-|>, head_length=10, head_width=3",
+    #             mutation_scale=1,
+    #             mutation_aspect=None,
+    #             linewidth=0,
+    #             color="red",
+    #         ),
+    #     )
+
+    axes.set_aspect("equal")
+    axes.axis("off")
+
+    # Add colorbar
+    cbar = plt.colorbar(heat_map)
+    cbar.set_label("Magnitude (currently in pixels)")
+    # ax.legend() # not needed
+    mic = input.microscope()
+    obj = input.objective()
+    obj = get_nice_objective_name(objective_df, obj)
+    info = input.info()
+    fig.suptitle(f"Field Distortion (from OMERO ROIs):\n{mic} {obj} ({info})")
+    return fig
+
+
+@reactive.calc
 def create_uniformity_plot():
     """
     Create a heat-map like plot for the Filed Uniformity between 2 dates.
@@ -283,8 +398,16 @@ def create_uniformity_plot():
     df_1 = normalize_percentile(df_1).to_numpy()
     df_2 = normalize_percentile(df_2).to_numpy()
 
-    # Create plot
-    fig, axes = plt.subplots(1, 2)
+    # Create an image with the difference of the two (in %)
+    diff = (df_1 - df_2) * 100
+
+    # Create plot (4 rows, last one for the scale bar)
+    fig, axes = plt.subplots(
+        nrows=1,
+        ncols=4,
+        figsize=(12, 4),
+        gridspec_kw={"width_ratios": [1, 1, 1, 0.2]},
+    )
     # Interpolation = bicubic for smooth interpolation
     axes[0].imshow(
         df_1, interpolation="bicubic", origin="upper", cmap="viridis"
@@ -295,15 +418,34 @@ def create_uniformity_plot():
     )
     axes[1].set_title(f"{date2} - {channel}")
 
-    for ax in axes:
-        ax.axis("off")
+    # Add the difference plot with colors blue>white>red (always show values -100 to + 100)
+    diff_img = axes[2].imshow(
+        diff,
+        interpolation="bicubic",
+        origin="upper",
+        cmap="bwr",
+        vmin=-100,
+        vmax=100,
+    )
+    axes[2].set_title("Difference")
+    # Add color bar for the difference plot
+    # Can't make it look better than that. Depends on the window size...
+    cbar = fig.colorbar(diff_img, ax=axes[3])
+    cbar.set_label("Difference [%]")
+
+    # Hide the frames / ticks except for the difference plot
+    for i, ax in enumerate(axes):
+        if i == 2:
+            ax.set_xticks([])
+            ax.set_yticks([])
+        else:
+            ax.axis("off")
 
     mic = input.microscope()
     obj = input.objective()
     obj = get_nice_objective_name(objective_df, obj)
     info = input.info()
     fig.suptitle(f"Field Uniformity: {mic} {obj} ({info})")
-
     return fig
 
 

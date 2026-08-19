@@ -4,7 +4,6 @@ import pandas as pd
 import pytest
 
 from metroloshiny.data_objects.field_data import FieldData
-from metroloshiny.utils.common_utils import set_local_file
 
 
 def _create_mock_omero_df_() -> pd.DataFrame:
@@ -98,7 +97,7 @@ def test_fielddata():
     """
     # Create mock data
     df = _create_mock_omero_df_()
-    # Create data object WITH loading from OMERO
+    # Create data object without loading from OMERO
     data = FieldData(base_df=df, retrieve_omero=False)
 
     # Basic tests without OMERO data
@@ -240,20 +239,71 @@ def test_heat_mapping():
     # Assert row 13 (remember 0-based index) col GFP expected average value
     assert df.iloc[len(df) // 2, 1] == 35.75
 
-    # TODO move this section to pytest.mark.manual decorated function
-    # Test relying on OMERO data            ##################################
-    if set_local_file():
-        # Skip tests on local file (i.e. when in pytest)
-        return
 
-    # Test get_distortion_dataframe (for arrows and magnitude)
-    # Load data for real tests
-    # TODO not finished yet
-    data._set_data_()
-    data.get_distortion_dataframe("20260101")
+@pytest.mark.manual
+def test_get_distortion_dataframe_from_rois():
+    """
+    Test the arrow heat map test function.
+
+    Runs only with 'pixi run manual'
+    """
+    # Create mock data
+    df = _create_mock_omero_df_()
+    # Create data object WITH loading from OMERO
+    data = FieldData(base_df=df, retrieve_omero=True)
+    date = "20260101"
+    x, y = data.get_field_of_rings_grid_size(date)
+
+    # Test the function (expected way)
+    df = data.get_distortion_dataframe_from_rois(date)
+    # There should be one more entry...
+    assert len(df) == len(data.get_distortion().get(date)) + 1
+    # And x * y tiles entries
+    assert len(df) == x * y
+
+    for idx in range(1, x * y + 1):
+        assert idx in list(df["Ring_ID"])
+    # TODO assert tile X (in range(1, n Y tiles + 1)) appears Y times in df and vice versa
+    for idx in range(1, x + 1):
+        msg = f"{idx} occurs {list(df['x']).count(idx)} instead of {y}"
+        assert y == list(df["x"]).count(idx), msg
+    for idy in range(1, y + 1):
+        msg = f"{idy} occurs {list(df['y']).count(idy)} instead of {x}"
+        assert x == list(df["y"]).count(idy), msg
+
+    middle_row = df.iloc[len(df) // 2]
+    assert middle_row["x"] == middle_row["y"] == x // 2 + 1 == y // 2 + 1
+    # Check if values were calculated correctly
+    d_x = df.iloc[len(df) // 2 - x, 3]
+    d_x = d_x + df.iloc[len(df) // 2 - 1, 3]
+    d_x = d_x + df.iloc[len(df) // 2 + 1, 3]
+    d_x = d_x + df.iloc[len(df) // 2 + x, 3]
+    d_x = d_x / 4
+    d_y = df.iloc[len(df) // 2 - x, 4]
+    d_y = d_y + df.iloc[len(df) // 2 - 1, 4]
+    d_y = d_y + df.iloc[len(df) // 2 + 1, 4]
+    d_y = d_y + df.iloc[len(df) // 2 + x, 4]
+    d_y = d_y / 4
+    mag = df.iloc[len(df) // 2 - x, 5]
+    mag = mag + df.iloc[len(df) // 2 - 1, 5]
+    mag = mag + df.iloc[len(df) // 2 + 1, 5]
+    mag = mag + df.iloc[len(df) // 2 + x, 5]
+    mag = mag / 4
+
+    assert d_x == middle_row["dx"]
+    assert d_y == middle_row["dy"]
+    # The middle Magnitude is != the average of the individual magnitudes
+    # Calculate it again, using individual ∆x and ∆y
+    calc_mag = d_x * d_x
+    calc_mag = calc_mag + d_y * d_y
+    calc_mag = calc_mag**0.5
+    msg = f"Calculated magnitude {calc_mag} != {middle_row['Magnitude']}"
+    assert calc_mag == middle_row["Magnitude"], msg
+    # assert mag == middle_row["Magnitude"] # does not need to be the same...
 
 
 if __name__ == "__main__":
     # test_basics()
     # test_heat_mapping()
+    # test_get_distortion_dataframe_from_rois()
     pass

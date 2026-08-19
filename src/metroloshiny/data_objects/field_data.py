@@ -6,6 +6,7 @@ import numpy as np
 import pandas as pd
 from omero.gateway import BlitzGateway
 
+from metroloshiny.utils.common_utils import point_2d_point_distance
 from metroloshiny.utils.omero_utils import (
     get_cred,
     get_omero_ring_rois,
@@ -157,8 +158,8 @@ class FieldData:
                 f"Expected an 'Ring_ID' column, found only: {df.columns}"
             )
 
-        # FIXME middle should be calculated using XY tile numbers
-        middleTile = len(df) // 2  # 0-based index
+        # Calculate the middle tile (also for non-square field of rings)
+        middleTile = x * (y // 2) + x // 2  # 0-based index
         # middleValues = [middleTile + 1] # like a row: Ring_ID, ch-middle-values
         middleValues = {"Ring_ID": [middleTile + 1]}
         for col in df.columns[1:]:
@@ -179,9 +180,7 @@ class FieldData:
         df_out = pd.concat([before, middle, after], ignore_index=True)
 
         # Add columns for X and Y positions (1-based)
-        # x_arr = list(range(1, x + 1)) * y  # FIXME (remove)
         x_arr = [i for _ in range(y) for i in range(1, x + 1)]
-        # y_arr = np.repeat(list(range(1, y + 1)), x)  # FIXME (remove)
         y_arr = [i for i in range(1, y + 1) for _ in range(x)]
 
         df_out["X"] = x_arr
@@ -189,7 +188,7 @@ class FieldData:
 
         return df_out
 
-    def get_distortion_dataframe(self, date: str) -> pd.DataFrame:
+    def get_distortion_dataframe_from_rois(self, date: str) -> pd.DataFrame:
         """
         Create distortion dataframe for visualisation.
 
@@ -234,9 +233,11 @@ class FieldData:
                 "Only implemented for center Ring missing!"
             )
         # FIXME this is only for one channel (the last)
-        # Get the index of the middle
-        # FIXME this should be calculated using XY tile numbers
-        middle_idx = len(detected) // 2 + 1
+
+        # TODO continue here
+        # Get the middle index using tile numbers (supports non-square field of rings)
+        middle_idx = n_x * (n_y // 2) + n_x // 2 + 1  # 1-based index
+
         # Idxs for 4-connected Rings before adding middle
         four_1 = middle_idx - n_x
         four_2 = middle_idx - 1
@@ -258,12 +259,10 @@ class FieldData:
             (np.average(x_ideal_avg), np.average(y_ideal_avg)),
         ]
 
-        # FIXME commit temp fix
-        fours_avg = fours_avg * 2
-
         # Create dict for final dataframe
         df_dict = {
             # "Channel": ??, not yet (at the end...)
+            "Ring_ID": [],
             "x": [],  # tile position
             "y": [],
             "dx": [],
@@ -272,29 +271,48 @@ class FieldData:
         }
         # Currently not for channel
         # FIXME continue here -> or better with something else until we have a better Table...
-        for k, _v in sorted(detected.items()):
-            x_tile = 1
-            y_tile = 1
-            x_tile = x_tile + 1  # FIXME commit temp fix
+        x_tile = 1
+        y_tile = 1
+        for k, p_detected in sorted(detected.items()):
+            # Calculate vector
+            p_ideal = ideal.get(k)
+            d_x = p_detected[0] - p_ideal[0]
+            d_y = p_detected[1] - p_ideal[1]
+
             cur_ring = int(k)
-            if cur_ring % n_x:
+            # Adjust XY tiles according to new rows
+            if x_tile > n_x:
                 x_tile = 1
                 y_tile = y_tile + 1
+            # Add the middle index
             if cur_ring == middle_idx:
-                # add middle element before adding cur_ring as is
-                # increase also xy tile
-                df_dict["x"].append(1)
-                df_dict["y"].append(1)
-                df_dict["dx"].append(1)
-                df_dict["dy"].append(1)
-                df_dict["Magnitude"].append(1)
+                # add middle element before adding cur_ring as it is
+                df_dict["Ring_ID"].append(cur_ring)
+                df_dict["x"].append(x_tile)
+                df_dict["y"].append(y_tile)
+                df_dict["dx"].append(fours_avg[0][0] - fours_avg[1][0])
+                df_dict["dy"].append(fours_avg[0][1] - fours_avg[1][1])
+                df_dict["Magnitude"].append(
+                    point_2d_point_distance(fours_avg[0], fours_avg[1])
+                )
+                # Update counters
+                x_tile = x_tile + 1
+            # After middle increate cur_ring by 1
+            if cur_ring >= middle_idx:
+                cur_ring = cur_ring + 1
 
             # Add element as is (including middle one)
+            df_dict["Ring_ID"].append(cur_ring)
+            df_dict["x"].append(x_tile)
+            df_dict["y"].append(y_tile)
+            df_dict["dx"].append(d_x)
+            df_dict["dy"].append(d_y)
+            df_dict["Magnitude"].append((d_x**2 + d_y**2) ** 0.5)
+            # Increment the x tile count
+            x_tile = x_tile + 1
 
-        # for k, v in sorted(detected.items()):
-        #     print(k)
-        # FIXME commit temp fix
-        return pd.DataFrame()
+        # Convert dictionary to dataframe
+        return pd.DataFrame().from_dict(df_dict)
 
     def get_field_of_rings_grid_size(self, date: str) -> tuple[float, float]:
         """
