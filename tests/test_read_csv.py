@@ -83,5 +83,28 @@ def test_read_nis_job_xlsx():
     assert "date-missing" in df.columns
 
 
+def test_read_simple_xlsx():
+    """Test reading a simple power measurement xlsx file."""
+    # Get the example file relative from this file
+    example_dir = Path(__file__).parent.parent / "example_files"
+    path = example_dir / "example_simple_power_measurement.xlsx"
+
+    df = rc.read_simple_xlsx(path=str(path))
+    assert len(df) == 8
+
+    # Test file with wrong measurement unit
+    test_dir = Path(__file__).parent.parent / "tests" / "test_files"
+    path = test_dir / "simple_power_measurement_1.xlsx"
+    with pytest.raises(NotImplementedError, match=r"Measurement unit *"):
+        rc.read_simple_xlsx(path=str(path))
+
+    # Test file with missing value
+    path = test_dir / "simple_power_measurement_2.xlsx"
+    with pytest.raises(
+        NotImplementedError, match=r"Data contains missing val*"
+    ):
+        rc.read_simple_xlsx(path=str(path))
+
+
 if __name__ == "__main__":
     pass

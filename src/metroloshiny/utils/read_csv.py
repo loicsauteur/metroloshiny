@@ -27,6 +27,7 @@ def get_power_measurement(path: str) -> tuple[str, pd.DataFrame]:
 
     :return: tuple[str, pd.DataFrame]
         - str, file type output identifier
+            - "simpleXLSX" for a simple (manual) xlsx file
             - "nis_job" for Tom's file
             - "thorlabs" for Simone's file
             - TODO others to be implemented
@@ -35,23 +36,26 @@ def get_power_measurement(path: str) -> tuple[str, pd.DataFrame]:
     """
     # Init some place holders
     df = None
-    possible_exception = ""
+    possible_exception = []
     if path.endswith(".xlsx"):
+        # Try reading simple xlsx file
+        try:
+            df = read_simple_xlsx(path)
+            return "simpleXLSX", df
+        except Exception as err:
+            possible_exception.append(f"Simple XLSX file: {err!s}")
         # Try reading NIS JOB xlsx from Tom
         try:
             df = read_nis_job_xlsx(path)
             return "nis_job", df
         except Exception as err:
-            possible_exception = err
+            possible_exception.append(f"ThorLabs XLSX file: {err!s}")
         # TODO implement try reading other xlsx files
 
-        # If df is None, reading the file is not implemented
-        if df is None:
-            raise NotImplementedError(
-                f"The .xlsx file could not be read: {possible_exception}"
-            )
-        else:
-            raise NotImplementedError("No reader for your file implemented!")
+        # Reading the file is not implemented
+        raise NotImplementedError(
+            f"The .xlsx file could not be read: {possible_exception}"
+        )
 
     elif path.endswith(".csv"):
         # Try reading Thorlabs csv from Simone
@@ -62,13 +66,11 @@ def get_power_measurement(path: str) -> tuple[str, pd.DataFrame]:
             possible_exception = err
         # TODO implement try reading other csv files
 
-        # If df is None, reading the file is not implemented
-        if df is None:
-            raise NotImplementedError(
-                f"The .csv file could not be read: {possible_exception}"
-            )
-        else:
-            raise NotImplementedError("No reader for your file implemented!")
+        # Eeading the file is not implemented
+        raise NotImplementedError(
+            f"The .csv file could not be read: {possible_exception}"
+        )
+
     else:
         raise NotImplementedError(f"Your file type is not implemented: {path}")
 
@@ -152,6 +154,57 @@ def read_thorlabs_csv(path: str) -> pd.DataFrame:
 
     # Add the wavelength as first column
     df.insert(0, "? Line [nm]", wavelength)
+    return df
+
+
+def read_simple_xlsx(path: str) -> pd.DataFrame:
+    """
+    Try reading xlsx file manually generated (power measurements).
+
+    Creates a dataframe similar to the google spread sheet, with columns:
+    ["? Line [nm]", "Power [%]", "'the date'"]
+
+    :raises: NotImplementedError, if not xlsx or file not as expected.
+
+    :return: pd.DataFrame
+    """
+    # Sanity test
+    if not isinstance(path, str):
+        raise IOError("Only string paths are supported.")
+    # Only support csv files
+    if not path.endswith(".xlsx"):
+        raise NotImplementedError("Not an excel files.")
+
+    # Read the file into pandas
+    df = pd.read_excel(path)
+    # Check the file
+    if df.empty:
+        raise NotImplementedError("Empty file.")
+    if (
+        len(df.columns) != 3
+        or "Wavelength" != df.columns[0]
+        or "Power" != df.columns[1]
+    ):
+        raise NotImplementedError("Columns not as expected.")
+    if df.columns[2] not in ["nW", "µW", "mW", "W"]:
+        raise NotImplementedError(
+            f"Measurement unit <{df.columns[2]}> is unknown."
+        )
+    for col in df.columns:
+        if df[col].dtype not in ["int64", "float64"]:
+            raise NotImplementedError(f"Data (in column {col}) is not numeric")
+    # Do not allow missing values
+    if df.isna().any().any():
+        raise NotImplementedError("Data contains missing values.")
+
+    # Rename the columns to ensure measurements in mW
+    new_cols = ["? Line [nm]", "prct", f"Power ({df.columns[2]})"]
+    df.columns = new_cols
+    df = convert_power_column(df)
+
+    # Final renaming of the columns
+    new_cols = ["? Line [nm]", "Power [%]", "date-missing"]
+    df.columns = new_cols
     return df
 
 
