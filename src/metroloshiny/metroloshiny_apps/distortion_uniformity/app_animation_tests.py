@@ -1,10 +1,14 @@
-import time
+"""Tries for plotting animated distortion plots."""
+
+import base64
+import io
 from typing import Optional
 
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import plotly.express as px
+import plotly.graph_objects as go
 from matplotlib.figure import Figure
 from matplotlib.quiver import Quiver
 from shiny import reactive
@@ -194,63 +198,60 @@ with ui.nav_panel(title=""):
         with ui.navset_card_underline(title="Field Distortion"):
             with ui.nav_panel(title="Plot"):
 
+                @render.text
+                def temp_1():
+                    """Show temp message."""
+                    # TODO try arrow plot with vectors calculated from ROIs
+                    return "Under construction"
+
                 @render.ui
-                def dist_date_sel_1():
-                    """Show date selection for 2nd unifomrity figure."""
-                    data = get_omero_data()
-                    if data is None:
-                        choices = []
-                    else:
-                        choices = data.get_distortion().keys()
-                        choices = list(choices)
-                    dist_date_selector_1 = ui.input_select(
-                        "dist_date_selector_1",
-                        "Select a date",
-                        choices=choices,
-                        selected=None if len(choices) == 0 else choices[0],
-                    )
-                    return dist_date_selector_1
-
-                # Disable busy indicator for the distortion animation
-                ui.busy_indicators.options(
-                    spinner_selector="#show_distortion_from_rois",
-                    fade_selector="#show_distortion_from_rois",
-                    fade_opacity=1,
-                    spinner_size="0px",
-                )
-
-                @render.plot
-                def show_distortion_from_rois():
+                def animateed_distortion():
                     """
-                    Plot distortion calculated from ROIs.
+                    Test.
 
-                    # TODO will be replaced by table data, to show distortion for each channel
-                    # FIXME not sure where (maybe outside of the app) when reloading
-                        asyncio.exceptions.CancelledError is raised...
+                    # FIXME
                     """
-                    fig, q, dx, dy = create_distortion_plot()
-                    # If no data
-                    if q is None or dx is None or dy is None:
-                        return fig
+                    fig = animated_distortion_plot()
+                    return ui.HTML(fig.to_html())
 
-                    # Animate the quiver plot
-                    # Determine animation phase from wall-clock time
-                    animate_invalidation()
-                    t = time.perf_counter()
-                    # 2-second cycle
-                    phase = t % 2.0
+                @render.ui
+                def test_111():
+                    """Render the example animated plot."""
+                    return ui.HTML(coordinate_space().to_html())
 
-                    # Quiver scaling from 0 -> 1 during first half of the cycle
-                    scale = phase
-                    if phase < 1:
-                        scale = phase
-                    else:
-                        # No scaling for second half of the cycle
-                        scale = 1
+                # @render.plot
+                # def show_distortion_from_rois():
+                #     """
+                #     Plot distortion calculated from ROIs.
 
-                    # Update the quiver data
-                    q.set_UVC(dx * scale, dy * scale)
-                    return fig
+                #     # TODO will be replaced by table data, to show distortion for each channel
+                #     """
+                #     fig, q, dx, dy = create_distortion_plot()
+                #     # If no data
+                #     if q is None:
+                #         return fig
+
+                #     # Animate the quiver plot
+                #     # Determine animation phase from wall-clock time
+                #     animate_invalidation()
+                #     t = time.perf_counter()
+                #     # 2-second cycle
+                #     phase = t % 2.0
+
+                #     # Quiver scaling from 0 -> 1 during first half of the cycle
+                #     scale = phase
+                #     if phase < 1:
+                #         scale = phase
+                #     else:
+                #         # No scaling for second half of the cycle
+                #         scale = 1
+
+                #     # Update the quiver data
+                #     q.set_UVC(
+                #         dx * scale,
+                #         dy * scale
+                #     )
+                #     return fig
 
             with ui.nav_panel(title="Table"):
                 # FIXME not sure if there will be a table
@@ -270,15 +271,472 @@ with ui.nav_panel(title=""):
 # Plot creation             --------------------------------------------------
 
 
-@reactive.calc
-def animate_invalidation() -> bool:
+def coordinate_space():
     """
-    Invalidate function for plot animation.
+    Create an example plot.
 
-    Used to force reload plot visualization every 30ms.
+    Found somewhere on a forum...
     """
-    reactive.invalidate_later(0.03)
-    return True
+    with ui.Progress(min=1, max=5) as p:
+        data = {
+            "X": [1, 2, 3, 4, 5],
+            "Y": [5, 4, 3, 2, 1],
+            "Z": [2, 3, 4, 5, 6],
+            "FZ_new": [10, 20, 30, 40, 50],
+            "FZ": [5, 10, 15, 20, 25],
+        }
+
+        scaled_coordinate_system = pd.DataFrame(data)
+
+        p.set(2, message="Data loaded, preparing plot...")
+
+        fig = px.scatter_3d(
+            scaled_coordinate_system,
+            x="X",
+            y="Y",
+            z="Z",
+            size="FZ_new",
+            color="FZ_new",
+            opacity=0.7,
+        )
+
+        fig1 = go.Figure(fig)
+        p.set(3, message="Adding traces to the plot...")
+
+        frames = [
+            go.Frame(
+                data=[
+                    go.Scatter3d(
+                        x=scaled_coordinate_system["X"],
+                        y=scaled_coordinate_system["Y"],
+                        z=scaled_coordinate_system["Z"],
+                        mode="markers",
+                        marker={
+                            "size": scaled_coordinate_system["FZ_new"] * 10,
+                            "color": "Red",
+                        },
+                        opacity=0.9,
+                        name="Frame 1",
+                    )
+                ]
+            ),
+            go.Frame(
+                data=[
+                    go.Scatter3d(
+                        x=scaled_coordinate_system["X"],
+                        y=scaled_coordinate_system["Y"],
+                        z=scaled_coordinate_system["Z"],
+                        mode="markers",
+                        marker={
+                            "size": scaled_coordinate_system["FZ"],
+                            "color": scaled_coordinate_system["FZ"],
+                        },
+                        opacity=0.7,
+                        name="Frame 2",
+                    )
+                ]
+            ),
+        ]
+
+        print("Frames")
+
+        fig1.frames = frames
+
+        p.set(4, message="Updating layout...")
+
+        fig1.update_layout(
+            scene={
+                "xaxis_title": "X AXIS",
+                "yaxis_title": "Y AXIS",
+                "zaxis_title": "Z AXIS",
+            },
+            updatemenus=[
+                {
+                    "type": "buttons",
+                    "direction": "down",
+                    "showactive": True,
+                    "buttons": [
+                        {
+                            "label": "Play",
+                            "method": "animate",
+                            "args": [
+                                None,
+                                {
+                                    "frame": {"duration": 500, "redraw": True},
+                                    "fromcurrent": True,
+                                    "transition": {"duration": 0},
+                                },
+                            ],
+                        },
+                        {
+                            "label": "Pause",
+                            "method": "animate",
+                            "args": [
+                                [None],
+                                {
+                                    "frame": {"duration": 0, "redraw": False},
+                                    "mode": "immediate",
+                                },
+                            ],
+                        },
+                    ],
+                }
+            ],
+        )
+
+        fig1.update_layout(margin={"l": 0, "r": 0, "b": 0, "t": 0})
+        camera = {"eye": {"x": 2, "y": 2, "z": 0.5}}
+
+        fig1.update_layout(scene_camera=camera)
+        p.set(5, message="Rendering plot...")
+        return fig1
+
+
+def create_arrow_data(x, y, dx, dy, scale):
+    """
+    Test.
+
+    #FIXME
+    """
+    shaft_x = []
+    shaft_y = []
+    head_x = []
+    head_y = []
+    head_angle = []
+
+    for (
+        xi,
+        yi,
+        dxi,
+        dyi,
+    ) in zip(x, y, dx, dy, strict=True):
+        x_end = xi + dxi * scale
+        y_end = yi + dyi * scale
+
+        shaft_x.extend([xi, x_end, None])
+        shaft_y.extend([yi, y_end, None])
+
+        head_x.append(x_end)
+        head_y.append(y_end)
+        head_angle.append(np.degrees(np.arctan2(dyi, dxi)) + 90)
+    return shaft_x, shaft_y, head_x, head_y, head_angle
+
+
+@reactive.calc
+def animated_distortion_plot():
+    """
+    Test with plotly.
+
+    # FIXME
+    """
+    omero_data = get_omero_data()
+    if omero_data is None:
+        return no_data_plotly()
+
+    # Get the plotting data
+    df = omero_data.get_distortion_dataframe_from_rois(
+        "20260101"
+    )  # FIXME hard-coded date
+    # Set the XY tiles to 0-based index
+    df = df.copy()
+    df["x"] = df["x"] - 1
+    df["y"] = df["y"] - 1
+
+    # Create magnitude heat-map
+    heat = df.pivot(index="y", columns="x", values="Magnitude").to_numpy()
+
+    # Create normalized distortion vectors
+    df_norm = normalize_df(df, start_col=3)
+    x = df_norm["x"].to_numpy()
+    y = df_norm["y"].to_numpy()
+    dx = df_norm["dx"].to_numpy()
+    dy = df_norm["dy"].to_numpy()
+
+    # Create the heatmap figure             ##################################
+    fig = go.Figure()
+    fig.add_trace(
+        go.Heatmap(
+            z=heat,
+            x=np.arange(heat.shape[1]),
+            y=np.arange(heat.shape[0]),
+            colorscale="Viridis",
+            colorbar={"title": "Magnitude<br>(currently in pixels)"},
+            zsmooth="best",
+            hovertemplate=(
+                "x=%{x}<br>y=%{y}<br>Magnitude=%{z:.3f}<extra></extra>"
+            ),
+        )
+    )
+
+    # Initial arrow traces                  ##################################
+    sx, sy, hx, hy, ha = create_arrow_data(x, y, dx, dy, scale=0)
+    fig.add_trace(
+        go.Scatter(
+            x=sx,
+            y=sy,
+            mode="lines",
+            line={
+                "color": "white",
+                "width": 1,
+            },
+            hoverinfo="skip",
+            showlegend=False,
+        )
+    )
+    fig.add_trace(
+        go.Scatter(
+            x=hx,
+            y=hy,
+            mode="markers",
+            marker={
+                "symbol": "arrow",
+                "size": 10,
+                "color": "white",
+                "angle": ha,
+            },
+            hoverinfo="skip",
+            showlegend=False,
+        )
+    )
+    # Animation frames
+    n_frames = 20
+    frames = []
+
+    for f in range(n_frames + 1):
+        scale = f / n_frames
+
+        shaft_x, shaft_y, head_x, head_y, head_angle = create_arrow_data(
+            x,
+            y,
+            dx,
+            dy,
+            scale,
+        )
+
+        frames.append(
+            go.Frame(
+                data=[
+                    # Heatmap stays unchanged
+                    go.Heatmap(
+                        z=heat,
+                        x=np.arange(heat.shape[1]),
+                        y=np.arange(heat.shape[0]),
+                    ),
+                    # All shafts
+                    go.Scatter(
+                        x=shaft_x,
+                        y=shaft_y,
+                        mode="lines",
+                        line={
+                            "color": "white",
+                            "width": 2,
+                        },
+                    ),
+                    # All arrowheads
+                    go.Scatter(
+                        x=head_x,
+                        y=head_y,
+                        mode="markers",
+                        marker={
+                            "symbol": "arrow",
+                            "size": 10,
+                            "color": "white",
+                            "angle": head_angle,
+                        },
+                    ),
+                ],
+                name=str(f),
+            )
+        )
+
+    fig.frames = frames
+
+    # # Each arrow: 1 line trace, 1 marker for the arrow head
+    # arrow_scale = 1.0
+    # for xi, yi, dxi, dyi in zip(x, y, dx, dy):
+    #     x_end = xi + dxi * arrow_scale
+    #     y_end = yi + dyi * arrow_scale
+
+    #     fig.add_trace(
+    #         go.Scatter(
+    #             # x=[xi, x_end], # Final arrow
+    #             # y=[yi, y_end], # Final arrow
+    #             x=[xi, xi],
+    #             y=[yi, yi],
+    #             mode="lines",
+    #             line=dict(
+    #                 color="white",
+    #                 width=1,
+    #             ),
+    #             hoverinfo="skip",
+    #             showlegend=False,
+    #         )
+    #     )
+    #     # Arrow head using Plotly marker
+    #     fig.add_trace(
+    #         go.Scatter(
+    #             # x=[x_end], # Final arrow
+    #             # y=[y_end], # Final arrow
+    #             x=[xi],
+    #             y=[yi],
+    #             mode="markers",
+    #             marker=dict(
+    #                 symbol="arrow",
+    #                 size=10,
+    #                 color="white",
+    #                 angle=np.degrees(
+    #                     np.arctan2(dyi, dxi)
+    #                 ) + 90,
+    #             ),
+    #             hoverinfo="skip",
+    #             showlegend=False,
+    #         )
+    #     )
+
+    # # Animation frames                      ##################################
+    # n_frames = 20
+    # frames = []
+    # for f in range(n_frames + 1):
+    #     scale = f / n_frames
+
+    #     # Keep heatmap unchanged
+    #     frame_data = [
+    #         go.Heatmap(
+    #             z=heat,
+    #             x=np.arange(heat.shape[1]),
+    #             y=np.arange(heat.shape[0]),
+    #         )
+    #     ]
+
+    #     # Arrows
+    #     for xi, yi, dxi, dyi in zip(x, y, dx, dy):
+    #         x_end = xi + dxi * scale
+    #         y_end = yi + dyi * scale
+
+    #         # Shaft
+    #         frame_data.append(
+    #             go.Scatter(
+    #                 x=[xi, x_end],
+    #                 y=[yi, y_end],
+    #                 mode="lines",
+    #                 line=dict(
+    #                     color="white",
+    #                     width=1,
+    #                 ),
+    #                 hoverinfo="skip",
+    #                 showlegend=False,
+    #             )
+    #         )
+    #         # Arrow head
+    #         angle = np.degrees(
+    #             np.arctan2(dyi, dxi)
+    #         )
+    #         frame_data.append(
+    #             go.Scatter(
+    #                 x=[x_end],
+    #                 y=[y_end],
+    #                 marker=dict(
+    #                     symbol="arrow",
+    #                     size=10,
+    #                     color="white",
+    #                     angle=angle + 90
+    #                 )
+    #             )
+    #         )
+    #     frames.append(
+    #         go.Frame(
+    #             data=frame_data,
+    #             name=str(f),
+    #         )
+    #     )
+    # fig.frames = frames
+
+    # Layout                                ##################################
+    mic = input.microscope()
+    obj = input.objective()
+    obj = get_nice_objective_name(objective_df, obj)
+    info = input.info()
+
+    fig.update_layout(
+        title=(f"Field Distortion (from OMERO ROIs):<br>{mic} {obj} ({info})"),
+        plot_bgcolor="white",
+        xaxis={
+            "showgrid": False,
+            "zeroline": False,
+            "showticklabels": False,
+            "constrain": "domain",
+        },
+        yaxis={
+            "showgrid": False,
+            "zeroline": False,
+            "showticklabels": False,
+            "constrain": "domain",
+            "scaleanchor": "x",
+            "scaleratio": 1,
+            "autorange": "reversed",
+        },
+        margin={
+            "l": 20,
+            "r": 20,
+            "t": 80,
+            "b": 20,
+        },
+        # Animation controls            ----------------------------
+        updatemenus=[
+            {
+                "type": "buttons",
+                "showactive": True,
+                # x=1.0,
+                # y=1.15,
+                # xanchor="left",
+                # yanchor="bottom",
+                "direction": "down",
+                "buttons": [
+                    {
+                        "label": "▶",
+                        "method": "animate",
+                        "args": [
+                            None,
+                            {
+                                "frame": {
+                                    "duration": 200,
+                                    "redraw": True,
+                                },
+                                "transition": {
+                                    "duration": 0,
+                                },
+                                "fromcurrent": True,
+                                "mode": "immediate",
+                            },
+                        ],
+                    }
+                ],
+            }
+        ],
+    )
+    return fig
+
+
+def fig_to_data_uri(fig) -> str:
+    """
+    Convert a Matplotlib figure to a PNG data URI.
+
+    #FIXME
+    """
+    buffer = io.BytesIO()
+
+    fig.savefig(
+        buffer,
+        format="png",
+        bbox_inches="tight",
+        dpi=150,
+    )
+
+    plt.close(fig)
+
+    encoded = base64.b64encode(buffer.getvalue()).decode("ascii")
+
+    return f"data:image/png;base64,{encoded}"
 
 
 @reactive.calc
@@ -291,10 +749,11 @@ def create_distortion_plot() -> tuple[
     """
     Create a distortion quiver plot.
 
-    Create a heat-map background for the magnitude.
-    Add arrows for the distortion direction (+ magnitude.)
-    Returns plotting relevant variables for the arrows,
-    which allows modification on the fly (within the plot UI function).
+    TODO: maybe the coloring as heat-map background and arrows just one color?
+        Make a few different versions
+        - with background heat map
+        - arrows just the arrow head
+        - full arrows in one color or color map, etc.
 
     TODO for comparing 2 dates, the coloring should be the same for the 2 plots,
         i.e. normalise the 2 dataframes together?
@@ -306,12 +765,13 @@ def create_distortion_plot() -> tuple[
     :return: Optional[pd.Series], dy values (aka V)
     """
     omero_data = get_omero_data()
-    date1 = input.dist_date_selector_1()
-    if omero_data is None or date1 is None:
+    if omero_data is None:
         return no_data_seaborn(), None, None, None
 
     # Get the plotting data
-    df = omero_data.get_distortion_dataframe_from_rois(date1)
+    df = omero_data.get_distortion_dataframe_from_rois(
+        "20260101"
+    )  # FIXME hard-coded date
     # Set the XY tiles to 0-based index
     df["x"] = df["x"] - 1
     df["y"] = df["y"] - 1
@@ -352,21 +812,49 @@ def create_distortion_plot() -> tuple[
         # minlength=0.0001,  # doesnt really do anything
         # width=0.0001,
     )
+    # # Animate
+    # def update(frame):
+    #     scale = frame / 30
+    #     q.set_UVC(df["dx"] * scale, df["dy"] * scale)
+    #     return q,
+
+    # anim = FuncAnimation(
+    #     fig,
+    #     update,
+    #     frames=31,
+    #     interval=30,
+    #     blit=True
+    # )
+
+    # Add arrows heads which point to the center of the tile
+    # for _, row in df.iterrows():
+    #     ax.add_patch(
+    #         FancyArrowPatch(
+    #             (row["x"] - row["dx"], row["y"] - row["dy"]),
+    #             (row["x"], row["y"]),
+    #             arrowstyle="-|>, head_length=10, head_width=3",
+    #             mutation_scale=1,
+    #             mutation_aspect=None,
+    #             linewidth=0,
+    #             color="red",
+    #         ),
+    #     )
 
     axes.set_aspect("equal")
     axes.axis("off")
 
     # Add colorbar
     cbar = plt.colorbar(heat_map)
-    # FIXME currently pixel units
     cbar.set_label("Magnitude (currently in pixels)")
     # ax.legend() # not needed
     mic = input.microscope()
     obj = input.objective()
     obj = get_nice_objective_name(objective_df, obj)
     info = input.info()
-    # FIXME currently from OMERO ROIs
     fig.suptitle(f"Field Distortion (from OMERO ROIs):\n{mic} {obj} ({info})")
+    print(df["dx"], "\nIs of type:", type(df["dx"]))
+    print("figure type=", type(fig))
+    print("quiver type=", type(quiver))
     return fig, quiver, df["dx"], df["dy"]
 
 
@@ -575,14 +1063,8 @@ def get_omero_data() -> Optional[FieldData]:
     # Create and load data
     data = FieldData(df, retrieve_omero=True)
 
-    # Report possible errors (other than the ones below...) with the list data.problems
-    if len(data.problems) > 0:
-        msg = ["There were some problems while loading the data:"]
-        for i in data.problems:
-            msg.append(ui.tags.br())
-            msg.append(i)
-        ui.notification_show(*msg, id="data_problems", type="error")
-
+    # FIXME: report possible errors (other than the ones below...)
+    #   with the list data.problems
     # Check if there is really data associated
     try:
         data.get_distortion()
