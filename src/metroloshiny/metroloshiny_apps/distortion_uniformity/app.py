@@ -5,6 +5,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import plotly.express as px
+import plotly.graph_objects as go
 from matplotlib.figure import Figure
 from matplotlib.quiver import Quiver
 from shiny import reactive
@@ -219,15 +220,21 @@ with ui.nav_panel(title=""):
                     spinner_size="0px",
                 )
 
-                @render.plot
+                # @render_widget
+                @render.ui
                 def show_distortion_from_rois():
                     """
                     Plot distortion calculated from ROIs.
+
+                    FIXME FIXME FIXME
+                        animated plot does not work on VM :(
+                        -> change to plotly plot!
 
                     # TODO will be replaced by table data, to show distortion for each channel
                     # FIXME not sure where (maybe outside of the app) when reloading
                         asyncio.exceptions.CancelledError is raised...
                     """
+                    return ui.HTML(create_distortion_plot2().to_html())
                     fig, q, dx, dy = create_distortion_plot()
                     # If no data
                     if q is None or dx is None or dy is None:
@@ -277,8 +284,332 @@ def animate_invalidation() -> bool:
 
     Used to force reload plot visualization every 30ms.
     """
-    reactive.invalidate_later(0.03)
+    reactive.invalidate_later(0.05)
     return True
+
+
+def create_arrow_data(x, y, dx, dy, scale):
+    """
+    Test.
+
+    #FIXME
+    """
+    shaft_x = []
+    shaft_y = []
+    head_x = []
+    head_y = []
+    head_angle = []
+
+    for (
+        xi,
+        yi,
+        dxi,
+        dyi,
+    ) in zip(x, y, dx, dy, strict=True):
+        x_end = xi + dxi * scale
+        y_end = yi + dyi * scale
+
+        shaft_x.extend([xi, x_end, None])
+        shaft_y.extend([yi, y_end, None])
+
+        head_x.append(x_end)
+        head_y.append(y_end)
+        head_angle.append(np.degrees(np.arctan2(dyi, dxi)) + 90)
+    return shaft_x, shaft_y, head_x, head_y, head_angle
+
+
+@reactive.calc
+def create_distortion_plot2():
+    """
+    Create a distortion (quiver) plot with plotly.
+
+    :return: plotly plot
+    """
+    # Get the data and necessary inputs
+    omero_data = get_omero_data()
+    date1 = input.dist_date_selector_1()
+    if omero_data is None or date1 is None:
+        return no_data_plotly()
+
+    # Get the plotting data
+    df = omero_data.get_distortion_dataframe_from_rois(date1).copy()
+    # Set the XY tiles to 0-based index
+    df["x"] = df["x"] - 1
+    df["y"] = df["y"] - 1
+
+    # Create magnitude heat-map data (no normalization)
+    heat = df.pivot(index="y", columns="x", values="Magnitude").to_numpy()
+
+    # Create normalized distortion vectors
+    df_norm = normalize_df(df, start_col=3)
+    x = df_norm["x"].to_numpy()
+    y = df_norm["y"].to_numpy()
+    dx = df_norm["dx"].to_numpy()
+    dy = df_norm["dy"].to_numpy()
+
+    # Create the heatmap figure             ##################################
+    fig = go.Figure()
+    fig.add_trace(
+        go.Heatmap(
+            z=heat,
+            x=np.arange(heat.shape[1]),
+            y=np.arange(heat.shape[0]),
+            colorscale="Viridis",
+            colorbar={"title": "Magnitude<br>(currently in pixels)"},
+            zsmooth="best",
+            hovertemplate=(
+                "x=%{x}<br>y=%{y}<br>Magnitude=%{z:.3f}<extra></extra>"
+            ),
+        )
+    )
+
+    # Initial arrow traces                  ##################################
+    sx, sy, hx, hy, ha = create_arrow_data(x, y, dx, dy, scale=0)
+    fig.add_trace(
+        go.Scatter(
+            x=sx,
+            y=sy,
+            mode="lines",
+            line={
+                "color": "white",
+                "width": 1,
+            },
+            hoverinfo="skip",
+            showlegend=False,
+        )
+    )
+    fig.add_trace(
+        go.Scatter(
+            x=hx,
+            y=hy,
+            mode="markers",
+            marker={
+                "symbol": "arrow",
+                "size": 10,
+                "color": "white",
+                "angle": ha,
+            },
+            hoverinfo="skip",
+            showlegend=False,
+        )
+    )
+    # Animation frames
+    n_frames = 20
+    frames = []
+
+    for f in range(n_frames + 1):
+        scale = f / n_frames
+
+        shaft_x, shaft_y, head_x, head_y, head_angle = create_arrow_data(
+            x,
+            y,
+            dx,
+            dy,
+            scale,
+        )
+
+        frames.append(
+            go.Frame(
+                data=[
+                    # Heatmap stays unchanged
+                    go.Heatmap(
+                        z=heat,
+                        x=np.arange(heat.shape[1]),
+                        y=np.arange(heat.shape[0]),
+                    ),
+                    # All shafts
+                    go.Scatter(
+                        x=shaft_x,
+                        y=shaft_y,
+                        mode="lines",
+                        line={
+                            "color": "white",
+                            "width": 2,
+                        },
+                    ),
+                    # All arrowheads
+                    go.Scatter(
+                        x=head_x,
+                        y=head_y,
+                        mode="markers",
+                        marker={
+                            "symbol": "arrow",
+                            "size": 10,
+                            "color": "white",
+                            "angle": head_angle,
+                        },
+                    ),
+                ],
+                name=str(f),
+            )
+        )
+
+    fig.frames = frames
+
+    # # Each arrow: 1 line trace, 1 marker for the arrow head
+    # arrow_scale = 1.0
+    # for xi, yi, dxi, dyi in zip(x, y, dx, dy):
+    #     x_end = xi + dxi * arrow_scale
+    #     y_end = yi + dyi * arrow_scale
+
+    #     fig.add_trace(
+    #         go.Scatter(
+    #             # x=[xi, x_end], # Final arrow
+    #             # y=[yi, y_end], # Final arrow
+    #             x=[xi, xi],
+    #             y=[yi, yi],
+    #             mode="lines",
+    #             line=dict(
+    #                 color="white",
+    #                 width=1,
+    #             ),
+    #             hoverinfo="skip",
+    #             showlegend=False,
+    #         )
+    #     )
+    #     # Arrow head using Plotly marker
+    #     fig.add_trace(
+    #         go.Scatter(
+    #             # x=[x_end], # Final arrow
+    #             # y=[y_end], # Final arrow
+    #             x=[xi],
+    #             y=[yi],
+    #             mode="markers",
+    #             marker=dict(
+    #                 symbol="arrow",
+    #                 size=10,
+    #                 color="white",
+    #                 angle=np.degrees(
+    #                     np.arctan2(dyi, dxi)
+    #                 ) + 90,
+    #             ),
+    #             hoverinfo="skip",
+    #             showlegend=False,
+    #         )
+    #     )
+
+    # # Animation frames                      ##################################
+    # n_frames = 20
+    # frames = []
+    # for f in range(n_frames + 1):
+    #     scale = f / n_frames
+
+    #     # Keep heatmap unchanged
+    #     frame_data = [
+    #         go.Heatmap(
+    #             z=heat,
+    #             x=np.arange(heat.shape[1]),
+    #             y=np.arange(heat.shape[0]),
+    #         )
+    #     ]
+
+    #     # Arrows
+    #     for xi, yi, dxi, dyi in zip(x, y, dx, dy):
+    #         x_end = xi + dxi * scale
+    #         y_end = yi + dyi * scale
+
+    #         # Shaft
+    #         frame_data.append(
+    #             go.Scatter(
+    #                 x=[xi, x_end],
+    #                 y=[yi, y_end],
+    #                 mode="lines",
+    #                 line=dict(
+    #                     color="white",
+    #                     width=1,
+    #                 ),
+    #                 hoverinfo="skip",
+    #                 showlegend=False,
+    #             )
+    #         )
+    #         # Arrow head
+    #         angle = np.degrees(
+    #             np.arctan2(dyi, dxi)
+    #         )
+    #         frame_data.append(
+    #             go.Scatter(
+    #                 x=[x_end],
+    #                 y=[y_end],
+    #                 marker=dict(
+    #                     symbol="arrow",
+    #                     size=10,
+    #                     color="white",
+    #                     angle=angle + 90
+    #                 )
+    #             )
+    #         )
+    #     frames.append(
+    #         go.Frame(
+    #             data=frame_data,
+    #             name=str(f),
+    #         )
+    #     )
+    # fig.frames = frames
+
+    # Layout                                ##################################
+    mic = input.microscope()
+    obj = input.objective()
+    obj = get_nice_objective_name(objective_df, obj)
+    info = input.info()
+
+    fig.update_layout(
+        title=(f"Field Distortion (from OMERO ROIs):<br>{mic} {obj} ({info})"),
+        plot_bgcolor="white",
+        xaxis={
+            "showgrid": False,
+            "zeroline": False,
+            "showticklabels": False,
+            "constrain": "domain",
+        },
+        yaxis={
+            "showgrid": False,
+            "zeroline": False,
+            "showticklabels": False,
+            "constrain": "domain",
+            "scaleanchor": "x",
+            "scaleratio": 1,
+            "autorange": "reversed",
+        },
+        margin={
+            "l": 20,
+            "r": 20,
+            "t": 80,
+            "b": 20,
+        },
+        # Animation controls            ----------------------------
+        updatemenus=[
+            {
+                "type": "buttons",
+                "showactive": True,
+                # x=1.0,
+                # y=1.15,
+                # xanchor="left",
+                # yanchor="bottom",
+                "direction": "down",
+                "buttons": [
+                    {
+                        "label": "▶",
+                        "method": "animate",
+                        "args": [
+                            None,
+                            {
+                                "frame": {
+                                    "duration": 200,
+                                    "redraw": True,
+                                },
+                                "transition": {
+                                    "duration": 0,
+                                },
+                                "fromcurrent": True,
+                                "mode": "immediate",
+                            },
+                        ],
+                    }
+                ],
+            }
+        ],
+    )
+    return fig
 
 
 @reactive.calc
