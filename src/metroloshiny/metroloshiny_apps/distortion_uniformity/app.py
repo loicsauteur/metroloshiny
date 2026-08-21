@@ -1,11 +1,12 @@
-import time
 from typing import Optional
 
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import plotly.express as px
+import plotly.figure_factory as pff
 import plotly.graph_objects as go
+import seaborn as sns
 from matplotlib.figure import Figure
 from matplotlib.quiver import Quiver
 from shiny import reactive
@@ -212,52 +213,14 @@ with ui.nav_panel(title=""):
                     )
                     return dist_date_selector_1
 
-                # Disable busy indicator for the distortion animation
-                ui.busy_indicators.options(
-                    spinner_selector="#show_distortion_from_rois",
-                    fade_selector="#show_distortion_from_rois",
-                    fade_opacity=1,
-                    spinner_size="0px",
-                )
-
-                # @render_widget
-                @render.ui
+                @render_widget
                 def show_distortion_from_rois():
                     """
                     Plot distortion calculated from ROIs.
 
-                    FIXME FIXME FIXME
-                        animated plot does not work on VM :(
-                        -> change to plotly plot!
-
                     # TODO will be replaced by table data, to show distortion for each channel
-                    # FIXME not sure where (maybe outside of the app) when reloading
-                        asyncio.exceptions.CancelledError is raised...
                     """
-                    return ui.HTML(create_distortion_plot2().to_html())
-                    fig, q, dx, dy = create_distortion_plot()
-                    # If no data
-                    if q is None or dx is None or dy is None:
-                        return fig
-
-                    # Animate the quiver plot
-                    # Determine animation phase from wall-clock time
-                    animate_invalidation()
-                    t = time.perf_counter()
-                    # 2-second cycle
-                    phase = t % 2.0
-
-                    # Quiver scaling from 0 -> 1 during first half of the cycle
-                    scale = phase
-                    if phase < 1:
-                        scale = phase
-                    else:
-                        # No scaling for second half of the cycle
-                        scale = 1
-
-                    # Update the quiver data
-                    q.set_UVC(dx * scale, dy * scale)
-                    return fig
+                    return create_distortion_plot()
 
             with ui.nav_panel(title="Table"):
                 # FIXME not sure if there will be a table
@@ -278,48 +241,7 @@ with ui.nav_panel(title=""):
 
 
 @reactive.calc
-def animate_invalidation() -> bool:
-    """
-    Invalidate function for plot animation.
-
-    Used to force reload plot visualization every 30ms.
-    """
-    reactive.invalidate_later(0.05)
-    return True
-
-
-def create_arrow_data(x, y, dx, dy, scale):
-    """
-    Test.
-
-    #FIXME
-    """
-    shaft_x = []
-    shaft_y = []
-    head_x = []
-    head_y = []
-    head_angle = []
-
-    for (
-        xi,
-        yi,
-        dxi,
-        dyi,
-    ) in zip(x, y, dx, dy, strict=True):
-        x_end = xi + dxi * scale
-        y_end = yi + dyi * scale
-
-        shaft_x.extend([xi, x_end, None])
-        shaft_y.extend([yi, y_end, None])
-
-        head_x.append(x_end)
-        head_y.append(y_end)
-        head_angle.append(np.degrees(np.arctan2(dyi, dxi)) + 90)
-    return shaft_x, shaft_y, head_x, head_y, head_angle
-
-
-@reactive.calc
-def create_distortion_plot2():
+def create_distortion_plot():
     """
     Create a distortion (quiver) plot with plotly.
 
@@ -333,9 +255,6 @@ def create_distortion_plot2():
 
     # Get the plotting data
     df = omero_data.get_distortion_dataframe_from_rois(date1).copy()
-    # Set the XY tiles to 0-based index
-    df["x"] = df["x"] - 1
-    df["y"] = df["y"] - 1
 
     # Create magnitude heat-map data (no normalization)
     heat = df.pivot(index="y", columns="x", values="Magnitude").to_numpy()
@@ -347,204 +266,59 @@ def create_distortion_plot2():
     dx = df_norm["dx"].to_numpy()
     dy = df_norm["dy"].to_numpy()
 
+    df["angle"] = (np.degrees(np.arctan2(df["dx"], df["dy"])) * -1 + 180) % 360
+    angle = df.pivot(index="y", columns="x", values="angle").to_numpy()
+
     # Create the heatmap figure             ##################################
     fig = go.Figure()
     fig.add_trace(
         go.Heatmap(
             z=heat,
-            x=np.arange(heat.shape[1]),
-            y=np.arange(heat.shape[0]),
+            x=np.arange(1, heat.shape[1] + 1),
+            y=np.arange(1, heat.shape[0] + 1),
             colorscale="Viridis",
-            colorbar={"title": "Magnitude<br>(currently in pixels)"},
+            colorbar={
+                "title": {
+                    "text": "Magnitude<br>(currently in pixels)",
+                    "side": "right",
+                },
+                # Position relative to whole figure
+                "x": 1.0,
+                "xanchor": "left",
+                "xpad": 0,
+                # Make height as tall asa heatmap
+                # "len": 1.0,
+                # "y": 0.5,
+                # "yanchor": "middle",
+            },
             zsmooth="best",
+            customdata=angle,
             hovertemplate=(
-                "x=%{x}<br>y=%{y}<br>Magnitude=%{z:.3f}<extra></extra>"
+                "x=%{x}<br>"
+                "y=%{y}<br>"
+                "Magnitude=%{z:.3f}<br>"
+                "Angle=%{customdata:.1f}°<extra></extra>"
             ),
         )
     )
 
-    # Initial arrow traces                  ##################################
-    sx, sy, hx, hy, ha = create_arrow_data(x, y, dx, dy, scale=0)
-    fig.add_trace(
-        go.Scatter(
-            x=sx,
-            y=sy,
-            mode="lines",
-            line={
-                "color": "white",
-                "width": 1,
-            },
-            hoverinfo="skip",
-            showlegend=False,
-        )
+    quiv = pff.create_quiver(
+        x,
+        y,
+        dx,
+        dy,
+        scale=2,
+        arrow_scale=0.3,
+        hoverinfo="skip",
+        showlegend=False,
+        # fill="white",
     )
-    fig.add_trace(
-        go.Scatter(
-            x=hx,
-            y=hy,
-            mode="markers",
-            marker={
-                "symbol": "arrow",
-                "size": 10,
-                "color": "white",
-                "angle": ha,
-            },
-            hoverinfo="skip",
-            showlegend=False,
-        )
-    )
-    # Animation frames
-    n_frames = 20
-    frames = []
-
-    for f in range(n_frames + 1):
-        scale = f / n_frames
-
-        shaft_x, shaft_y, head_x, head_y, head_angle = create_arrow_data(
-            x,
-            y,
-            dx,
-            dy,
-            scale,
-        )
-
-        frames.append(
-            go.Frame(
-                data=[
-                    # Heatmap stays unchanged
-                    go.Heatmap(
-                        z=heat,
-                        x=np.arange(heat.shape[1]),
-                        y=np.arange(heat.shape[0]),
-                    ),
-                    # All shafts
-                    go.Scatter(
-                        x=shaft_x,
-                        y=shaft_y,
-                        mode="lines",
-                        line={
-                            "color": "white",
-                            "width": 2,
-                        },
-                    ),
-                    # All arrowheads
-                    go.Scatter(
-                        x=head_x,
-                        y=head_y,
-                        mode="markers",
-                        marker={
-                            "symbol": "arrow",
-                            "size": 10,
-                            "color": "white",
-                            "angle": head_angle,
-                        },
-                    ),
-                ],
-                name=str(f),
-            )
-        )
-
-    fig.frames = frames
-
-    # # Each arrow: 1 line trace, 1 marker for the arrow head
-    # arrow_scale = 1.0
-    # for xi, yi, dxi, dyi in zip(x, y, dx, dy):
-    #     x_end = xi + dxi * arrow_scale
-    #     y_end = yi + dyi * arrow_scale
-
-    #     fig.add_trace(
-    #         go.Scatter(
-    #             # x=[xi, x_end], # Final arrow
-    #             # y=[yi, y_end], # Final arrow
-    #             x=[xi, xi],
-    #             y=[yi, yi],
-    #             mode="lines",
-    #             line=dict(
-    #                 color="white",
-    #                 width=1,
-    #             ),
-    #             hoverinfo="skip",
-    #             showlegend=False,
-    #         )
-    #     )
-    #     # Arrow head using Plotly marker
-    #     fig.add_trace(
-    #         go.Scatter(
-    #             # x=[x_end], # Final arrow
-    #             # y=[y_end], # Final arrow
-    #             x=[xi],
-    #             y=[yi],
-    #             mode="markers",
-    #             marker=dict(
-    #                 symbol="arrow",
-    #                 size=10,
-    #                 color="white",
-    #                 angle=np.degrees(
-    #                     np.arctan2(dyi, dxi)
-    #                 ) + 90,
-    #             ),
-    #             hoverinfo="skip",
-    #             showlegend=False,
-    #         )
-    #     )
-
-    # # Animation frames                      ##################################
-    # n_frames = 20
-    # frames = []
-    # for f in range(n_frames + 1):
-    #     scale = f / n_frames
-
-    #     # Keep heatmap unchanged
-    #     frame_data = [
-    #         go.Heatmap(
-    #             z=heat,
-    #             x=np.arange(heat.shape[1]),
-    #             y=np.arange(heat.shape[0]),
-    #         )
-    #     ]
-
-    #     # Arrows
-    #     for xi, yi, dxi, dyi in zip(x, y, dx, dy):
-    #         x_end = xi + dxi * scale
-    #         y_end = yi + dyi * scale
-
-    #         # Shaft
-    #         frame_data.append(
-    #             go.Scatter(
-    #                 x=[xi, x_end],
-    #                 y=[yi, y_end],
-    #                 mode="lines",
-    #                 line=dict(
-    #                     color="white",
-    #                     width=1,
-    #                 ),
-    #                 hoverinfo="skip",
-    #                 showlegend=False,
-    #             )
-    #         )
-    #         # Arrow head
-    #         angle = np.degrees(
-    #             np.arctan2(dyi, dxi)
-    #         )
-    #         frame_data.append(
-    #             go.Scatter(
-    #                 x=[x_end],
-    #                 y=[y_end],
-    #                 marker=dict(
-    #                     symbol="arrow",
-    #                     size=10,
-    #                     color="white",
-    #                     angle=angle + 90
-    #                 )
-    #             )
-    #         )
-    #     frames.append(
-    #         go.Frame(
-    #             data=frame_data,
-    #             name=str(f),
-    #         )
-    #     )
-    # fig.frames = frames
+    # Add the quiver to the figure
+    for trace in quiv.data:
+        # Define arrow color and line width
+        trace.line.color = "white"
+        trace.line.width = 1.0
+        fig.add_trace(trace)
 
     # Layout                                ##################################
     mic = input.microscope()
@@ -556,6 +330,7 @@ def create_distortion_plot2():
         title=(f"Field Distortion (from OMERO ROIs):<br>{mic} {obj} ({info})"),
         plot_bgcolor="white",
         xaxis={
+            # "domain": [0, 0.88],  # Space for the heatmap
             "showgrid": False,
             "zeroline": False,
             "showticklabels": False,
@@ -565,55 +340,27 @@ def create_distortion_plot2():
             "showgrid": False,
             "zeroline": False,
             "showticklabels": False,
-            "constrain": "domain",
+            # "constrain": "domain",
             "scaleanchor": "x",
             "scaleratio": 1,
             "autorange": "reversed",
         },
         margin={
-            "l": 20,
-            "r": 20,
-            "t": 80,
-            "b": 20,
+            "l": 0,
+            "r": 80,
+            "t": 60,
+            "b": 0,
         },
-        # Animation controls            ----------------------------
-        updatemenus=[
-            {
-                "type": "buttons",
-                "showactive": True,
-                # x=1.0,
-                # y=1.15,
-                # xanchor="left",
-                # yanchor="bottom",
-                "direction": "down",
-                "buttons": [
-                    {
-                        "label": "▶",
-                        "method": "animate",
-                        "args": [
-                            None,
-                            {
-                                "frame": {
-                                    "duration": 200,
-                                    "redraw": True,
-                                },
-                                "transition": {
-                                    "duration": 0,
-                                },
-                                "fromcurrent": True,
-                                "mode": "immediate",
-                            },
-                        ],
-                    }
-                ],
-            }
-        ],
+        # Define the size of the figure - Don't use that
+        # width=900,
+        # height=600,
+        autosize=True,
     )
     return fig
 
 
 @reactive.calc
-def create_distortion_plot() -> tuple[
+def create_distortion_plot_old_mpl() -> tuple[
     Figure,
     Optional[Quiver],
     Optional[pd.Series],
@@ -622,10 +369,13 @@ def create_distortion_plot() -> tuple[
     """
     Create a distortion quiver plot.
 
+    FIXME deprecated matplotlib version of the plot
+
     Create a heat-map background for the magnitude.
     Add arrows for the distortion direction (+ magnitude.)
     Returns plotting relevant variables for the arrows,
     which allows modification on the fly (within the plot UI function).
+    However, animated plots do not work on the VM.
 
     TODO for comparing 2 dates, the coloring should be the same for the 2 plots,
         i.e. normalise the 2 dataframes together?
@@ -702,9 +452,117 @@ def create_distortion_plot() -> tuple[
 
 
 @reactive.calc
+def create_uniformity_plot_sns():
+    """
+    Create a heat-map like plot for the Filed Uniformity between 2 dates.
+
+    FIXME seaborn heatmaps cannot have interpolation...
+
+    :return: matplotlib Figure with seaborn plots
+    """
+    # Get the date selections and channel selection
+    channel = input.uni_ch_selector()
+    date1 = input.uni_date_selector_1()
+    date2 = input.uni_date_selector_2()
+    omero_data = get_omero_data()
+    if channel is None or date1 is None or date2 is None or omero_data is None:
+        return no_data_seaborn()
+
+    # Get the data (convert unidata for heatmap)
+    uni_data = omero_data.get_uniformity()
+    df_1 = omero_data.get_heat_map_dataframe(date=date1, data_dict=uni_data)
+    df_2 = omero_data.get_heat_map_dataframe(date=date2, data_dict=uni_data)
+
+    # Pivot the dfs for given channel (-> XY-table)
+    df_1 = df_1.pivot(index="Y", columns="X", values=channel)
+    df_2 = df_2.pivot(index="Y", columns="X", values=channel)
+    # Normalise the values (individually for each df)
+    df_1 = normalize_percentile(df_1).to_numpy()
+    df_2 = normalize_percentile(df_2).to_numpy()
+
+    # Create an image with the difference of the two (in %)
+    diff = (df_1 - df_2) * 100
+
+    # Create plot
+    fig, axes = plt.subplots(
+        nrows=1,
+        ncols=4,
+        figsize=(12, 4),
+        gridspec_kw={"width_ratios": [1, 1, 1, 0.2]},
+    )
+
+    # Common Seaborn settings
+    heatmap_kwargs = {
+        "cmap": "viridis",
+        "xticklabels": False,
+        "yticklabels": False,
+        "cbar": False,
+        "ax": axes[0],
+    }
+
+    # First date
+    sns.heatmap(
+        df_1,
+        **heatmap_kwargs,
+    )
+    axes[0].set_title(f"{date1} - {channel}")
+    axes[0].set_xlabel("")
+    axes[0].set_ylabel("")
+
+    # Second date
+    sns.heatmap(
+        df_2,
+        **{**heatmap_kwargs, "ax": axes[1]},
+    )
+    axes[1].set_title(f"{date2} - {channel}")
+    axes[1].set_xlabel("")
+    axes[1].set_ylabel("")
+
+    # Difference plot
+    sns.heatmap(
+        diff,
+        ax=axes[2],
+        cmap="bwr",
+        vmin=-100,
+        vmax=100,
+        xticklabels=False,
+        yticklabels=False,
+        cbar=False,
+    )
+    axes[2].set_title("Difference")
+    axes[2].set_xlabel("")
+    axes[2].set_ylabel("")
+
+    # Dedicated colorbar axis
+    norm = plt.Normalize(vmin=-100, vmax=100)
+    sm = plt.cm.ScalarMappable(norm=norm, cmap="bwr")
+    sm.set_array([])
+
+    cbar = fig.colorbar(sm, cax=axes[3])
+    cbar.set_label("Difference [%]")
+
+    # Hide the unused axis frames
+    for ax in axes[:3]:
+        for spine in ax.spines.values():
+            spine.set_visible(False)
+
+    mic = input.microscope()
+    obj = input.objective()
+    obj = get_nice_objective_name(objective_df, obj)
+    info = input.info()
+
+    fig.suptitle(f"Field Uniformity: {mic} {obj} ({info})")
+
+    return fig
+
+
+@reactive.calc
 def create_uniformity_plot():
     """
     Create a heat-map like plot for the Filed Uniformity between 2 dates.
+
+    FIXME: on VM when scaling the window, title gets bigger and bigger,
+        until it gives an error...
 
     :return: matplotlib plot
     """
