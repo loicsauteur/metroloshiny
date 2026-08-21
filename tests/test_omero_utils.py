@@ -100,7 +100,6 @@ def test_get_omero_ring_rois():
 
     Tests:
     - get_omero_ring_rois
-    - get_field_distortion
     - get_omero_field_uniformity_table
 
     TODO: maybe check several ROI related functions.
@@ -132,22 +131,6 @@ def test_get_omero_ring_rois():
         for i in detected.keys():
             assert i in ideal.keys()
 
-        # Calculate the number of X/Y rings FIXME deprecated!
-        x_rings, y_rings = ou.get_field_of_ring_grid_size(detected)
-        n_rings = x_rings * y_rings
-        # assert n_detected rings == x * y (optional -1, since center ring may be missing)
-        assert len(detected) == n_rings - 1 or len(detected) == n_rings
-
-        # Check field distortion        ------------------------
-        distortion = ou.get_field_distortion(detected, ideal)
-        assert len(distortion) == len(detected)
-        # for k, v in distortion.items():
-        #     print(k, v)
-
-        # Additional dummy check
-        dist = ou.get_field_distortion(detected, detected)
-        assert sum(dist.values()) == 0
-
         # Get the field uniformity and distortion tables        ##############
         dist_df = ou.get_omero_table(conn, image_id, "Field_distortion")
         unif_df = ou.get_omero_table(conn, image_id, "Field_uniformity")
@@ -160,11 +143,6 @@ def test_get_omero_ring_rois():
             match=rf"No '\*{name}\*' table could be found for image *",
         ):
             ou.get_omero_table(conn, image_id, name)
-
-        # TODO have omero_utils function to get the distance between points - DONE
-        #   Can i also get a vector, that could be used for visualisation?
-        #   Can I calculate a heat map from the positions? -> X/Y tiles
-        #   # what to do with center (average surroundings?)
 
     finally:
         conn.c.closeSession()
@@ -263,19 +241,6 @@ def test_getting_metric_functions():
         )
         conn.connect()
 
-        # Testing get_metric_data function          --------------------------
-        # This function should be deprecated (FIXME)
-        # PSF image
-        image_id = 3454870
-        df = ou.get_metric_data(conn, image_id=image_id, metric="FWHM")
-        assert df is not None
-        assert "Key" in df.columns
-
-        # Uniformity/Distortion image
-        image_id = 3454869
-        df = ou.get_metric_data(conn, image_id=image_id, metric="FWHM")
-        assert df is not None
-
         # Testing get_fwhm_metric_data              --------------------------
         # PSF image
         image_id = 3454870
@@ -295,7 +260,6 @@ def test_getting_metric_functions():
 
 if __name__ == "__main__":
     # TODO would be nice to have parameterized functions
-    # TODO python file i could run manually to check all functions that do not run in pytest?!
 
     # Uniformity / distortion
     #     Metrology test dataset: 82171

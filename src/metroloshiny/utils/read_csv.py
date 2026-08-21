@@ -242,7 +242,7 @@ def read_nis_job_xlsx(path: str) -> pd.DataFrame:
     df_final = pd.DataFrame()
 
     # Open the full sheet to identify extra info
-    for sheet in sheets:  # FIXME currently only for sheet 3
+    for sheet in sheets:
         df = pd.read_excel(file, sheet_name=sheet)
         # Find the power unit (if None -> no measurements for this sheet) ####
         # Find the cell (first col) shtat startswith "All values" to identify unit

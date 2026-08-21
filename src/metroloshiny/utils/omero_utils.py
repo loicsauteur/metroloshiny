@@ -10,7 +10,6 @@ from omero.gateway import (
     TagAnnotationI,  # same if imported from omero.model
 )
 
-from metroloshiny.utils.common_utils import point_2d_point_distance
 from metroloshiny.utils.read_file import get_private_data
 
 # Dictionary matching upload category to metric to look for.
@@ -20,8 +19,6 @@ __metrics__ = {
     # Uni./Distortion: tags to find
     "Uniformity/Distortion": ["field_uniformity", "field_distortion"],
 }
-
-# FIXME: here are several deprecated functions -> TODO clean up!
 
 
 def get_omero_dates(
@@ -352,29 +349,6 @@ def get_cred(
     return username, passwd, host, port
 
 
-def omero_table_to_dict(table) -> dict:
-    """
-    Already loaded OMERO.table to dict.
-
-    TODO check if this works as expected.
-
-    :param table: OMERO table data object (already loaded)
-
-    :return: dict
-    """
-    n_headers = len(table.getHeaders())
-    n_rows = table.getNumberOfRows()
-    data = table.read(range(n_headers), start=0, stop=n_rows)
-    dict_out = {}
-    for col in data.columns:
-        if col.name in dict_out.keys():
-            raise RuntimeError(
-                f"OMERO table contains headers with same name: {col.name}"
-            )
-        dict_out[col.name] = col.values
-    return dict_out
-
-
 def get_fwhm_metric_data(
     conn: BlitzGateway, image_id: int, metric: str
 ) -> Optional[pd.DataFrame]:
@@ -420,81 +394,6 @@ def get_fwhm_metric_data(
 
     # Return None as nothing was found
     return None
-
-
-def get_metric_data(
-    conn: BlitzGateway, image_id: int, metric: str
-) -> Optional[pd.DataFrame]:
-    """
-    Get the metric data from the OMERO image.
-
-    FIXME: I want to deprecate this function, it may return dataframes when not expected.
-        e.g. when looking for FWHM data in a uniformity/distortion image.
-
-    Finds the first OMERO.table or kv-pair that contains the metric of interest.
-    Prefers kv-pair over OMERO.table.
-    Checks OMERO.table headers if any of them contain the metric.
-    Checks kv pair keys for metric (excludes "Profile_length_for_FWHM")
-
-    :param conn: BlitzGateway
-    :param image_id: int, OMERO image ID
-    :param metric: str, metric to find, e.g. FWHM
-
-    :return: None, if the metric was not found in the image
-        pd.DataFrame
-    """
-    # Collect all kv-paris and omero.tables
-    kv_pairs = []
-    tables = []
-    # Get Omero image
-    image = conn.getObject("image", image_id)
-    if image is None:
-        raise RuntimeError(f"ID <{image_id} does not seem to be an Image ID.")
-    # Loop over annotation objects to get kv-paris or table
-    res = conn.c.sf.sharedResources()
-    for ann in image.listAnnotations():
-        # Check for tables
-        if isinstance(ann, FileAnnotationWrapper):
-            try:
-                # It's a table if it can be opened
-                table = res.openTable(ann.getFile()._obj)
-                tables.append(table)
-            except Exception:
-                # Not a table - skip
-                pass
-        elif isinstance(ann, MapAnnotationWrapper):
-            kv_pairs.append(ann.getValue())
-
-    # Check if the metric of interest is somewhere
-    final_kv_pair = None
-    final_table = None
-
-    # Get the first table that has the metric
-    for table in tables:
-        for col in table.getHeaders():
-            if metric in col.name:
-                final_table = table
-                break
-
-    # Get the first kv-pair that contains the metric
-    for kv in kv_pairs:
-        # loop over the tuples of length 2,
-        for k, _v in kv:
-            # Check if the first item (key) contains the metric
-            if metric in k and "Profile_length_for_FWHM" not in k:
-                final_kv_pair = kv
-                break
-
-    if final_kv_pair is None and final_table is None:
-        return None
-    if final_kv_pair is not None:
-        # Return the found key-value pair
-        # kv_item = list[list[key, value]]
-        return pd.DataFrame(final_kv_pair, columns=["Key", "Value"])
-    else:
-        # Return the full OMERO table
-        # FIXME THIS part has not been tested (just returns the full)
-        return omero_table_to_dataframe(conn, final_table)
 
 
 def get_dates(conn: BlitzGateway, image_id: int) -> tuple[Optional[str], str]:
@@ -650,32 +549,6 @@ def get_omero_ring_rois(
     return detected_rois, ideal_rois
 
 
-def get_field_distortion(
-    detected: dict[str, tuple[float, float]],
-    ideal: dict[str, tuple[float, float]],
-) -> dict[str, float]:
-    """
-    Calculate the distance between detected points and ideal location.
-
-    FIXME probably never used (Deprecated)!
-
-    :param detected: dict, with str point number and tuple XY coordinates
-    :param ideal: dict, with str point number and tuple XY coordinates
-
-    :return: dict, with str point number and distance
-    """
-    # Sanity check
-    if len(detected) != len(ideal):
-        raise ValueError(
-            "Cannot calculate field distortion when number of detected != ideal points."
-        )
-
-    dist = {}
-    for k in detected.keys():
-        dist[k] = point_2d_point_distance(detected.get(k), ideal.get(k))
-    return dist
-
-
 def get_omero_table(
     conn: BlitzGateway, image_id: int, name_part: str
 ) -> pd.DataFrame:
@@ -717,6 +590,8 @@ def omero_table_to_dataframe(
 ) -> pd.DataFrame:
     """
     Convert the OMERO table object to a dataframe.
+
+    This function is specific for field uniformity/distortion tables.
 
     Additionally:
         - will convert the type of Ring_ID to 1-based integer (instead of float), if available.
@@ -761,46 +636,6 @@ def omero_table_to_dataframe(
     if "Ring_ID" in df.columns:
         df["Ring_ID"] = df["Ring_ID"].astype(int).add(1)
     return df
-
-
-def get_field_of_ring_grid_size(
-    coords: dict[str, tuple[float, float]],
-) -> tuple[int, int]:
-    """
-    Calculate the number of detected rings in X and Y.
-
-    FIXME Deprecated / moved to FieldData class. Remove also from test...
-
-    With the argolight slide, the middle ring is missing (there's a cross).
-
-    :param coords:, dict of str point number and XY coordinates
-
-    :return: tuple, ring count in x and y
-    """
-    # Get a list of only X and Y coordinates separately
-    x = [i[0] for i in coords.values()]
-    y = [i[1] for i in coords.values()]
-
-    x_count = 1
-    # Count the number of rings on the first row
-    for i in range(1, len(x)):
-        if x[i] > x[i - 1]:
-            x_count += 1
-        else:
-            break
-
-    y_count = 1
-    delta_x = (x[1] - x[0]) / 2
-    prev_y = y[0]
-    # Count the number of rings on the first column
-    for i in range(1, len(y)):
-        # Check only the first y coords (allow +/- half ring to ring distance)
-        if x[i] > x[0] - delta_x and x[i] < x[0] + delta_x:
-            if y[i] > prev_y:
-                y_count += 1
-                prev_y = y[i]
-
-    return x_count, y_count
 
 
 if __name__ == "__main__":
