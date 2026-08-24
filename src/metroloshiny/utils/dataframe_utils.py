@@ -484,22 +484,4 @@ def convert_power_column(df: pd.DataFrame) -> pd.DataFrame:
 
 
 if __name__ == "__main__":
-    # # from metroloshiny.utils.read_file import read_xlsx
-    # from metroloshiny.utils.read_file import get_laser_power_objective_data
-
-    # # raw_df = read_xlsx()
-    # # print(get_power_over_time_data(raw_df, 405, 100))
-    # # df = get_linearity(raw_df, str(20240109))
-
-    # # new tests
-    # _, df = get_laser_power_objective_data(dev_local_file=True)
-    # mic = "Ti CSU-W1"
-    # # mic = "Ti2 Righty"
-    # df = filter_by_column_value(df, "Site", "Hebelstrasse")
-    # df = filter_by_column_value(df, "Microscope", mic)
-    # df = filter_by_column_value(df, "Objective", "20x/0,75")
-    # # skipping info sorting for testing
-    # print(df)
-    # df = keep_non_nan_rows(df, "LED Line [nm]")
-    # print(df)
     pass

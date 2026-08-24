@@ -1,6 +1,7 @@
 """Utils for reading files."""
 
 import os
+from pathlib import Path
 from typing import Optional, Union
 
 import gspread
@@ -141,8 +142,12 @@ def get_sheet(
     # Get the data from the excel sheet
     sheet = None
     if dev_local_file:
+        loc_file = Path(__file__).parent.parent.parent.parent
+        loc_file = (
+            loc_file / "example_files" / "metroloshiny_data_example.xlsx"
+        )
         df = pd.read_excel(
-            "./example_files/metroloshiny_data_example.xlsx",
+            str(loc_file),
             sheet_name=__sheet_names__.get(kind),
         )
     else:
@@ -234,42 +239,6 @@ def get_gspread(
         whole_document=True if sheet_name is None else False,
     )
     return doc
-
-
-def get_laser_power_objective_data(
-    data_path: Optional[str] = None, dev_local_file: bool = False
-) -> tuple[
-    Optional[Union[gspread.Worksheet, gspread.Spreadsheet]], pd.DataFrame
-]:
-    """
-    Load google spread sheet & return it + DataFrame of it.
-
-    :param data_path: str path to csv file with key-value to access sheet.
-    :param dev_local_file: boolean to load from excel instead of
-                           google (hard-coded).
-
-    :return: gspread.worksheet (or None for dev_local_file = True).
-    :return: gspread.Worksheet, pd.DataFrame
-    """
-    # For testing on local file
-    if dev_local_file:
-        return None, ensure_numeric_data(
-            pd.read_excel("./data/metroloshiny_data.xlsx")
-        )
-
-    # Load google sheet with laser power at objective data
-    url = get_private_data("Sheet URL", data_path=data_path)
-    path_sa = get_private_data("PathToServiceAccountJSON", data_path=data_path)
-    sheet = load_gspread(
-        gsheet_url=url,
-        sheet_name="laser_power_measurements",
-        path_service_account=path_sa,
-    )
-    df = pd.DataFrame(sheet.get_all_records())
-    # Make sure only numeric data for measurement columns
-    #   (including lines & power)
-    df = ensure_numeric_data(df, first_column=4)
-    return sheet, df
 
 
 def ensure_numeric_data(
