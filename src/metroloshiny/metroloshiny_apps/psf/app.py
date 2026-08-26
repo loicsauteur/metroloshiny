@@ -67,7 +67,9 @@ with ui.nav_panel(title="PSF"):
             ui.input_select("info", "Filter by info column", choices=[])
 
         # Selection card     -------------------------------------------------
-        with ui.navset_card_underline(title="Plotting options"):
+        with ui.navset_card_underline(
+            title="Plotting options", id="plotting_options"
+        ):
             with ui.nav_panel(title="Options"):
                 # Add checkboxes & other as columns
                 with ui.layout_column_wrap(
@@ -168,7 +170,9 @@ with ui.nav_panel(title="PSF"):
                     return render.DataGrid(o_df, styles=styles)
 
         # PSF over time     --------------------------------------------------
-        with ui.navset_card_underline(title="PSF over time"):
+        with ui.navset_card_underline(
+            title="PSF over time", id="psf_over_time"
+        ):
             with ui.nav_panel(title="Plot"):
 
                 @render_widget
@@ -188,7 +192,9 @@ with ui.nav_panel(title="PSF"):
                     return df_table
 
         # Shift over time     ------------------------------------------------
-        with ui.navset_card_underline(title="Chromatic shift over time"):
+        with ui.navset_card_underline(
+            title="Chromatic shift over time", id="chromatic_over_time"
+        ):
             with ui.nav_panel(title="Plot: All"):
 
                 @render.text
