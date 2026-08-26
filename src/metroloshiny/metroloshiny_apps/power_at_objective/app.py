@@ -66,7 +66,9 @@ with ui.nav_panel(title="Light Source Power"):
             )
 
         # Plot linearity        ----------------------------------------------
-        with ui.navset_card_underline(title="Power linearity"):
+        with ui.navset_card_underline(
+            title="Power linearity", id="linearity_card"
+        ):
             with ui.nav_panel(title="Plot"):
 
                 @render.ui
@@ -93,7 +95,9 @@ with ui.nav_panel(title="Light Source Power"):
                     return create_power_linearity_table()
 
         # Plot stability        ----------------------------------------------
-        with ui.navset_card_underline(title="Power stability"):
+        with ui.navset_card_underline(
+            title="Power stability", id="stability_card"
+        ):
             with ui.nav_panel(title="Plot"):
 
                 @render.ui
