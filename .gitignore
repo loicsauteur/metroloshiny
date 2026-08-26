@@ -1,5 +1,7 @@
 # Custom ignors
 data/*
+# Excel temp files
+~$*
 
 # pixi environments
 .pixi/*
