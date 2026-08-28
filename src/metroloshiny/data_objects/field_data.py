@@ -65,6 +65,17 @@ class FieldData:
             self._set_data_()
 
     # Getters/Setters           ##############################################
+    def get_channel_names(self, date: str) -> list[str]:
+        """
+        Getter for channels for a specific date.
+
+        :return: list[str], of channels or empty
+        """
+        try:
+            return list(self._map_channel_names_(date).values())
+        except KeyError:
+            return []
+
     def get_distortion(self) -> dict[str, Optional[pd.DataFrame]]:
         """
         Getter for the distortion data.
@@ -188,6 +199,136 @@ class FieldData:
 
         return df_out
 
+    def get_distortion_dataframe(self, date: str) -> pd.DataFrame:
+        """
+        Create distortion dataframe for visualisation.
+
+        Per ring AND channel get ∆x, ∆y, and magnitude (absolute distance).
+        Averages in 4-connected manner the middle (missing) ring.
+
+        :raises:
+            RuntimeError if:
+            - OMERO data is not loaded (i.e. self.distortion_tables is empty)
+            - If there is no missing middle ring (x * y -1 != detected rings)
+            NotImplementedError if:
+            - No missing middle ring (even number of XY tiles)
+            ValueError if:
+            - the date has no associated distortion table
+
+        :param date: str, date to calculate the df from
+
+        :return: pd.DataFame with columns:
+            - Ring_ID, Channel, x, y, dx, dy, magnitude
+        """
+        # Sanity checks
+        if not self.distortion_tables:
+            raise RuntimeError("The OMERO data seems not to be loaded yet.")
+        if date not in self.distortion_tables.keys():
+            raise ValueError(
+                f"The date <{date}> does not have a distortion table."
+            )
+
+        # Get the number of x and y tiles calculated from the detected ROI locations
+        n_x, n_y = self.get_field_of_rings_grid_size(date=date)
+        df = pd.DataFrame(self.distortion_tables.get(date))
+
+        if n_x * n_y - 1 != len(df):
+            raise RuntimeError(
+                f"Expected a missing center ROI. There are {n_x} X & {n_y} Y "
+                f"tiles = {n_x * n_y}, and {len(df)} detected rings!"
+            )
+        if n_x * n_y % 2 == 0:
+            raise NotImplementedError(
+                "Only implemented for center Ring missing!"
+            )
+
+        # Get the middle index using tile numbers (supports non-square field of rings)
+        middle_idx = n_x * (n_y // 2) + n_x // 2 + 1  # 1-based index
+
+        # Idxs for 4-connected Rings before adding middle
+        fours = [
+            middle_idx - n_x,
+            middle_idx - 1,
+            middle_idx,
+            middle_idx + n_x - 1,
+        ]
+
+        # Get a list of the available channels
+        # Example columns: Ring_ID, DAPI, DAPI_dx, DAPI_dy, 488, 488_dx, 488_dy, Alexa 647, Alexa 647_dx, Alexa 647_dy
+        chs = [x for x in df.columns if "_" not in x]
+
+        # Initialise the final dataframe
+        df_final = pd.DataFrame()
+        # Create channel dataframes
+        for ch in chs:
+            # Create dict for final dataframe per channel
+            df_dict = {
+                "Ring_ID": [],
+                "Channel": [ch] * (len(df) + 1),
+                "x": [],  # tile position
+                "y": [],
+                "dx": [],
+                "dy": [],
+                "Magnitude": [],
+            }
+            # Get the values that need to be averaged
+            dxs = [
+                df.loc[df["Ring_ID"] == f, f"{ch}_dx"].iloc[0] for f in fours
+            ]
+            dys = [
+                df.loc[df["Ring_ID"] == f, f"{ch}_dy"].iloc[0] for f in fours
+            ]
+            dxs = np.average(dxs)
+            dys = np.average(dys)
+            # Calculate the middle magnitude from their ∆x & ∆y (don't average the 4 individual ones)
+            magnitudes = (dxs**2 + dys**2) ** 0.5
+
+            # Initialise the tile positions
+            x_tile = 1
+            y_tile = 1
+            # Loop over the rows in the dataframe
+            for _idx, row in df.iterrows():
+                # Get the current Ring ID
+                cur_ring = int(row["Ring_ID"])
+                # Adjust XY tiles according to new rows
+                if x_tile > n_x:
+                    x_tile = 1
+                    y_tile = y_tile + 1
+                # Add the middle index
+                if cur_ring == middle_idx:
+                    df_dict["Ring_ID"].append(cur_ring)
+                    df_dict["x"].append(x_tile)
+                    df_dict["y"].append(y_tile)
+                    df_dict["dx"].append(dxs)
+                    df_dict["dy"].append(dys)
+                    df_dict["Magnitude"].append(magnitudes)
+                    # Update x-tile counter
+                    x_tile = x_tile + 1
+                # After middle: increase cur_ring by 1
+                if cur_ring >= middle_idx:
+                    cur_ring = cur_ring + 1
+
+                # Add row as
+                df_dict["Ring_ID"].append(cur_ring)
+                df_dict["x"].append(x_tile)
+                df_dict["y"].append(y_tile)
+                df_dict["dx"].append(row[f"{ch}_dx"])
+                df_dict["dy"].append(row[f"{ch}_dy"])
+                df_dict["Magnitude"].append(row[ch])
+                # Increment the x tile count
+                x_tile = x_tile + 1
+
+            # Append result to final dict
+            if df_final.empty:
+                df_final = pd.DataFrame().from_dict(df_dict)
+            else:
+                df_final = pd.concat(
+                    [df_final, pd.DataFrame().from_dict(df_dict)],
+                    ignore_index=True,
+                )
+
+        return df_final
+
     def get_distortion_dataframe_from_rois(self, date: str) -> pd.DataFrame:
         """
         Create distortion dataframe for visualisation.
@@ -195,10 +336,12 @@ class FieldData:
         Per ring get ∆x, ∆y, and magnitude (absolute distance).
         Averages in 4-connected manner the middle (missing) ring.
 
+        # FIXME this will be deprecated, since I can calculate it by channel from table data
+
         :param date: str, date to calculate the df from
 
         :return: pd.DataFame with columns:
-            - Channel, x, y, dx, dy, magnitude
+            - Ring_ID, x, y, dx, dy, magnitude
         """
         # Sanity checks
         if not self.distortion_tables:
@@ -234,7 +377,6 @@ class FieldData:
             )
         # FIXME this is only for one channel (the last)
 
-        # TODO continue here
         # Get the middle index using tile numbers (supports non-square field of rings)
         middle_idx = n_x * (n_y // 2) + n_x // 2 + 1  # 1-based index
 
@@ -297,7 +439,7 @@ class FieldData:
                 )
                 # Update counters
                 x_tile = x_tile + 1
-            # After middle increate cur_ring by 1
+            # After middle increase cur_ring by 1
             if cur_ring >= middle_idx:
                 cur_ring = cur_ring + 1
 
@@ -547,11 +689,18 @@ class FieldData:
                 # First column stays the same
                 new_cols = [_df.columns[0]]
                 for col in _df.columns[1:]:
-                    if col not in ch_map.keys():
+                    if "_" in col:
+                        # col e.g. = ch0_dx
+                        ch_name = col.split("_")[0]
+                    else:
+                        # col e.g. = ch0
+                        ch_name = col
+                    if ch_name not in ch_map.keys():
                         raise ValueError(
                             f"Cannot match <{col}> to a channel name."
                         )
-                    new_cols.append(ch_map.get(col))
+                    # Replace e.g. ch0 with the actual channel name
+                    new_cols.append(col.replace(ch_name, ch_map.get(ch_name)))
                 # Set the new column names
                 _df.columns = new_cols
                 # Overwrite the data dict (necessary!)

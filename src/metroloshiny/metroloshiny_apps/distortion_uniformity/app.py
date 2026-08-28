@@ -9,6 +9,7 @@ import plotly.graph_objects as go
 import seaborn as sns
 from matplotlib.figure import Figure
 from matplotlib.quiver import Quiver
+from plotly.subplots import make_subplots
 from shiny import reactive
 from shiny.express import input, render, ui
 from shinywidgets import render_widget
@@ -65,34 +66,9 @@ with ui.nav_panel(title=""):
             ui.input_select("objective", "Select an objective", choices=[])
             ui.input_select("info", "Filter by info column", choices=[])
 
-        with ui.navset_card_underline(title="Plotting options"):
-            with ui.nav_panel(title="Options"):
-
-                @render.ui
-                def render_plotting_options():
-                    """FIXME: Construction in progress."""
-                    return "under construction"
-
-            with ui.nav_panel(title="Objective information"):
-
-                @render.text
-                def show_objective_table_message():
-                    """Show info if no database objective available."""
-                    df, _ = create_objective_db_table()
-                    if df.empty:
-                        return "No objective information available."
-                    else:
-                        return ""
-
-                @render.data_frame
-                def show_objective_table():
-                    """Render the available objective table."""
-                    df, styles = create_objective_db_table()
-                    return render.DataGrid(df, styles=styles)
-
         #   Field Distortion and Uniformity - average metrics   ##############
         with ui.navset_card_underline(
-            title="Average Field Distortion & Uniformity"
+            title="Average Field Distortion & Uniformity", id="averages_card"
         ):
             with ui.nav_panel(title="Plot Field Uniformity"):
 
@@ -136,8 +112,27 @@ with ui.nav_panel(title=""):
                     df = df.sort_values(by=["Date", "Channel"])
                     return df
 
+            with ui.nav_panel(title="Objective information"):
+
+                @render.text
+                def show_objective_table_message():
+                    """Show info if no database objective available."""
+                    df, _ = create_objective_db_table()
+                    if df.empty:
+                        return "No objective information available."
+                    else:
+                        return ""
+
+                @render.data_frame
+                def show_objective_table():
+                    """Render the available objective table."""
+                    df, styles = create_objective_db_table()
+                    return render.DataGrid(df, styles=styles)
+
         # Uniformity - Heat-map like plots                  ##################
-        with ui.navset_card_underline(title="Field Uniformity"):
+        with ui.navset_card_underline(
+            title="Field Uniformity", id="uniformity_card"
+        ):
             with ui.nav_panel(title="Plot"):
                 # Add 2 columns for date comparison selections
                 with ui.layout_column_wrap(width=1 / 2):
@@ -181,7 +176,8 @@ with ui.nav_panel(title=""):
                 @render.ui
                 def uniformity_channel_selector():
                     """Show a channel selector."""
-                    channels = get_common_uniformity_channels()
+                    _ = get_omero_data()
+                    channels = sorted(get_common_uniformity_channels())
                     uni_ch_selector = ui.input_select(
                         "uni_ch_selector", "Display channel", choices=channels
                     )
@@ -193,25 +189,57 @@ with ui.nav_panel(title=""):
                     return create_uniformity_plot()
 
         # Distortion - Heat-map like plots                  ##################
-        with ui.navset_card_underline(title="Field Distortion"):
+        with ui.navset_card_underline(
+            title="Field Distortion", id="distortion_card"
+        ):
             with ui.nav_panel(title="Plot"):
+                # Add 2 columns for date comparison selections
+                with ui.layout_column_wrap(width=1 / 2):
+
+                    @render.ui
+                    def dist_date_sel_1():
+                        """Show date selection for 1st distortion figure."""
+                        data = get_omero_data()
+                        if data is None:
+                            choices = []
+                        else:
+                            choices = data.get_distortion().keys()
+                            choices = list(choices)
+                        dist_date_selector_1 = ui.input_select(
+                            "dist_date_selector_1",
+                            "Select a date",
+                            choices=choices,
+                            selected=None if len(choices) == 0 else choices[0],
+                        )
+                        return dist_date_selector_1
+
+                    @render.ui
+                    def dist_date_sel_2():
+                        """Show date selection for 2nd distortion figure."""
+                        data = get_omero_data()
+                        if data is None:
+                            choices = []
+                        else:
+                            choices = data.get_distortion().keys()
+                            choices = list(choices)
+                        dist_date_selector_2 = ui.input_select(
+                            "dist_date_selector_2",
+                            "Select a date",
+                            choices=choices,
+                            selected=(
+                                None if len(choices) == 0 else choices[-1]
+                            ),
+                        )
+                        return dist_date_selector_2
 
                 @render.ui
-                def dist_date_sel_1():
-                    """Show date selection for 2nd unifomrity figure."""
-                    data = get_omero_data()
-                    if data is None:
-                        choices = []
-                    else:
-                        choices = data.get_distortion().keys()
-                        choices = list(choices)
-                    dist_date_selector_1 = ui.input_select(
-                        "dist_date_selector_1",
-                        "Select a date",
-                        choices=choices,
-                        selected=None if len(choices) == 0 else choices[0],
+                def distortion_channel_selector():
+                    """Show a channel selector."""
+                    channels = sorted(get_common_distortion_channels())
+                    dist_ch_selector = ui.input_select(
+                        "dist_ch_selector", "Display channel", choices=channels
                     )
-                    return dist_date_selector_1
+                    return dist_ch_selector
 
                 @render_widget
                 def show_distortion_from_rois():
@@ -250,36 +278,99 @@ def create_distortion_plot():
     # Get the data and necessary inputs
     omero_data = get_omero_data()
     date1 = input.dist_date_selector_1()
-    if omero_data is None or date1 is None:
+    date2 = input.dist_date_selector_2()
+    channel = input.dist_ch_selector()
+    if None in [omero_data, date1, date2, channel]:
         return no_data_plotly()
 
     # Get the plotting data
-    df = omero_data.get_distortion_dataframe_from_rois(date1).copy()
+    df1 = omero_data.get_distortion_dataframe(date1).copy()
+    df2 = omero_data.get_distortion_dataframe(date2).copy()
+    df1 = filter_by_column_value(df1, column_name="Channel", value=channel)
+    df2 = filter_by_column_value(df2, column_name="Channel", value=channel)
 
     # Create magnitude heat-map data (no normalization)
-    heat = df.pivot(index="y", columns="x", values="Magnitude").to_numpy()
+    heat1 = df1.pivot(index="y", columns="x", values="Magnitude").to_numpy()
+    heat2 = df2.pivot(index="y", columns="x", values="Magnitude").to_numpy()
 
     # Create normalized distortion vectors
-    df_norm = normalize_df(df, start_col=3)
-    x = df_norm["x"].to_numpy()
-    y = df_norm["y"].to_numpy()
-    dx = df_norm["dx"].to_numpy()
-    dy = df_norm["dy"].to_numpy()
+    df_norm1 = normalize_df(df1, start_col=3)
+    x1 = df_norm1["x"].to_numpy()
+    y1 = df_norm1["y"].to_numpy()
+    dx1 = df_norm1["dx"].to_numpy()
+    dy1 = df_norm1["dy"].to_numpy()
+    df_norm2 = normalize_df(df2, start_col=3)
+    x2 = df_norm2["x"].to_numpy()
+    y2 = df_norm2["y"].to_numpy()
+    dx2 = df_norm2["dx"].to_numpy()
+    dy2 = df_norm2["dy"].to_numpy()
 
-    df["angle"] = (np.degrees(np.arctan2(df["dx"], df["dy"])) * -1 + 180) % 360
-    angle = df.pivot(index="y", columns="x", values="angle").to_numpy()
+    df1["angle"] = (
+        np.degrees(np.arctan2(df1["dx"], df1["dy"])) * -1 + 180
+    ) % 360
+    df2["angle"] = (
+        np.degrees(np.arctan2(df2["dx"], df2["dy"])) * -1 + 180
+    ) % 360
+    angle1 = df1.pivot(index="y", columns="x", values="angle").to_numpy()
+    angle2 = df2.pivot(index="y", columns="x", values="angle").to_numpy()
+
+    # Get the magnitude max values (min is set to 0)
+    heat_max = max(np.nanmax(heat1), np.nanmax(heat2))
 
     # Create the heatmap figure             ##################################
-    fig = go.Figure()
+    fig = make_subplots(
+        rows=1,
+        cols=2,
+        # subplot_titles=(
+        #     f"{date1} - {channel}",
+        #     f"{date2} - {channel}",
+        # ),
+    )
+    # Heat-map for date1
     fig.add_trace(
         go.Heatmap(
-            z=heat,
-            x=np.arange(1, heat.shape[1] + 1),
-            y=np.arange(1, heat.shape[0] + 1),
+            z=heat1,
+            x=np.arange(1, heat1.shape[1] + 1),
+            y=np.arange(1, heat1.shape[0] + 1),
             colorscale="Viridis",
+            # Set the color min/max
+            zmin=0,
+            zmax=heat_max,
+            # No colorbar explicitly with showscale=False
+            showscale=False,
+            zsmooth="best",
+            customdata=angle1,
+            hovertemplate=(
+                "x=%{x}<br>"
+                "y=%{y}<br>"
+                "Magnitude=%{z:.3f}<br>"
+                "Angle=%{customdata:.1f}°<extra></extra>"
+            ),
+        ),
+        row=1,
+        col=1,
+    )
+    # Heat-map for date1
+    fig.add_trace(
+        go.Heatmap(
+            z=heat2,
+            x=np.arange(1, heat2.shape[1] + 1),
+            y=np.arange(1, heat2.shape[0] + 1),
+            colorscale="Viridis",
+            # Set the color min/max
+            zmin=0,
+            zmax=heat_max,
+            zsmooth="best",
+            customdata=angle2,
+            hovertemplate=(
+                "x=%{x}<br>"
+                "y=%{y}<br>"
+                "Magnitude=%{z:.3f}<br>"
+                "Angle=%{customdata:.1f}°<extra></extra>"
+            ),
             colorbar={
                 "title": {
-                    "text": "Magnitude<br>(currently in pixels)",
+                    "text": "Magnitude [µm]",
                     "side": "right",
                 },
                 # Position relative to whole figure
@@ -291,22 +382,17 @@ def create_distortion_plot():
                 # "y": 0.5,
                 # "yanchor": "middle",
             },
-            zsmooth="best",
-            customdata=angle,
-            hovertemplate=(
-                "x=%{x}<br>"
-                "y=%{y}<br>"
-                "Magnitude=%{z:.3f}<br>"
-                "Angle=%{customdata:.1f}°<extra></extra>"
-            ),
-        )
+        ),
+        row=1,
+        col=2,
     )
 
-    quiv = pff.create_quiver(
-        x,
-        y,
-        dx,
-        dy,
+    # Add quiver plots on top               ##################################
+    quiv1 = pff.create_quiver(
+        x1,
+        y1,
+        dx1,
+        dy1,
         scale=2,
         arrow_scale=0.3,
         hoverinfo="skip",
@@ -314,11 +400,28 @@ def create_distortion_plot():
         # fill="white",
     )
     # Add the quiver to the figure
-    for trace in quiv.data:
+    for trace in quiv1.data:
         # Define arrow color and line width
         trace.line.color = "white"
         trace.line.width = 1.0
-        fig.add_trace(trace)
+        fig.add_trace(trace, row=1, col=1)
+    quiv2 = pff.create_quiver(
+        x2,
+        y2,
+        dx2,
+        dy2,
+        scale=2,
+        arrow_scale=0.3,
+        hoverinfo="skip",
+        showlegend=False,
+        # fill="white",
+    )
+    # Add the quiver to the figure
+    for trace in quiv2.data:
+        # Define arrow color and line width
+        trace.line.color = "white"
+        trace.line.width = 1.0
+        fig.add_trace(trace, row=1, col=2)
 
     # Layout                                ##################################
     mic = input.microscope()
@@ -327,34 +430,65 @@ def create_distortion_plot():
     info = input.info()
 
     fig.update_layout(
-        title=(f"Field Distortion (from OMERO ROIs):<br>{mic} {obj} ({info})"),
+        title={
+            "text": f"Field Distortion: {mic} {obj} ({info})",
+            "y": 0.94,
+            "yanchor": "top",
+            "x": 0.5,
+            "xanchor": "center",
+            "font": {"size": 18},
+        },
         plot_bgcolor="white",
-        xaxis={
-            # "domain": [0, 0.88],  # Space for the heatmap
-            "showgrid": False,
-            "zeroline": False,
-            "showticklabels": False,
-            "constrain": "domain",
-        },
-        yaxis={
-            "showgrid": False,
-            "zeroline": False,
-            "showticklabels": False,
-            # "constrain": "domain",
-            "scaleanchor": "x",
-            "scaleratio": 1,
-            "autorange": "reversed",
-        },
         margin={
             "l": 0,
             "r": 80,
             "t": 60,
             "b": 0,
         },
-        # Define the size of the figure - Don't use that
-        # width=900,
-        # height=600,
         autosize=True,
+    )
+    fig.update_xaxes(
+        showgrid=False,
+        zeroline=False,
+        showticklabels=False,
+        constrain="domain",
+    )
+    fig.update_yaxes(
+        showgrid=False,
+        zeroline=False,
+        showticklabels=False,
+        autorange="reversed",
+    )
+    # Ensure square plots
+    fig.update_yaxes(row=1, col=1, scaleanchor="x", scaleratio=1)
+    fig.update_yaxes(row=1, col=2, scaleanchor="x2", scaleratio=1)
+    # Shift the plot a bit down (relative to title/top of the full figure)
+    # for ann in fig.layout.annotations:
+    #     ann.y -= 0.02
+    # Add subplot tiltes
+    fig.add_annotation(
+        text=f"{date1} - {channel}",
+        xref="x domain",
+        yref="y domain",  # relative to subplot 1's own domain
+        x=0.5,
+        y=0.94,  # centered horizontally, top of domain
+        xanchor="center",
+        yanchor="bottom",
+        yshift=-15,  # small pixel offset, tune to taste
+        showarrow=False,
+        font={"size": 18},  # match default subplot title size if needed
+    )
+    fig.add_annotation(
+        text=f"{date2} - {channel}",
+        xref="x2 domain",
+        yref="y2 domain",  # relative to subplot 1's own domain
+        x=0.5,
+        y=0.94,  # centered horizontally, top of domain
+        xanchor="center",
+        yanchor="bottom",
+        yshift=-15,  # small pixel offset, tune to taste
+        showarrow=False,
+        font={"size": 18},  # match default subplot title size if needed
     )
     return fig
 
@@ -456,6 +590,7 @@ def create_uniformity_plot_sns():
     """
     Create a heat-map like plot for the Filed Uniformity between 2 dates.
 
+    FIXME Deprecated
     FIXME seaborn heatmaps cannot have interpolation...
 
     :return: matplotlib Figure with seaborn plots
@@ -695,20 +830,42 @@ def create_plot_over_time(df: pd.DataFrame):
 
 
 @reactive.calc
-def get_valid_uniformity_dataframes() -> dict[str, pd.DataFrame]:
+def get_common_distortion_channels() -> list[str]:
     """
-    Get the uniformity tables, excluding the dates are None.
+    Get a list of common distortion channels (between 2 dates).
 
-    :return: dict, same as get_uniformity() but date always has a pd.DataFrame
+    Reacts on inputs uni_date_selector_1 & uni_date_selector_2
+    Function is shortened compared to the uniformity analog (below).
+
+    :return: list[str] of channels or empty list
     """
-    uni = get_omero_data().get_uniformity()
-    return {k: v for k, v in uni.items() if v is not None}
+    # Get the date inputs
+    date1 = input.dist_date_selector_1()
+    date2 = input.dist_date_selector_2()
+    if None in [date1, date2]:
+        return []
+    # Get the OMERO data
+    data = get_omero_data()
+    if data is None:
+        return []
+
+    channels1 = data.get_channel_names(date1)
+    channels2 = data.get_channel_names(date2)
+    # Filter common channels between 2 dates
+    common_chs = list(set(channels1).intersection(channels2))
+    if len(common_chs) != len(channels1) or len(common_chs) != len(channels2):
+        ui.notification_show(
+            "Some distortion channels are not available for both dates!",
+            type="warning",
+            id="dist_ch_warn",
+        )
+    return common_chs
 
 
 @reactive.calc
 def get_common_uniformity_channels() -> list[str]:
     """
-    Get a list of common uniformity channels (between 2 dats).
+    Get a list of common uniformity channels (between 2 dates).
 
     Reacts on inputs uni_date_selector_1 & uni_date_selector_2
 
@@ -727,17 +884,26 @@ def get_common_uniformity_channels() -> list[str]:
         return []
     # Column headers to exclude
     default_cols = ["Ring_ID", "X", "Y"]
+    # Make sure that there are only dates (keys) with dataframes
+    uni_tables = {
+        # Key must be cast to str
+        str(k): v
+        for k, v in data.get_uniformity().items()
+        if v is not None
+    }
     # Get channel names for date 1 & 2
-    date1_chs = get_valid_uniformity_dataframes().get(date1)
-    date1_chs = [x for x in date1_chs.columns if x not in default_cols]
-    date2_chs = get_valid_uniformity_dataframes().get(date2)
-    date2_chs = [x for x in date2_chs.columns if x not in default_cols]
+    date1_chs = [
+        x for x in uni_tables.get(date1).columns if x not in default_cols
+    ]
+    date2_chs = [
+        x for x in uni_tables.get(date2).columns if x not in default_cols
+    ]
     # Get the common channels
     common_chs = list(set(date1_chs).intersection(date2_chs))
     # Warn if some channels are not available for both dates
     if len(common_chs) != len(date1_chs) or len(common_chs) != len(date2_chs):
         ui.notification_show(
-            "Some channels are not available for both dates",
+            "Some uniformity channels are not available for both dates!",
             type="warning",
             id="uni_ch_warn",
         )
@@ -760,6 +926,8 @@ def get_omero_data() -> Optional[FieldData]:
     # Drop nan columns (cols may not be nan but empty str...)
     df = df.replace("", np.nan)
     df = df.dropna(axis="columns")
+    # Make sure that headers are all str
+    df.columns = [str(x) for x in df.columns]
 
     # Create and load data
     data = FieldData(df, retrieve_omero=True)

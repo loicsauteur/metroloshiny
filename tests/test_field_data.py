@@ -1,5 +1,6 @@
 """Test for the FieldData class."""
 
+import numpy as np
 import pandas as pd
 import pytest
 
@@ -302,8 +303,73 @@ def test_get_distortion_dataframe_from_rois():
     # assert mag == middle_row["Magnitude"] # does not need to be the same...
 
 
+@pytest.mark.manual
+def test_get_distortion_dataframe():
+    """
+    Test the get_distortion_dataframe function.
+
+    Which implements distortion for multiple channels.
+    """
+    # Create mock data
+    df = _create_mock_omero_df_()
+    # Create data object WITH loading from OMERO
+    data = FieldData(base_df=df, retrieve_omero=True)
+    date = "20260101"
+    # Number of XY tiles
+    x, y = data.get_field_of_rings_grid_size(date)
+
+    # Test the function
+    df = data.get_distortion_dataframe(date=date)
+    # Get the number of channels
+    n_ch = len(data._map_channel_names_(date=date).values())
+    # There should be rows = x * y * channels
+    assert len(df) == x * y * n_ch
+    assert len(df.columns) == 7
+
+    unique_ch = list(np.unique(np.asarray(df["Channel"])))
+    assert len(unique_ch) == n_ch
+    for ch in unique_ch:
+        assert ch in data._map_channel_names_(date=date).values()
+
+    for idx in range(1, x * y + 1):
+        assert idx in list(df["Ring_ID"])
+    for idx in range(1, x + 1):
+        msg = f"{idx} occurs {list(df['x']).count(idx)} instead of {y * n_ch}"
+        assert y * n_ch == list(df["x"]).count(idx), msg
+    for idy in range(1, y + 1):
+        msg = f"{idy} occurs {list(df['y']).count(idy)} instead of {x * n_ch}"
+        assert x * n_ch == list(df["y"]).count(idy), msg
+
+    for ch in unique_ch:
+        # Filter a dataframe copy by the current channel
+        df_copy = df.copy()
+        df_copy = df_copy[df_copy["Channel"] == ch]
+        assert len(df_copy) == x * y
+        middle_row = df_copy.iloc[x * y // 2]
+        assert middle_row["x"] == middle_row["y"] == x // 2 + 1 == y // 2 + 1
+
+        # Check if values were calculated correctly
+        dx = df_copy.iloc[x * y // 2 - x, 4]
+        dx = dx + df_copy.iloc[x * y // 2 - 1, 4]
+        dx = dx + df_copy.iloc[x * y // 2 + 1, 4]
+        dx = dx + df_copy.iloc[x * y // 2 + x, 4]
+        dx = dx / 4
+        dy = df_copy.iloc[x * y // 2 - x, 5]
+        dy = dy + df_copy.iloc[x * y // 2 - 1, 5]
+        dy = dy + df_copy.iloc[x * y // 2 + 1, 5]
+        dy = dy + df_copy.iloc[x * y // 2 + x, 5]
+        dy = dy / 4
+        assert dx == middle_row["dx"]
+        assert dy == middle_row["dy"]
+        # Calculate the magnitude using ∆x & ∆y
+        calc_mag = (dx**2 + dy**2) ** 0.5
+        assert calc_mag == middle_row["Magnitude"]
+
+
 if __name__ == "__main__":
-    # test_basics()
+    # test_fielddata_pytest()
+    # test_fielddata()
     # test_heat_mapping()
     # test_get_distortion_dataframe_from_rois()
+    # test_get_distortion_dataframe()
     pass

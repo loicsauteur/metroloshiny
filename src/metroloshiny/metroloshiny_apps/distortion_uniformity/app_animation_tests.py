@@ -271,6 +271,13 @@ with ui.nav_panel(title=""):
 # Plot creation             --------------------------------------------------
 
 
+@reactive.calc()
+def animate_invalidation():
+    """Invalidate variable."""
+    reactive.invalidate_later(30)
+    return True
+
+
 def coordinate_space():
     """
     Create an example plot.

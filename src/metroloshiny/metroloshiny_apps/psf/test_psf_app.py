@@ -4,8 +4,6 @@ from playwright.sync_api import Page
 from shiny.playwright import controller as ctrl
 from shiny.run import ShinyAppProc
 
-# from shiny.playwright import controller as ctrl
-
 
 def test_basic_app(page: Page, local_app: ShinyAppProc) -> None:
     """
