@@ -1,4 +1,9 @@
-"""Test for the FieldData class."""
+"""
+Test for the FieldData class.
+
+FIXME: currently not tested on dates with a missing channel (e.g. "20260107")
+    Would need to have an OMERO table accordingly.
+"""
 
 import numpy as np
 import pandas as pd
@@ -47,6 +52,13 @@ def _create_mock_omero_df_() -> pd.DataFrame:
         ],
         # Date with NAN entries
         "20260106": ["", None, "", None],
+        # # Date with a missing channel
+        # "20260107": [
+        #     "omero3454869_ch-1",
+        #     "omero3454869_ch-2",
+        #     "",
+        #     "omero3454869_ch-0",
+        # ],
     }
     return pd.DataFrame().from_dict(_df)
 

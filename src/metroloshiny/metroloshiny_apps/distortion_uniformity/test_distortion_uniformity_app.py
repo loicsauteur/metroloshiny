@@ -84,17 +84,28 @@ def test_basic_app(page: Page, local_app: ShinyAppProc) -> None:
     obj_table.expect_ncol(0)
 
     # Check stuff on the Uniformity card (only input selections)    ##########
+    uniformity_card = ctrl.NavsetCardUnderline(page, "uniformity_card")
+    uniformity_card.set("Compare two dates")
     # (on Mattenstrasse, where there is some data associated)
     expected_dates = ["20260101", "20260109", "20260120"]
     expected_channels = sorted(["488", "561", "Alexa 647", "DAPI"])
     uni_date1 = ctrl.InputSelect(page, "uni_date_selector_1")
     uni_date2 = ctrl.InputSelect(page, "uni_date_selector_2")
-    uni_ch = ctrl.InputSelect(page, "uni_ch_selector")
     uni_date1.expect_choices(expected_dates)
     uni_date2.expect_choices(expected_dates)
     uni_date1.expect_selected(expected_dates[0])
     uni_date2.expect_selected(expected_dates[-1])
-    uni_ch.expect_choices(expected_channels)
+
+    uniformity_card.set("Compare channels")
+    uni_ch1 = ctrl.InputSelect(page, "uni_ch_selector1")
+    uni_ch2 = ctrl.InputSelect(page, "uni_ch_selector2")
+    uni_single_date = ctrl.InputSelect(page, "uni_single_date_selector")
+    uni_ch1.expect_choices(expected_channels)
+    uni_ch2.expect_choices(expected_channels)
+    uni_ch1.expect_selected(expected_channels[0])
+    uni_ch2.expect_selected(expected_channels[-1])
+    uni_single_date.expect_choices(expected_dates)
+    uni_single_date.expect_selected(expected_dates[0])
 
     # Check stuff on the Distortion card (only input selections)    ##########
     dist_date1 = ctrl.InputSelect(page, "dist_date_selector_1")

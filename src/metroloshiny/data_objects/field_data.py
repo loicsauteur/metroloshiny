@@ -22,6 +22,8 @@ class FieldData:
     it will still try to get some date. And at the same time it will populate a "log" list
     (a list of strings; variable name = problems).
 
+    FIXME: not tested on dates that have missing channel(s).
+
     """
 
     def __init__(self, base_df: pd.DataFrame, retrieve_omero: bool = True):
@@ -41,7 +43,7 @@ class FieldData:
         """
         # Make sure that there are not nan columns in the input dataframe
         base_df = base_df.replace("", np.nan)
-        base_df = base_df.dropna(axis="columns")
+        base_df = base_df.dropna(axis="columns", how="all")
         # Make sure the Channels are all str
         base_df["Channel"] = base_df["Channel"].astype(str)
         self.base_df = base_df
@@ -860,8 +862,11 @@ class FieldData:
 
         unique_ids = {}
         for col in df.columns:
-            # Get a list of omeroID
-            col_ids = [str(x).split("_")[0] for x in df[col]]
+            # Get a list of omeroID (missing ids may be nan)
+            # Only consider strings. Missing channels (NaNs) are ignored
+            col_ids = [
+                str(x).split("_")[0] for x in df[col] if isinstance(x, str)
+            ]
             unique = list(np.unique(np.asarray(col_ids)))
             # Error if there is multiple IDs per date
             if len(unique) > 1:

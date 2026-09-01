@@ -6,7 +6,6 @@ import pandas as pd
 import plotly.express as px
 import plotly.figure_factory as pff
 import plotly.graph_objects as go
-import seaborn as sns
 from matplotlib.figure import Figure
 from matplotlib.quiver import Quiver
 from plotly.subplots import make_subplots
@@ -51,6 +50,8 @@ sites = np.unique(np.asarray(dataframe["Site"]))
 # Reactive variables              --------------------------------------------
 # Remember choices for objectives (to maybe create an objective_db table)
 objective_choices = reactive.value(None)
+# Card heights (random initial values)
+uni_2_dates_card_height = reactive.value("20px")
 
 # Create UI         ----------------------------------------------------------
 ui.page_opts(
@@ -130,10 +131,12 @@ with ui.nav_panel(title=""):
                     return render.DataGrid(df, styles=styles)
 
         # Uniformity - Heat-map like plots                  ##################
+        # TODO FIXME: could do also use express.ui.accordion for collapsible vertical tabs??
         with ui.navset_card_underline(
             title="Field Uniformity", id="uniformity_card"
         ):
-            with ui.nav_panel(title="Plot"):
+            # Compare 2 dates for the same colors           ##################
+            with ui.nav_panel(title="Compare two dates"):
                 # Add 2 columns for date comparison selections
                 with ui.layout_column_wrap(width=1 / 2):
 
@@ -145,11 +148,13 @@ with ui.nav_panel(title=""):
                             choices = []
                         else:
                             choices = data.get_uniformity().keys()
+                            choices = list(choices)
                         # Unfortunately a slider does not work nicely
                         uni_date_selector_1 = ui.input_select(
                             "uni_date_selector_1",
-                            "Select a date",
+                            "Select a first date",
                             choices=list(choices),
+                            selected=None if len(choices) == 0 else choices[0],
                         )
                         return uni_date_selector_1
 
@@ -165,7 +170,7 @@ with ui.nav_panel(title=""):
                         # Unfortunately a slider does not work nicely
                         uni_date_selector_2 = ui.input_select(
                             "uni_date_selector_2",
-                            "Select a date",
+                            "Select a second date",
                             choices=choices,
                             selected=(
                                 None if len(choices) == 0 else choices[-1]
@@ -173,20 +178,95 @@ with ui.nav_panel(title=""):
                         )
                         return uni_date_selector_2
 
-                @render.ui
-                def uniformity_channel_selector():
-                    """Show a channel selector."""
-                    _ = get_omero_data()
-                    channels = sorted(get_common_uniformity_channels())
-                    uni_ch_selector = ui.input_select(
-                        "uni_ch_selector", "Display channel", choices=channels
-                    )
-                    return uni_ch_selector
+                # Plot the uniformity comparison between 2 dates   -----------
+                @render.express
+                def card_uni_2_dates():
+                    # """Trick to dynamically set the card height."""
+                    # No doc-string, would be printed in UI.
+                    # Add a little space
+                    ui.div(style="margin-top: 20px;")
+                    with ui.card(min_height=uni_2_dates_card_height.get()):
 
-                @render.plot
-                def plot_field_uniformity():
-                    """Plot field uniformity of 2 dates side by side."""
-                    return create_uniformity_plot()
+                        @render.plot()
+                        def plot_field_uniformity():
+                            """Plot field uniformity of 2 dates side by side."""
+                            # Trigger card height reactive calculation
+                            _height = set_card_height_uni_2_dates()
+
+                            # Show the plot
+                            # return create_uniformity_plot()
+                            return plot_uniformity_2_measurements()
+
+            # Compare 2 channels on the same date           ##################
+            with ui.nav_panel(title="Compare channels"):
+                # Add 2 columns for 2 channel selections (for 1 date)
+                with ui.layout_column_wrap(width=1 / 2):
+
+                    @render.ui
+                    def uniformity_channel_selector_1():
+                        """Show selector for a first channel."""
+                        data = get_omero_data()
+                        date = input.uni_single_date_selector()
+                        if data is None or date is None:
+                            channels = []
+                        else:
+                            channels = sorted(data.get_channel_names(date))
+                        uni_ch_selector1 = ui.input_select(
+                            "uni_ch_selector1",
+                            "Select a first channel",
+                            choices=channels,
+                            selected=(
+                                None if len(channels) == 0 else channels[0]
+                            ),
+                        )
+                        return uni_ch_selector1
+
+                    @render.ui
+                    def uniformity_channel_selector_2():
+                        """Show selector for a second channel."""
+                        data = get_omero_data()
+                        date = input.uni_single_date_selector()
+                        if data is None or date is None:
+                            channels = []
+                        else:
+                            channels = sorted(data.get_channel_names(date))
+                        uni_ch_selector2 = ui.input_select(
+                            "uni_ch_selector2",
+                            "Select a second channel",
+                            choices=channels,
+                            selected=(
+                                None if len(channels) == 0 else channels[-1]
+                            ),
+                        )
+                        return uni_ch_selector2
+
+                @render.ui
+                def uni_single_date_sel():
+                    """Show date selection for 1st unifomrity figure."""
+                    data = get_omero_data()
+                    if data is None:
+                        choices = []
+                    else:
+                        choices = data.get_uniformity().keys()
+                        choices = list(choices)
+                    # Unfortunately a slider does not work nicely
+                    uni_single_date_selector = ui.input_select(
+                        "uni_single_date_selector",
+                        "Select a date",
+                        choices=list(choices),
+                        selected=None if len(choices) == 0 else choices[0],
+                    )
+                    return uni_single_date_selector
+
+                # Add a little space
+                ui.div(style="margin-top: 20px;")
+                # Plot the uniformity comparison between channels       ------
+                with ui.card(min_height="400px"):
+
+                    @render.plot
+                    def plot_field_uniformity_between_channels():
+                        """Plot field uniformity of different channels on same date."""
+                        return plot_uniformity_between_channels()
 
         # Distortion - Heat-map like plots                  ##################
         with ui.navset_card_underline(
@@ -511,10 +591,6 @@ def create_distortion_plot_old_mpl() -> tuple[
     which allows modification on the fly (within the plot UI function).
     However, animated plots do not work on the VM.
 
-    TODO for comparing 2 dates, the coloring should be the same for the 2 plots,
-        i.e. normalise the 2 dataframes together?
-
-
     :return: plt.Figure, if no data figure, other values are None
     :return: Optional[plt.Quiver]
     :return: Optional[pd.Series], dx values (aka U)
@@ -586,39 +662,32 @@ def create_distortion_plot_old_mpl() -> tuple[
 
 
 @reactive.calc
-def create_uniformity_plot_sns():
+def plot_uniformity_between_channels():
     """
-    Create a heat-map like plot for the Filed Uniformity between 2 dates.
+    Create heatmap like plots of the Field uniformity to compare 2 channels.
 
-    FIXME Deprecated
-    FIXME seaborn heatmaps cannot have interpolation...
+    (On the same date)
 
-    :return: matplotlib Figure with seaborn plots
+    :return: matplotlib figure
     """
-    # Get the date selections and channel selection
-    channel = input.uni_ch_selector()
-    date1 = input.uni_date_selector_1()
-    date2 = input.uni_date_selector_2()
+    # The the UI selections
+    ch1 = input.uni_ch_selector1()
+    ch2 = input.uni_ch_selector2()
+    date = input.uni_single_date_selector()
     omero_data = get_omero_data()
-    if channel is None or date1 is None or date2 is None or omero_data is None:
+    if None in [ch1, ch2, date, omero_data]:
         return no_data_seaborn()
+
+    # Don't bother plotting if there is only one channel
+    if len(omero_data.get_channel_names(date)) == 1:
+        msg = f"Only one channel ({omero_data.get_channel_names(date)[0]}) available for date {date}!"
+        return no_data_seaborn(msg)
 
     # Get the data (convert unidata for heatmap)
     uni_data = omero_data.get_uniformity()
-    df_1 = omero_data.get_heat_map_dataframe(date=date1, data_dict=uni_data)
-    df_2 = omero_data.get_heat_map_dataframe(date=date2, data_dict=uni_data)
+    df = omero_data.get_heat_map_dataframe(date=date, data_dict=uni_data)
 
-    # Pivot the dfs for given channel (-> XY-table)
-    df_1 = df_1.pivot(index="Y", columns="X", values=channel)
-    df_2 = df_2.pivot(index="Y", columns="X", values=channel)
-    # Normalise the values (individually for each df)
-    df_1 = normalize_percentile(df_1).to_numpy()
-    df_2 = normalize_percentile(df_2).to_numpy()
-
-    # Create an image with the difference of the two (in %)
-    diff = (df_1 - df_2) * 100
-
-    # Create plot
+    # Create figure (4 rows, last one for the scale bar)
     fig, axes = plt.subplots(
         nrows=1,
         ncols=4,
@@ -626,75 +695,211 @@ def create_uniformity_plot_sns():
         gridspec_kw={"width_ratios": [1, 1, 1, 0.2]},
     )
 
-    # Common Seaborn settings
-    heatmap_kwargs = {
-        "cmap": "viridis",
-        "xticklabels": False,
-        "yticklabels": False,
-        "cbar": False,
-        "ax": axes[0],
-    }
+    # Pivot the dfs for given channel (-> XY-table)
+    df1 = df.pivot(index="Y", columns="X", values=ch1)
+    df2 = df.pivot(index="Y", columns="X", values=ch2)
+    # Normalise the values (individually for each df)
+    df1 = normalize_percentile(df1).to_numpy()
+    df2 = normalize_percentile(df2).to_numpy()
+    # Create an image of the difference of the 2 (in %)
+    # FIXME not 100% correct since normalisation over percentile
+    diff = (df1 - df2) * 100
 
-    # First date
-    sns.heatmap(
-        df_1,
-        **heatmap_kwargs,
+    # Interpolation = bicubic for smooth interpolation
+    axes[0].imshow(
+        df1, interpolation="bicubic", origin="upper", cmap="viridis"
     )
-    axes[0].set_title(f"{date1} - {channel}")
-    axes[0].set_xlabel("")
-    axes[0].set_ylabel("")
-
-    # Second date
-    sns.heatmap(
-        df_2,
-        **{**heatmap_kwargs, "ax": axes[1]},
+    axes[1].imshow(
+        df2, interpolation="bicubic", origin="upper", cmap="viridis"
     )
-    axes[1].set_title(f"{date2} - {channel}")
-    axes[1].set_xlabel("")
-    axes[1].set_ylabel("")
 
-    # Difference plot
-    sns.heatmap(
+    # Add date as title to the left
+    axes[0].text(
+        -0.05,
+        0.5,
+        date,
+        rotation="vertical",
+        transform=axes[0].transAxes,
+        va="center",
+        ha="center",
+        fontsize=12,
+    )
+
+    # Add the difference plot with colors blue>white>red (always show values -100 to + 100)
+    diff_img = axes[2].imshow(
         diff,
-        ax=axes[2],
+        interpolation="bicubic",
+        origin="upper",
         cmap="bwr",
         vmin=-100,
         vmax=100,
-        xticklabels=False,
-        yticklabels=False,
-        cbar=False,
     )
-    axes[2].set_title("Difference")
-    axes[2].set_xlabel("")
-    axes[2].set_ylabel("")
-
-    # Dedicated colorbar axis
-    norm = plt.Normalize(vmin=-100, vmax=100)
-    sm = plt.cm.ScalarMappable(norm=norm, cmap="bwr")
-    sm.set_array([])
-
-    cbar = fig.colorbar(sm, cax=axes[3])
+    # Add color bar for the difference plot
+    # Can't make it look better than that. Depends on the window size...
+    cbar = fig.colorbar(diff_img, ax=axes[3])
     cbar.set_label("Difference [%]")
 
-    # Hide the unused axis frames
-    for ax in axes[:3]:
-        for spine in ax.spines.values():
-            spine.set_visible(False)
+    # Adjust titles
+    axes[0].set_title(f"{ch1}")
+    axes[1].set_title(f"{ch2}")
+    axes[2].set_title("Difference")
+
+    # Hide the frames / ticks except for the difference plot
+    for i, ax in enumerate(axes):
+        if i == 2:
+            ax.set_xticks([])
+            ax.set_yticks([])
+        else:
+            ax.axis("off")
 
     mic = input.microscope()
     obj = input.objective()
     obj = get_nice_objective_name(objective_df, obj)
     info = input.info()
-
     fig.suptitle(f"Field Uniformity: {mic} {obj} ({info})")
-
+    fig.tight_layout(rect=[0, 0, 1, 0.96])
     return fig
+
+
+@reactive.calc
+def plot_uniformity_2_measurements():
+    """
+    Create heatmap like plots for the Field uniformity between 2 dates.
+
+    For all common channels. I.e.:
+    DAPI | date1 | date2 | diff
+    488  | date1 | date2 | diff
+    ...
+
+    :return: matplotlib plot
+    """
+    # Get date selections
+    date1 = input.uni_date_selector_1()
+    date2 = input.uni_date_selector_2()
+    omero_data = get_omero_data()
+    if date1 is None or date2 is None or omero_data is None:
+        return no_data_seaborn()
+
+    # Check available channels for the dates
+    channels1 = omero_data.get_channel_names(date1)
+    channels2 = omero_data.get_channel_names(date2)
+    common_chs = sorted(set(channels1).intersection(channels2))
+    if len(common_chs) == 0:
+        return no_data_seaborn("No common channels between the 2 dates!")
+
+    # Get the data (convert unidata for heatmap)
+    uni_data = omero_data.get_uniformity()
+    df_1 = omero_data.get_heat_map_dataframe(date=date1, data_dict=uni_data)
+    df_2 = omero_data.get_heat_map_dataframe(date=date2, data_dict=uni_data)
+
+    # Create figure (4 rows, last one for the scale bar)
+    fig, axes = plt.subplots(
+        nrows=len(common_chs),
+        ncols=4,
+        figsize=(12, 4 * len(common_chs)),
+        gridspec_kw={"width_ratios": [1, 1, 1, 0.2]},
+    )
+    # Create figure: one channel per row
+    for row, channel in enumerate(common_chs):
+        # Pivot the dfs for given channel (-> XY-table)
+        df1 = df_1.pivot(index="Y", columns="X", values=channel)
+        df2 = df_2.pivot(index="Y", columns="X", values=channel)
+        # Normalise the values (individually for each df)
+        df1 = normalize_percentile(df1).to_numpy()
+        df2 = normalize_percentile(df2).to_numpy()
+        # Create an image of the difference of the 2 (in %)
+        # FIXME not 100% correct since normalisation over percentile
+        diff = (df1 - df2) * 100
+
+        # Interpolation = bicubic for smooth interpolation
+        axes[row][0].imshow(
+            df1, interpolation="bicubic", origin="upper", cmap="viridis"
+        )
+        axes[row][1].imshow(
+            df2, interpolation="bicubic", origin="upper", cmap="viridis"
+        )
+
+        # Add channel title to the left
+        # axes[row][0].set_title(channel, rotation="vertical", x=-0.05, y=0.5)
+        axes[row][0].text(
+            -0.05,
+            0.5,
+            channel,
+            rotation="vertical",
+            transform=axes[row][0].transAxes,
+            va="center",
+            ha="center",
+            fontsize=12,
+        )
+
+        # Add the difference plot with colors blue>white>red (always show values -100 to + 100)
+        diff_img = axes[row][2].imshow(
+            diff,
+            interpolation="bicubic",
+            origin="upper",
+            cmap="bwr",
+            vmin=-100,
+            vmax=100,
+        )
+        # Add color bar for the difference plot
+        # Can't make it look better than that. Depends on the window size...
+        cbar = fig.colorbar(diff_img, ax=axes[row][3])
+        cbar.set_label("Difference [%]")
+
+    # Adjust titles
+    axes[0][0].set_title(f"{date1}")
+    axes[0][1].set_title(f"{date2}")
+    axes[0][2].set_title("Difference")
+
+    # Hide the frames / ticks except for the difference plot
+    for row in axes:
+        for i, ax in enumerate(row):
+            if i == 2:
+                ax.set_xticks([])
+                ax.set_yticks([])
+            else:
+                ax.axis("off")
+
+    mic = input.microscope()
+    obj = input.objective()
+    obj = get_nice_objective_name(objective_df, obj)
+    info = input.info()
+    fig.suptitle(f"Field Uniformity: {mic} {obj} ({info})")
+    fig.tight_layout(rect=[0, 0, 1, 0.96])
+    return fig
+
+
+@reactive.calc
+def set_card_height_uni_2_dates() -> str:
+    """
+    Calculate card display height based on plot size.
+
+    Tries to set 400px height per row (channel).
+    FIXME: this is not optimal, since it should be in relation
+        to the window width. But it is not really possible to get it...
+
+    :return: str, e.g. 1000px (but stays unused I guess)
+        400px * number of figure rows
+    """
+    fig = plot_uniformity_2_measurements()
+
+    # Height is to be set 4x number of rows
+    _w, h = fig.get_size_inches()
+
+    # Empirically set min row height (in pixels)
+    row_height = 400
+    row_height = row_height * h // 4
+    # print(f"Row height set to: {row_height}px")
+    uni_2_dates_card_height.set(f"{row_height}px")
+    return f"{row_height}px"
 
 
 @reactive.calc
 def create_uniformity_plot():
     """
     Create a heat-map like plot for the Filed Uniformity between 2 dates.
+
+    # FIXME Deprecated: replaced by plot_uniformity_2_measurements()
 
     FIXME: on VM when scaling the window, title gets bigger and bigger,
         until it gives an error...
@@ -925,7 +1130,7 @@ def get_omero_data() -> Optional[FieldData]:
 
     # Drop nan columns (cols may not be nan but empty str...)
     df = df.replace("", np.nan)
-    df = df.dropna(axis="columns")
+    df = df.dropna(axis="columns", how="all")
     # Make sure that headers are all str
     df.columns = [str(x) for x in df.columns]
 
@@ -936,9 +1141,9 @@ def get_omero_data() -> Optional[FieldData]:
     if len(data.problems) > 0:
         msg = ["There were some problems while loading the data:"]
         for i in data.problems:
-            msg.append(ui.tags.br())
+            msg.append(" | ")
             msg.append(i)
-        ui.notification_show(*msg, id="data_problems", type="error")
+        ui.notification_show("".join(msg), id="data_problems", type="error")
 
     # Check if there is really data associated
     try:
@@ -1012,6 +1217,43 @@ def create_objective_db_table() -> tuple[pd.DataFrame, list[dict]]:
         }
     ]
     return subset, styles
+
+
+# Reactive functions - UI           ------------------------------------------
+
+
+@reactive.effect
+@reactive.event(input.uni_single_date_selector)
+def update_uni_channel_selectors():
+    """Update the channel choices for Uniformity comparison."""
+    data = get_omero_data()
+    date = input.uni_single_date_selector()
+    if data is None or date is None:
+        channels = []
+    else:
+        channels = sorted(data.get_channel_names(date))
+
+    ui.update_select(
+        "uni_ch_selector1",
+        choices=channels,
+        selected=None if len(channels) == 0 else channels[0],
+    )
+    ui.update_select(
+        "uni_ch_selector2",
+        choices=channels,
+        selected=None if len(channels) == 0 else channels[-1],
+    )
+
+
+# TODO FIXME - this should be enabled...
+# @reactive.effect
+# @reactive.event(input.dist_date_selector_1, input.dist_date_selector_2)
+# def update_dist_channel_selector():
+#     """Update the channel choices for the Distortion plot."""
+#     channels = sorted(get_common_distortion_channels())
+#     dist_ch_selector = ui.update_select(
+#         "dist_ch_selector", choices=channels
+#     )
 
 
 # Reactive functions - Sidebar      ------------------------------------------
