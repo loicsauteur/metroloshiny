@@ -57,6 +57,8 @@ def test_basic_app(page: Page, local_app: ShinyAppProc) -> None:
     # There should be no data in the plots
     averages_card.set("Plot Field Uniformity")
     plot_uni_avg = ctrl.OutputUi(page, "show_field_uniformity_over_time_plot")
+    # Needs some waiting until ready... (does not work with timeout...)
+    time.sleep(5)
     assert "No data to visualise!" in str(plot_uni_avg.loc.text_content())
     averages_card.set("Plot Field Distortion")
     plot_dist_avg = ctrl.OutputUi(page, "show_field_distortion_over_time_plot")
@@ -82,6 +84,20 @@ def test_basic_app(page: Page, local_app: ShinyAppProc) -> None:
     obj_msg.expect_value("No objective information available.")
     obj_table.expect_nrow(0)
     obj_table.expect_ncol(0)
+
+    # Check date ranges for average plots (after setting to Mattenstrasse, i.e. data available)
+    averages_card.set("Plot Field Uniformity")
+    uni_date_range = ctrl.InputDateRange(page, "uni_date_range")
+    uni_date_range.expect_value(["20260101", "20260120"])
+    averages_card.set("Plot Field Distortion")
+    dist_date_range = ctrl.InputDateRange(page, "dist_date_range")
+    dist_date_range.expect_value(["20260101", "20260120"])
+    # Check no data plot after setting date range - DOES NOT WORK (getting only empty text_content)
+    # assert "No data to visualise!" not in str(plot_dist_avg.loc.text_content())
+    # dist_date_range.set(["20200101", "20210101"])
+    # # Needs some waiting time...
+    # time.sleep(5)
+    # assert "No data to visualise!" in str(plot_dist_avg.loc.text_content())
 
     # Check stuff on the Uniformity card (only input selections)    ##########
     uniformity_card = ctrl.NavsetCardUnderline(page, "uniformity_card")
