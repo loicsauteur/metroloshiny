@@ -30,6 +30,12 @@ from metroloshiny.utils.plot_utils import (
 )
 from metroloshiny.utils.read_file import get_sheet, load_doc
 
+# Ideas:
+# Uniformity        --------------
+# Line profiles (averages?) in different directions (also diagonal?) ?? TODO? probably not
+# TODO: Roll-off metrics instead of the current averages...
+
+
 # Load Data
 use_dev_local_file = set_local_file()
 sheet_doc = load_doc(dev_local_file=use_dev_local_file)
@@ -80,7 +86,6 @@ with ui.nav_panel(title=""):
                     if data is None:
                         return no_data_plotly()
                     df_unif = data.get_uniformity_over_time_melt()
-                    # TODO check for "problems" and give some warnings!
                     return create_plot_over_time(df_unif)
 
             with ui.nav_panel(title="Plot Field Distortion"):
@@ -92,7 +97,6 @@ with ui.nav_panel(title=""):
                     if data is None:
                         return no_data_plotly()
                     df_dist = data.get_distortion_over_time_melt()
-                    # TODO check for "problems" and give some warnings!
                     return create_plot_over_time(df_dist)
 
             with ui.nav_panel(title="Table"):
@@ -277,72 +281,23 @@ with ui.nav_panel(title=""):
                 with ui.layout_column_wrap(width=1 / 2):
 
                     @render.ui
-                    def dist_date_sel_1():
-                        """Show date selection for 1st distortion figure."""
-                        data = get_omero_data()
-                        if data is None:
-                            choices = []
-                        else:
-                            choices = data.get_distortion().keys()
-                            choices = list(choices)
-                        dist_date_selector_1 = ui.input_select(
-                            "dist_date_selector_1",
-                            "Select a date",
-                            choices=choices,
-                            selected=None if len(choices) == 0 else choices[0],
-                        )
-                        return dist_date_selector_1
+                    def distortion_selectors_1():
+                        """Show date/channel selection for 1st distortion figure."""
+                        return dist_date_selector_1, dist_ch_selector1
 
                     @render.ui
-                    def dist_date_sel_2():
-                        """Show date selection for 2nd distortion figure."""
-                        data = get_omero_data()
-                        if data is None:
-                            choices = []
-                        else:
-                            choices = data.get_distortion().keys()
-                            choices = list(choices)
-                        dist_date_selector_2 = ui.input_select(
-                            "dist_date_selector_2",
-                            "Select a date",
-                            choices=choices,
-                            selected=(
-                                None if len(choices) == 0 else choices[-1]
-                            ),
-                        )
-                        return dist_date_selector_2
-
-                @render.ui
-                def distortion_channel_selector():
-                    """Show a channel selector."""
-                    channels = sorted(get_common_distortion_channels())
-                    dist_ch_selector = ui.input_select(
-                        "dist_ch_selector", "Display channel", choices=channels
-                    )
-                    return dist_ch_selector
+                    def distortion_selectors_2():
+                        """Show date/channel selection for 2nd distortion figure."""
+                        return dist_date_selector_2, dist_ch_selector2
 
                 @render_widget
-                def show_distortion_from_rois():
+                def plot_distortion():
                     """
-                    Plot distortion calculated from ROIs.
+                    Plot distortion for a channel.
 
-                    # TODO will be replaced by table data, to show distortion for each channel
+                    Free choice between dates and channel.
                     """
                     return create_distortion_plot()
-
-            with ui.nav_panel(title="Table"):
-                # FIXME not sure if there will be a table
-
-                @render.text
-                def temp_2():
-                    """Show temp message."""
-                    return "Under construction"
-
-
-# Ideas:
-# Uniformity        --------------
-# heat map: normalised -- DONE!
-# Line profiles (averages?) in different directions (also diagonal?) ?? TODO?
 
 
 # Plot creation             --------------------------------------------------
@@ -359,15 +314,16 @@ def create_distortion_plot():
     omero_data = get_omero_data()
     date1 = input.dist_date_selector_1()
     date2 = input.dist_date_selector_2()
-    channel = input.dist_ch_selector()
-    if None in [omero_data, date1, date2, channel]:
+    channel1 = input.dist_ch_selector1()
+    channel2 = input.dist_ch_selector2()
+    if None in [omero_data, date1, date2, channel1, channel2]:
         return no_data_plotly()
 
     # Get the plotting data
     df1 = omero_data.get_distortion_dataframe(date1).copy()
     df2 = omero_data.get_distortion_dataframe(date2).copy()
-    df1 = filter_by_column_value(df1, column_name="Channel", value=channel)
-    df2 = filter_by_column_value(df2, column_name="Channel", value=channel)
+    df1 = filter_by_column_value(df1, column_name="Channel", value=channel1)
+    df2 = filter_by_column_value(df2, column_name="Channel", value=channel2)
 
     # Create magnitude heat-map data (no normalization)
     heat1 = df1.pivot(index="y", columns="x", values="Magnitude").to_numpy()
@@ -547,26 +503,26 @@ def create_distortion_plot():
     #     ann.y -= 0.02
     # Add subplot tiltes
     fig.add_annotation(
-        text=f"{date1} - {channel}",
+        text=f"{date1} - {channel1}",
         xref="x domain",
         yref="y domain",  # relative to subplot 1's own domain
-        x=0.5,
-        y=0.94,  # centered horizontally, top of domain
+        x=0.5,  # centered horizontally
+        y=0.94,  # top of domain
         xanchor="center",
         yanchor="bottom",
-        yshift=-15,  # small pixel offset, tune to taste
+        yshift=-10,  # small pixel offset (to shift text down)
         showarrow=False,
         font={"size": 18},  # match default subplot title size if needed
     )
     fig.add_annotation(
-        text=f"{date2} - {channel}",
+        text=f"{date2} - {channel2}",
         xref="x2 domain",
-        yref="y2 domain",  # relative to subplot 1's own domain
-        x=0.5,
-        y=0.94,  # centered horizontally, top of domain
+        yref="y2 domain",  # relative to subplot 2's own domain
+        x=0.5,  # centered horizontally
+        y=0.94,  # top of domain
         xanchor="center",
         yanchor="bottom",
-        yshift=-15,  # small pixel offset, tune to taste
+        yshift=-10,  # small pixel offset (to shift text down)
         showarrow=False,
         font={"size": 18},  # match default subplot title size if needed
     )
@@ -583,7 +539,7 @@ def create_distortion_plot_old_mpl() -> tuple[
     """
     Create a distortion quiver plot.
 
-    FIXME deprecated matplotlib version of the plot
+    FIXME deprecated matplotlib version of the plot (uses info from ROIs)
 
     Create a heat-map background for the magnitude.
     Add arrows for the distortion direction (+ magnitude.)
@@ -649,14 +605,13 @@ def create_distortion_plot_old_mpl() -> tuple[
 
     # Add colorbar
     cbar = plt.colorbar(heat_map)
-    # FIXME currently pixel units
+    # currently pixel units
     cbar.set_label("Magnitude (currently in pixels)")
     # ax.legend() # not needed
     mic = input.microscope()
     obj = input.objective()
     obj = get_nice_objective_name(objective_df, obj)
     info = input.info()
-    # FIXME currently from OMERO ROIs
     fig.suptitle(f"Field Distortion (from OMERO ROIs):\n{mic} {obj} ({info})")
     return fig, quiver, df["dx"], df["dy"]
 
@@ -1245,7 +1200,7 @@ def update_uni_channel_selectors():
     )
 
 
-# TODO FIXME - this should be enabled...
+# TODO FIXME - not needed
 # @reactive.effect
 # @reactive.event(input.dist_date_selector_1, input.dist_date_selector_2)
 # def update_dist_channel_selector():
@@ -1255,6 +1210,105 @@ def update_uni_channel_selectors():
 #         "dist_ch_selector", choices=channels
 #     )
 
+
+@reactive.effect
+@reactive.event(get_omero_data)
+def update_distortion_dates():
+    """
+    Update distortion date selectors on OMERO data changes.
+
+    Sets date selectors, to compare first and last date initially.
+    """
+    data = get_omero_data()
+    if data is None:
+        choices = []
+    else:
+        choices = data.get_distortion().keys()
+        choices = list(choices)
+    ui.update_select(
+        "dist_date_selector_1",
+        choices=choices,
+        selected=None if len(choices) == 0 else choices[0],
+    )
+    ui.update_select(
+        "dist_date_selector_2",
+        choices=choices,
+        selected=None if len(choices) == 0 else choices[-1],
+    )
+
+
+@reactive.effect
+@reactive.event(input.dist_date_selector_1)
+def update_distortion_channels_on_date_1():
+    """
+    Update distortion channel selection on date 1 changes.
+
+    Matches the channel selection between the 2 dates if possible.
+    """
+    date1 = input.dist_date_selector_1()
+    date2 = input.dist_date_selector_2()
+    if date1 is None or date2 is None:
+        ui.update_select("dist_ch_selector1", choices=[])
+        ui.update_select("dist_ch_selector2", choices=[])
+        return
+
+    channels1 = get_omero_data().get_channel_names(date1)
+    channels2 = get_omero_data().get_channel_names(date2)
+    ui.update_select(
+        "dist_ch_selector1", choices=channels1, selected=channels1[0]
+    )
+    ui.update_select(
+        "dist_ch_selector2",
+        choices=channels2,
+        selected=channels1[0] if channels1[0] in channels2 else channels2[0],
+    )
+
+
+@reactive.effect
+@reactive.event(input.dist_date_selector_2)
+def update_distortion_channels_on_date_2():
+    """
+    Update distortion channel selection on date 2 changes.
+
+    Matches date 1 channel selection if possible
+    """
+    date2 = input.dist_date_selector_2()
+    if date2 is None:
+        ui.update_select("dist_ch_selector2", choices=[])
+        return
+
+    channels2 = get_omero_data().get_channel_names(date2)
+    selected_ch1 = input.dist_ch_selector1()
+    if selected_ch1 is None:
+        select_ch2 = None
+    elif selected_ch1 in channels2:
+        select_ch2 = selected_ch1
+    else:
+        select_ch2 = channels2[0]
+    ui.update_select(
+        "dist_ch_selector2", choices=channels2, selected=select_ch2
+    )
+
+
+# UI selectors                      ------------------------------------------
+
+# Distortion channel and date selecotrs
+dist_date_selector_1 = ui.input_select(
+    "dist_date_selector_1",
+    "Select a first date",
+    choices=[],
+)
+dist_date_selector_2 = ui.input_select(
+    "dist_date_selector_2",
+    "Select a second date",
+    choices=[],
+)
+dist_ch_selector1 = ui.input_select(
+    "dist_ch_selector1", "Channel for first date (reference)", choices=[]
+)
+dist_ch_selector2 = ui.input_select(
+    "dist_ch_selector2", "Channel for second date", choices=[]
+)
 
 # Reactive functions - Sidebar      ------------------------------------------
 

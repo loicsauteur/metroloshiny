@@ -110,12 +110,34 @@ def test_basic_app(page: Page, local_app: ShinyAppProc) -> None:
     # Check stuff on the Distortion card (only input selections)    ##########
     dist_date1 = ctrl.InputSelect(page, "dist_date_selector_1")
     dist_date2 = ctrl.InputSelect(page, "dist_date_selector_2")
-    dist_ch = ctrl.InputSelect(page, "dist_ch_selector")
+    dist_ch1 = ctrl.InputSelect(page, "dist_ch_selector1")
+    dist_ch2 = ctrl.InputSelect(page, "dist_ch_selector2")
     dist_date1.expect_choices(expected_dates)
     dist_date2.expect_choices(expected_dates)
     dist_date1.expect_selected(expected_dates[0])
     dist_date2.expect_selected(expected_dates[-1])
-    dist_ch.expect_choices(expected_channels)
+    dist_ch1.expect_choices(expected_channels)
+    dist_ch2.expect_choices(expected_channels)
+
+    # Current expected behaviour
+    #   if i change dist_date2, dist_ch1 stays the same & dist_ch2 should match dist_ch1
+    cur_ch1_val = dist_ch1.loc.input_value()
+    dist_date2.set(expected_dates[1])
+    dist_ch1.expect_selected(cur_ch1_val)
+    dist_date2.set(expected_dates[2])
+    dist_ch1.expect_selected(cur_ch1_val)
+    dist_ch1.set(expected_channels[3])
+    dist_date2.set(expected_dates[0])
+    dist_ch1.expect_selected(expected_channels[3])
+    dist_date2.set(expected_dates[0])
+    dist_ch1.expect_selected(expected_channels[3])
+
+    # if i change dist_date1, dist_ch2 should be the same as dist_ch1 if available
+    dist_ch2.expect_selected(expected_channels[3])
+    dist_date1.set(expected_dates[1])
+    dist_date2.expect_selected(expected_dates[0])  # should not change
+    dist_ch1.expect_selected(expected_channels[0])
+    dist_ch2.expect_selected(expected_channels[0])
 
     # TODO/FIXME test more/better once more data and more final app
 
