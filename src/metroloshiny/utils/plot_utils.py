@@ -6,6 +6,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import plotly.express as px
+from plotly.graph_objects import Figure
 
 
 def normalize_percentile(values, low: int = 1, high: int = 99) -> list:
@@ -119,3 +120,85 @@ def no_data_plotly(message: str = "No data to visualise!"):
     fig.update_xaxes(visible=False)
     fig.update_yaxes(visible=False)
     return fig
+
+
+def add_center_cross_plotly(
+    fig: Figure,
+    x_shape: int,
+    y_shape: int,
+    row: int,
+    col: int,
+    color: str = "magenta",
+    width: float = 1,
+    length: float = 1,
+    as_x: bool = True,
+):
+    """
+    Add a centered cross onto a plotly subplot.
+
+    :param fig: plotly Figure (subplot)
+    :param x_shape: data shape in x
+    :param y_shape: data shape in y
+    :param row: subplot row
+    :param col: subplot col
+    :param color: cross color. Default = magenta
+    :param width: cross line width. Default = 1
+    :param length: cross arm length (in "XY plot units"). Default = 1
+    :param as_x: bool, if True (=default) the cross is an X, if False a +
+    """
+    # Calculate the center locations (off'ed by 0.5 for absolute center)
+    cx = (x_shape) / 2 + 0.5
+    cy = (y_shape) / 2 + 0.5
+    # Define the line-dict
+    line = {
+        "color": color,
+        "width": width,
+    }
+    # Add a X - cross
+    if as_x:
+        # 1. Diagonal - top left to bottom right
+        fig.add_shape(
+            type="line",
+            x0=cx - length,
+            y0=cy - length,
+            x1=cx + length,
+            y1=cy + length,
+            line=line,
+            row=row,
+            col=col,
+        )
+        # 2. Diagonal - top left to bottom right
+        fig.add_shape(
+            type="line",
+            x0=cx - length,
+            y0=cy + length,
+            x1=cx + length,
+            y1=cy - length,
+            line=line,
+            row=row,
+            col=col,
+        )
+    # Add a + - cross
+    else:
+        # Horizontal line
+        fig.add_shape(
+            type="line",
+            x0=cx - length,
+            y0=cy,
+            x1=cx + length,
+            y1=cy,
+            line=line,
+            row=row,
+            col=col,
+        )
+        # Vertical line
+        fig.add_shape(
+            type="line",
+            x0=cx,
+            y0=cy - length,
+            x1=cx,
+            y1=cy + length,
+            line=line,
+            row=row,
+            col=col,
+        )

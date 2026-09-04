@@ -1,4 +1,4 @@
-from typing import Optional
+from typing import Optional, Union
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -10,8 +10,8 @@ from matplotlib.figure import Figure
 from matplotlib.quiver import Quiver
 from plotly.subplots import make_subplots
 from shiny import reactive
-from shiny.express import input, render, ui
-from shinywidgets import render_widget
+from shiny.express import input, render, session, ui
+from shinywidgets import render_plotly, render_widget
 
 from metroloshiny.data_objects.field_data import FieldData
 from metroloshiny.utils.common_utils import (
@@ -23,6 +23,7 @@ from metroloshiny.utils.dataframe_utils import (
     filter_by_column_value,
 )
 from metroloshiny.utils.plot_utils import (
+    add_center_cross_plotly,
     no_data_plotly,
     no_data_seaborn,
     normalize_df,
@@ -34,6 +35,10 @@ from metroloshiny.utils.read_file import get_sheet, load_doc
 # Uniformity        --------------
 # Line profiles (averages?) in different directions (also diagonal?) ?? TODO? probably not
 # TODO: Roll-off metrics instead of the current averages...
+
+# TODO add absolute intensities to uniformity plot hover over
+
+# TODO distortion plots add difference plot (calculate new vectors from dx/dy)
 
 
 # Load Data
@@ -58,6 +63,7 @@ sites = np.unique(np.asarray(dataframe["Site"]))
 objective_choices = reactive.value(None)
 # Card heights (random initial values)
 uni_2_dates_card_height = reactive.value("20px")
+uni_channel_compare_card_height = reactive.value("20px")
 
 # Create UI         ----------------------------------------------------------
 ui.page_opts(
@@ -156,7 +162,6 @@ with ui.nav_panel(title=""):
                 @render.data_frame
                 def show_uni_dist_avg_over_time_table():
                     """Show table of distortion/uniformity average over time."""
-                    # TODO date_range_selector (setting min/max in get_omero_data function)
                     data = get_omero_data()
                     # Show no dataframe if no data loaded yet
                     if data is None:
@@ -235,23 +240,26 @@ with ui.nav_panel(title=""):
                         return uni_date_selector_2
 
                 # Plot the uniformity comparison between 2 dates   -----------
+                # Add a little space
+                ui.div(style="margin-top: 20px;")
+
                 @render.express
                 def card_uni_2_dates():
                     # """Trick to dynamically set the card height."""
                     # No doc-string, would be printed in UI.
-                    # Add a little space
-                    ui.div(style="margin-top: 20px;")
                     with ui.card(min_height=uni_2_dates_card_height.get()):
 
-                        @render.plot()
+                        @render_plotly
                         def plot_field_uniformity():
                             """Plot field uniformity of 2 dates side by side."""
                             # Trigger card height reactive calculation
-                            _height = set_card_height_uni_2_dates()
+                            _height = set_card_height_uni_2date_comparison()
 
                             # Show the plot
                             # return create_uniformity_plot()
-                            return plot_uniformity_2_measurements()
+                            # FIXME convert to plotly plots
+                            fig, _ = plot_uniformity_2_measurements()
+                            return fig
 
             # Compare 2 channels on the same date           ##################
             with ui.nav_panel(title="Compare channels"):
@@ -316,13 +324,22 @@ with ui.nav_panel(title=""):
 
                 # Add a little space
                 ui.div(style="margin-top: 20px;")
-                # Plot the uniformity comparison between channels       ------
-                with ui.card(min_height="400px"):
 
-                    @render.plot
-                    def plot_field_uniformity_between_channels():
-                        """Plot field uniformity of different channels on same date."""
-                        return plot_uniformity_between_channels()
+                # Plot the uniformity comparison between channels       ------
+                @render.express
+                def card_uni_compare_channels():
+                    # """Trick to dynamically set the card height."""
+                    # No doc-string, would be printed in UI.
+                    with ui.card(
+                        min_height=uni_channel_compare_card_height.get()
+                    ):
+
+                        @render_plotly
+                        def plot_field_uniformity_between_channels():
+                            """Plot field uniformity of different channels on same date."""
+                            # Trigger card height reactive calculation
+                            _ = set_card_height_uni_2channel_comparison()
+                            return plot_uniformity_between_channels()
 
         # Distortion - Heat-map like plots                  ##################
         with ui.navset_card_underline(
@@ -409,10 +426,6 @@ def create_distortion_plot():
     fig = make_subplots(
         rows=1,
         cols=2,
-        # subplot_titles=(
-        #     f"{date1} - {channel}",
-        #     f"{date2} - {channel}",
-        # ),
     )
     # Heat-map for date1
     fig.add_trace(
@@ -673,7 +686,235 @@ def plot_uniformity_between_channels():
     """
     Create heatmap like plots of the Field uniformity to compare 2 channels.
 
+    On the same date.
+
+    :return: plotly figure
+    """
+    # The the UI selections
+    ch1 = input.uni_ch_selector1()
+    ch2 = input.uni_ch_selector2()
+    date = input.uni_single_date_selector()
+    omero_data = get_omero_data()
+    if None in [ch1, ch2, date, omero_data]:
+        return no_data_plotly()
+
+    # Don't bother plotting if there is only one channel
+    if len(omero_data.get_channel_names(date)) == 1:
+        msg = f"Only one channel ({omero_data.get_channel_names(date)[0]}) available for date {date}!"
+        return no_data_plotly(msg)
+
+    # Get the data (convert unidata for heatmap)
+    uni_data = omero_data.get_uniformity()
+    df = omero_data.get_heat_map_dataframe(date=date, data_dict=uni_data)
+
+    # Pivot the dfs for given channel (-> XY-table)
+    raw1 = df.pivot(index="Y", columns="X", values=ch1)
+    raw2 = df.pivot(index="Y", columns="X", values=ch2)
+    # Normalise the values (individually for each df)
+    df1 = normalize_percentile(raw1).to_numpy()
+    df2 = normalize_percentile(raw2).to_numpy()
+    # Create an image of the difference of the 2 (in %)
+    # FIXME not 100% correct since normalisation over percentile
+    diff = (df1 - df2) * 100
+
+    # Create figure panels          ##########################################
+    fig = make_subplots(
+        rows=1,
+        cols=3,
+        row_heights=None,
+        column_widths=None,
+    )
+    # Add the channel panels        ------------------
+    for i, plot_data in enumerate(
+        zip([df1, df2], [raw1.to_numpy(), raw2.to_numpy()], strict=True),
+        start=1,
+    ):
+        cur_df, raw = plot_data
+        fig.add_trace(
+            go.Heatmap(
+                z=cur_df,
+                x=np.arange(1, cur_df.shape[1] + 1),
+                y=np.arange(1, cur_df.shape[0] + 1),
+                colorscale="Viridis",
+                showscale=False,  # No colorbar
+                zsmooth="best",
+                customdata=raw,
+                hovertemplate=(
+                    "x=%{x}<br>"
+                    "y=%{y}<br>"
+                    "Normalised Intensity=%{z:.0%}<br>"  # Show rounded percentage 0.1 = 10%
+                    "Absolute Intensity=%{customdata:.0f} AU<br>"
+                    "<extra></extra>"  # hide trace info hoverbox
+                ),
+            ),
+            row=1,
+            col=i,
+        )
+        # Add centering cross
+        add_center_cross_plotly(
+            fig,
+            x_shape=cur_df.shape[1],
+            y_shape=cur_df.shape[0],
+            row=1,
+            col=i,
+            length=0.5,
+            as_x=False,
+        )
+    # Add the difference panel      ------------------
+    # Get the plot y location for the colorbar
+    diff_domain = fig.layout["yaxis3"].domain
+    fig.add_trace(
+        go.Heatmap(
+            z=diff,
+            x=np.arange(1, diff.shape[1] + 1),
+            y=np.arange(1, diff.shape[0] + 1),
+            colorscale="RdBu",  # Red -> Blue
+            # Adjust color range and show heatmap
+            zmin=-100,
+            zmax=100,
+            colorbar={
+                "title": {
+                    "text": "Difference [%]",
+                    "side": "right",
+                },
+                # Position relative to whole figure
+                "x": 1.02,
+                "xanchor": "left",
+                "xpad": 0,
+                "yref": "paper",
+                "y": (diff_domain[0] + diff_domain[1])
+                / 2,  # middle of the row
+                "yanchor": "middle",
+                "len": (diff_domain[1] - diff_domain[0])
+                * 0.8,  # 80% of the row height
+                "thickness": 15,  # Default = 30 (bar-width)
+            },
+            reversescale=True,  # Blue -> Red
+            zsmooth="best",
+            hovertemplate=(
+                "x=%{x}<br>"
+                "y=%{y}<br>"
+                "Normalised Intensity=%{z:.0f}%<br>"
+                "<extra></extra>"  # hide trace info hoverbox
+            ),
+        ),
+        row=1,
+        col=3,
+    )
+    # Add centering cross
+    add_center_cross_plotly(
+        fig,
+        x_shape=diff.shape[1],
+        y_shape=diff.shape[0],
+        row=1,
+        col=3,
+        length=0.5,
+        color="black",
+        as_x=False,
+    )
+    # Add an outline to the Difference plot
+    fig.add_shape(
+        type="rect",
+        xref="x3",  # Refers to the data plot
+        yref="y3",
+        x0=0.5,
+        x1=diff.shape[1] + 0.5,
+        y0=0.5,
+        y1=diff.shape[0] + 0.5,
+        line={"color": "black", "width": 1},
+        fillcolor="rgba(0,0,0,0)",  # transparent
+        layer="above",
+    )
+    # Plot title & layout           ##########################################
+    mic = input.microscope()
+    obj = input.objective()
+    obj = get_nice_objective_name(objective_df, obj)
+    info = input.info()
+    fig.update_layout(
+        title={
+            "text": f"Field Uniformity {date}: {mic} {obj} ({info})",
+            "yref": "container",  # the full canvas
+            "pad": {
+                "b": 0,
+                "l": 0,
+                "r": 0,
+                "t": 10,
+            },  # Give a little space to top
+            "y": 1,  # at the top
+            "yanchor": "top",
+            "x": 0.5,
+            "xanchor": "center",
+            "font": {"size": 18},
+        },
+        plot_bgcolor="white",
+        margin={
+            # "autoexpand": False, # Default True, needed for colorbar
+            "l": 25,
+            "r": 0,
+            "t": 70,  # min. title font + title top pad (empiric, 60 is not good anymore)
+            "b": 0,
+        },
+        autosize=True,
+    )
+    fig.update_xaxes(
+        showgrid=False,
+        zeroline=False,
+        showticklabels=False,
+        constrain="domain",
+    )
+    fig.update_yaxes(
+        showgrid=False,
+        zeroline=False,
+        showticklabels=False,
+        autorange="reversed",
+    )
+    # Ensure square plots
+    fig.update_yaxes(row=1, col=1, scaleanchor="x", scaleratio=1)
+    fig.update_yaxes(row=1, col=2, scaleanchor="x2", scaleratio=1)
+    fig.update_yaxes(row=1, col=3, scaleanchor="x3", scaleratio=1)
+    # Add subplot tiltes            ##########################################
+    for i, title in enumerate([ch1, ch2, "Difference"], start=1):
+        if i == 1:
+            panel = ""
+        else:
+            panel = i
+        fig.add_annotation(
+            text=title,
+            xref=f"x{panel} domain",  # relative to panel's domain
+            x=0.5,  # centered horizontally
+            xanchor="center",
+            # yref=f"y{panel}",  # relative to the heatmap
+            yref="paper",
+            y=1,  # top of domain
+            yanchor="bottom",
+            # yshift=10,  # small pixel offset (- to shift text down; + up)
+            showarrow=False,
+            font={"size": 18},  # match default subplot title size if needed
+        )
+    # Add row title (date)
+    fig.add_annotation(
+        text=date,
+        xref="x domain",  # relative to the first panel
+        yref="y domain",  # relative to the first panel
+        x=0,
+        y=0.5,
+        xanchor="right",
+        yanchor="middle",
+        showarrow=False,
+        font={"size": 18},
+        textangle=-90,
+    )
+    return fig
+
+
+@reactive.calc
+def plot_uniformity_between_channels_mpl():
+    """
+    Create heatmap like plots of the Field uniformity to compare 2 channels.
+
     (On the same date)
+
+    FIXME DEPRECATED -> replaced with plotly plots
 
     :return: matplotlib figure
     """
@@ -772,6 +1013,247 @@ def plot_uniformity_between_channels():
 def plot_uniformity_2_measurements():
     """
     Create heatmap like plots for the Field uniformity between 2 dates.
+
+    For all common channels. I.e.:
+    DAPI | date1 | date2 | diff
+    488  | date1 | date2 | diff
+    ...
+
+    :return: tuple,
+        - plotly figure
+        - int, number of plot rows
+    """
+    # Get date selections
+    date1 = input.uni_date_selector_1()
+    date2 = input.uni_date_selector_2()
+    omero_data = get_omero_data()
+    if None in [date1, date2, omero_data]:
+        return no_data_plotly(), 1
+
+    # Check available channels for the dates
+    channels1 = omero_data.get_channel_names(date1)
+    channels2 = omero_data.get_channel_names(date2)
+    common_chs = sorted(set(channels1).intersection(channels2))
+    if len(common_chs) == 0:
+        return no_data_plotly("No common channels between the 2 dates!"), 1
+
+    # Get the data (convert unidata for heatmap)
+    uni_data = omero_data.get_uniformity()
+    df_1 = omero_data.get_heat_map_dataframe(date=date1, data_dict=uni_data)
+    df_2 = omero_data.get_heat_map_dataframe(date=date2, data_dict=uni_data)
+
+    # Create figure panels              ######################################
+    fig = make_subplots(rows=len(common_chs), cols=3, vertical_spacing=0.05)
+    # Add the panels row by row
+    for row, channel in enumerate(common_chs, start=1):
+        # Pivot the dfs for given channel (-> XY-table)
+        raw1 = df_1.pivot(index="Y", columns="X", values=channel)
+        raw2 = df_2.pivot(index="Y", columns="X", values=channel)
+        # Normalise the values (individually for each df)
+        df1 = normalize_percentile(raw1).to_numpy()
+        df2 = normalize_percentile(raw2).to_numpy()
+        # Create an image of the difference of the 2 (in %)
+        # FIXME not 100% correct since normalisation over percentile
+        diff = (df1 - df2) * 100
+
+        # Add channel plots     ----------------------
+        for col, plot_data in enumerate(
+            zip([df1, df2], [raw1.to_numpy(), raw2.to_numpy()], strict=True),
+            start=1,
+        ):
+            z, raw = plot_data
+            fig.add_trace(
+                go.Heatmap(
+                    z=z,
+                    x=np.arange(1, z.shape[1] + 1),
+                    y=np.arange(1, z.shape[0] + 1),
+                    colorscale="Viridis",
+                    showscale=False,  # No colorbar
+                    zsmooth="best",
+                    customdata=raw,
+                    hovertemplate=(
+                        "x=%{x}<br>"
+                        "y=%{y}<br>"
+                        "Normalised Intensity=%{z:.0%}<br>"  # Show rounded percentage 0.1 = 10%
+                        "Absolute Intensity=%{customdata:.0f} AU<br>"
+                        "<extra></extra>"  # hide trace info hoverbox
+                    ),
+                ),
+                row=row,
+                col=col,
+            )
+            # Add centering cross
+            add_center_cross_plotly(
+                fig,
+                x_shape=z.shape[1],
+                y_shape=z.shape[0],
+                row=row,
+                col=col,
+                length=0.5,
+                as_x=False,
+            )
+        # Add the difference panel      --------------
+        # Get the plot y location for the colorbar
+        yaxis = "yaxis" if row == 1 else f"yaxis{row * 3}"
+        diff_domain = fig.layout[yaxis].domain
+
+        fig.add_trace(
+            go.Heatmap(
+                z=diff,
+                x=np.arange(1, diff.shape[1] + 1),
+                y=np.arange(1, diff.shape[0] + 1),
+                colorscale="RdBu",  # Red -> Blue
+                # Adjust color range and show heatmap
+                zmin=-100,
+                zmax=100,
+                colorbar={
+                    "title": {
+                        "text": "Difference [%]",
+                        "side": "right",
+                    },
+                    # Position relative to whole figure
+                    "x": 1.02,
+                    "xanchor": "left",
+                    "xpad": 0,
+                    "yref": "paper",
+                    "y": (diff_domain[0] + diff_domain[1])
+                    / 2,  # middle of the row
+                    "yanchor": "middle",
+                    "len": (diff_domain[1] - diff_domain[0])
+                    * 0.8,  # 80% of the row height
+                    "thickness": 15,  # Default = 30 (bar-width)
+                },
+                reversescale=True,  # Blue -> Red
+                zsmooth="best",
+                hovertemplate=(
+                    "x=%{x}<br>"
+                    "y=%{y}<br>"
+                    "Normalised Intensity=%{z:.0f}%<br>"
+                    "<extra></extra>"  # hide trace info hoverbox
+                ),
+            ),
+            row=row,
+            col=3,
+        )
+        # Add centering cross
+        add_center_cross_plotly(
+            fig,
+            x_shape=diff.shape[1],
+            y_shape=diff.shape[0],
+            row=row,
+            col=3,
+            length=0.5,
+            color="black",
+            as_x=False,
+        )
+        # Add an outline to the Difference plot
+        fig.add_shape(
+            type="rect",
+            xref=f"x{3 * row}",  # Refers to the data plot
+            yref=f"y{3 * row}",
+            x0=0.5,
+            x1=diff.shape[1] + 0.5,
+            y0=0.5,
+            y1=diff.shape[0] + 0.5,
+            line={"color": "black", "width": 1},
+            fillcolor="rgba(0,0,0,0)",  # transparent
+            layer="above",
+        )
+    # Plot title & layout           ##########################################
+    mic = input.microscope()
+    obj = input.objective()
+    obj = get_nice_objective_name(objective_df, obj)
+    info = input.info()
+    fig.update_layout(
+        title={
+            "text": f"Field Uniformity: {mic} {obj} ({info})",
+            "yref": "container",  # the full canvas
+            "pad": {
+                "b": 0,
+                "l": 0,
+                "r": 0,
+                "t": 10,
+            },  # Give a little space to top
+            "y": 1,  # at the top
+            "yanchor": "top",
+            "x": 0.5,
+            "xanchor": "center",
+            "font": {"size": 18},
+        },
+        plot_bgcolor="white",
+        margin={
+            # "autoexpand": False, # Default True, needed for colorbar
+            "l": 25,
+            "r": 0,
+            "t": 70,  # min. title font + title top pad (empiric, 60 is not good anymore)
+            "b": 0,
+        },
+        autosize=True,
+    )
+    fig.update_xaxes(
+        showgrid=False,
+        zeroline=False,
+        showticklabels=False,
+        constrain="domain",
+    )
+    fig.update_yaxes(
+        showgrid=False,
+        zeroline=False,
+        showticklabels=False,
+        autorange="reversed",
+    )
+    # Ensure square plots
+    for row in range(1, len(common_chs) + 1):
+        for col in range(1, 4):
+            subplot = fig.get_subplot(row=row, col=col)
+            ax_id = subplot.xaxis.plotly_name.replace("axis", "")
+            fig.update_yaxes(row=row, col=col, scaleanchor=ax_id, scaleratio=1)
+
+    # Add subplot tiltes            ##########################################
+    for i, title in enumerate([date1, date2, "Difference"], start=1):
+        if i == 1:
+            panel = ""
+        else:
+            panel = i
+        fig.add_annotation(
+            text=title,
+            xref=f"x{panel} domain",  # relative to panel's domain
+            x=0.5,  # centered horizontally
+            xanchor="center",
+            yref="paper",  # ref = paper, works well with y=1 and anchor=bottom
+            y=1,
+            yanchor="bottom",
+            # yshift=10,  # small pixel offset (- to shift text down; + up)
+            showarrow=False,
+            font={"size": 18},  # match default subplot title size if needed
+        )
+    # Add row title (date)
+    for row, ch in enumerate(common_chs, start=1):
+        if row == 1:
+            domain = ""
+        else:
+            domain = 1 + (row - 1) * 3  # since 3 panels per row
+        fig.add_annotation(
+            text=ch,
+            xref="x domain",  # relative to the first panel
+            yref=f"y{domain} domain",  # relative to the first panel
+            x=0,
+            y=0.5,
+            xanchor="right",
+            yanchor="middle",
+            showarrow=False,
+            font={"size": 18},
+            textangle=-90,
+        )
+    return fig, len(common_chs)
+
+
+@reactive.calc
+def plot_uniformity_2_measurements_mpl():
+    """
+    Create heatmap like plots for the Field uniformity between 2 dates.
+
+    FIXME to be deprecated -> replace with plotly plots
 
     For all common channels. I.e.:
     DAPI | date1 | date2 | diff
@@ -877,9 +1359,73 @@ def plot_uniformity_2_measurements():
 
 
 @reactive.calc
-def set_card_height_uni_2_dates() -> str:
+def set_card_height_uni_2date_comparison() -> str:
+    """
+    Calculate card display height based on plot's number of rows and plot width.
+
+    For Uniformity plot that compares 2 dates.
+    Basically sets the card height = width / (3 cols) * n rows.
+    (minus a fixed value = 50)
+
+    :return: str, e.g. 1000px
+    """
+    _, rows = plot_uniformity_2_measurements()
+    width = get_uniformity_2dates_plot_width()
+    row_height = width // 3 * rows - 50
+    uni_2_dates_card_height.set(f"{row_height}px")
+    uni_channel_compare_card_height.set(f"{row_height}px")
+    # print("Plot width = ", width)
+    # print(f"Card height should be = {row_height}px")
+    return f"{row_height}px"
+
+
+@reactive.calc
+def set_card_height_uni_2channel_comparison() -> str:
+    """
+    Calculate card display height based on plot's number of rows and plot width.
+
+    For Uniformity plot that compares 2 channels.
+    Basically sets the card height = width / (3 cols) for one row
+    (minus a fixed value = 50)
+
+    :return: str, e.g. 1000px
+    """
+    width = get_uniformity_2channels_plot_width()
+    row_height = width // 3 - 50
+    uni_channel_compare_card_height.set(f"{row_height}px")
+    # print("Plot width = ", width)
+    # print(f"Card height should be = {row_height}px")
+    return f"{row_height}px"
+
+
+@reactive.calc
+def get_uniformity_2dates_plot_width() -> Union[int, float]:
+    """Get the plot width in pixels for Uniformity date comparison."""
+    width = session.clientdata.output_width("plot_field_uniformity")
+    if width is None:
+        # Set an arbitrary width
+        width = 800
+    return width
+
+
+@reactive.calc
+def get_uniformity_2channels_plot_width() -> Union[int, float]:
+    """Get the plot width in pixels for Uniformity channel comparison."""
+    width = session.clientdata.output_width(
+        "plot_field_uniformity_between_channels"
+    )
+    if width is None:
+        # Set an arbitrary width
+        width = 800
+    return width
+
+
+@reactive.calc
+def set_card_height_uni_2_dates_mpl() -> str:
     """
     Calculate card display height based on plot size.
+
+    FIXME DEPRECATED (old version for mpl plots)
 
     Tries to set 400px height per row (channel).
     FIXME: this is not optimal, since it should be in relation

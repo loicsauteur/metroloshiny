@@ -79,6 +79,8 @@ def test_basic_app(page: Page, local_app: ShinyAppProc) -> None:
     obj_table.expect_nrow(2)
 
     sites.set("Mattenstrasse")
+    mics.expect_selected("Test_microscope")
+    info.expect_selected("Test_info")
     averages_card.set("Plot Field Uniformity")
     averages_card.set("Objective information")
     obj_msg.expect_value("No objective information available.")
