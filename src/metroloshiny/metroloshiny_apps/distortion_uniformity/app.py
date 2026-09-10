@@ -36,8 +36,6 @@ from metroloshiny.utils.read_file import get_sheet, load_doc
 # Line profiles (averages?) in different directions (also diagonal?) ?? TODO? probably not
 # TODO: Roll-off metrics instead of the current averages...
 
-# TODO add absolute intensities to uniformity plot hover over
-
 # TODO distortion plots add difference plot (calculate new vectors from dx/dy)
 
 
@@ -64,6 +62,7 @@ objective_choices = reactive.value(None)
 # Card heights (random initial values)
 uni_2_dates_card_height = reactive.value("20px")
 uni_channel_compare_card_height = reactive.value("20px")
+dist_card_height = reactive.value("20px")
 
 # Create UI         ----------------------------------------------------------
 ui.page_opts(
@@ -359,17 +358,63 @@ with ui.nav_panel(title=""):
                         """Show date/channel selection for 2nd distortion figure."""
                         return dist_date_selector_2, dist_ch_selector2
 
-                @render_widget
-                def plot_distortion():
-                    """
-                    Plot distortion for a channel.
+                # Add a little space
+                ui.div(style="margin-top: 20px;")
 
-                    Free choice between dates and channel.
-                    """
-                    return create_distortion_plot()
+                @render.express
+                def card_distoration():
+                    # """Trick to dynamically set the card height."""
+                    # No doc-string, would be printed in UI.
+                    with ui.card(min_height=dist_card_height.get()):
+
+                        @render_widget
+                        def plot_distortion():
+                            """
+                            Plot distortion for a channel.
+
+                            Free choice between dates and channel.
+                            """
+                            # Trigger card height reactive calculation
+                            _ = set_distortion_card_height()
+                            return create_distortion_plot()
 
 
-# Plot creation             --------------------------------------------------
+# Plot creation & related functions            -------------------------------
+
+
+def calculate_distortion_difference(
+    df_date1: pd.DataFrame,
+    df_date2: pd.DataFrame,
+) -> pd.DataFrame:
+    """
+    Calculate the difference of 2 distortion dataframes.
+
+    Calculates differences between ∆x and ∆y; calculates magnitude.
+
+    :param df_date1: pd.DataFrame of a first date
+    :param df_date2: pd.DataFrame of a second date
+
+    :return: pd.DataFrame with the same columns as inputs
+        Headers:    Ring_ID | x | y | dx | dy | Magnitude
+    """
+    if len(df_date1) != len(df_date2):
+        raise ValueError("The dataframes do not have the same length.")
+    if len(df_date1.columns.difference(df_date2.columns)) != 0:
+        raise KeyError("The dataframe headers are not the same.")
+
+    # Reset the index (calculation does not work if indices do not match)
+    df_date1.reset_index(drop=True, inplace=True)
+    df_date2.reset_index(drop=True, inplace=True)
+
+    df_diff = df_date1[df_date1.columns[:3]].copy()
+    # Calculate the difference
+    df_diff["dx"] = df_date1["dx"] - df_date2["dx"]
+    df_diff["dy"] = df_date1["dy"] - df_date2["dy"]
+    # Calculate the magnitude from the new vectors
+    df_diff["Magnitude"] = (df_diff["dx"] ** 2 + df_diff["dy"] ** 2) ** 0.5
+    # Do not add angle yet, because of normalization at later timepoint
+    # df_diff["angle"] = (np.degrees(np.arctan2(df_diff["dx"], df_diff["dy"])) * -1 + 180) % 360
+    return df_diff
 
 
 @reactive.calc
@@ -393,22 +438,38 @@ def create_distortion_plot():
     df2 = omero_data.get_distortion_dataframe(date2).copy()
     df1 = filter_by_column_value(df1, column_name="Channel", value=channel1)
     df2 = filter_by_column_value(df2, column_name="Channel", value=channel2)
+    # Calculate the difference between the two dataframes
+    df_diff = calculate_distortion_difference(df1, df2)
 
     # Create magnitude heat-map data (no normalization)
     heat1 = df1.pivot(index="y", columns="x", values="Magnitude").to_numpy()
     heat2 = df2.pivot(index="y", columns="x", values="Magnitude").to_numpy()
+    heat_diff = df_diff.pivot(
+        index="y", columns="x", values="Magnitude"
+    ).to_numpy()
 
     # Create normalized distortion vectors
-    df_norm1 = normalize_df(df1, start_col=3)
+    # Get the absolute maximum of all arrays
+    max1 = df1[df1.columns[3:]].abs().max().max()
+    max2 = df2[df1.columns[3:]].abs().max().max()
+    max3 = df_diff[df1.columns[3:]].abs().max().max()
+    abs_max = max([max1, max2, max3])
+    # Normalize ∆x & ∆y together, otherwise diff scales unproportional
+    df_norm1 = normalize_df(df1, start_col=3, low=0, high=abs_max)
     x1 = df_norm1["x"].to_numpy()
     y1 = df_norm1["y"].to_numpy()
     dx1 = df_norm1["dx"].to_numpy()
     dy1 = df_norm1["dy"].to_numpy()
-    df_norm2 = normalize_df(df2, start_col=3)
+    df_norm2 = normalize_df(df2, start_col=3, low=0, high=abs_max)
     x2 = df_norm2["x"].to_numpy()
     y2 = df_norm2["y"].to_numpy()
     dx2 = df_norm2["dx"].to_numpy()
     dy2 = df_norm2["dy"].to_numpy()
+    df_norm_diff = normalize_df(df_diff, start_col=3, low=0, high=abs_max)
+    x_diff = df_norm_diff["x"].to_numpy()
+    y_diff = df_norm_diff["y"].to_numpy()
+    dx_diff = df_norm_diff["dx"].to_numpy()
+    dy_diff = df_norm_diff["dy"].to_numpy()
 
     df1["angle"] = (
         np.degrees(np.arctan2(df1["dx"], df1["dy"])) * -1 + 180
@@ -416,115 +477,157 @@ def create_distortion_plot():
     df2["angle"] = (
         np.degrees(np.arctan2(df2["dx"], df2["dy"])) * -1 + 180
     ) % 360
+    df_diff["angle"] = (
+        np.degrees(np.arctan2(df_diff["dx"], df_diff["dy"])) * -1 + 180
+    ) % 360
     angle1 = df1.pivot(index="y", columns="x", values="angle").to_numpy()
     angle2 = df2.pivot(index="y", columns="x", values="angle").to_numpy()
+    angle_diff = df_diff.pivot(
+        index="y", columns="x", values="angle"
+    ).to_numpy()
 
     # Get the magnitude max values (min is set to 0)
-    heat_max = max(np.nanmax(heat1), np.nanmax(heat2))
+    heat_max = max(np.nanmax(heat1), np.nanmax(heat2), np.nanmax(heat_diff))
 
     # Create the heatmap figure             ##################################
     fig = make_subplots(
         rows=1,
-        cols=2,
+        cols=3,
     )
-    # Heat-map for date1
+    # Heat-map for date1 and date2      --------------
+    for col, plot_data in enumerate(
+        zip([heat1, heat2], [angle1, angle2], strict=True), start=1
+    ):
+        z, angle = plot_data
+        fig.add_trace(
+            go.Heatmap(
+                z=z,
+                x=np.arange(1, z.shape[1] + 1),
+                y=np.arange(1, z.shape[0] + 1),
+                coloraxis="coloraxis",  # for shared colorbar
+                # Coloraxis min/max is set in updatelayout
+                # colorscale="Viridis",
+                # zmin=0,
+                # zmax=heat_max,
+                # No colorbar explicitly with showscale=False
+                showscale=False,
+                zsmooth="best",
+                customdata=angle,
+                hovertemplate=(
+                    "x=%{x}<br>"
+                    "y=%{y}<br>"
+                    "Magnitude=%{z:.3f}<br>"
+                    "Angle=%{customdata:.1f}°<extra></extra>"
+                ),
+            ),
+            row=1,
+            col=col,
+        )
+    # Heat-map for the difference   ------------------
+    # Get the plot y location for the color bar
+    # diff_domain = fig.layout["yaxis"].domain # FIXME not used anymore
     fig.add_trace(
         go.Heatmap(
-            z=heat1,
-            x=np.arange(1, heat1.shape[1] + 1),
-            y=np.arange(1, heat1.shape[0] + 1),
-            colorscale="Viridis",
-            # Set the color min/max
-            zmin=0,
-            zmax=heat_max,
-            # No colorbar explicitly with showscale=False
-            showscale=False,
+            z=heat_diff,
+            x=np.arange(1, heat_diff.shape[1] + 1),
+            y=np.arange(1, heat_diff.shape[0] + 1),
+            coloraxis="coloraxis",  # for shared coloraxis & colorbar
+            # Coloraxis min/max is set in updatelayout
+            # colorscale="Viridis",
+            # zmin=0,
+            # zmax=heat_max,
             zsmooth="best",
-            customdata=angle1,
+            customdata=angle_diff,
             hovertemplate=(
                 "x=%{x}<br>"
                 "y=%{y}<br>"
                 "Magnitude=%{z:.3f}<br>"
                 "Angle=%{customdata:.1f}°<extra></extra>"
             ),
+            # colorbar={  # Old, individual colorbar
+            #     "title": {
+            #         "text": "Magnitude [µm]",
+            #         "side": "right",
+            #     },
+            #     # Position relative to whole figure
+            #     "x": 1.02,
+            #     "xanchor": "left",
+            #     "xpad": 0,
+            #     "yref": "paper",
+            #     # middle of the row
+            #     "y": (diff_domain[1] - diff_domain[0]) / 2,
+            #     "yanchor": "middle",
+            #     # 80% of the row height
+            #     "len": (diff_domain[1] - diff_domain[0]) * 0.8,
+            #     "thickness": 15,  # Default = 30 (bar-width)
+            # },
         ),
         row=1,
-        col=1,
-    )
-    # Heat-map for date1
-    fig.add_trace(
-        go.Heatmap(
-            z=heat2,
-            x=np.arange(1, heat2.shape[1] + 1),
-            y=np.arange(1, heat2.shape[0] + 1),
-            colorscale="Viridis",
-            # Set the color min/max
-            zmin=0,
-            zmax=heat_max,
-            zsmooth="best",
-            customdata=angle2,
-            hovertemplate=(
-                "x=%{x}<br>"
-                "y=%{y}<br>"
-                "Magnitude=%{z:.3f}<br>"
-                "Angle=%{customdata:.1f}°<extra></extra>"
-            ),
-            colorbar={
-                "title": {
-                    "text": "Magnitude [µm]",
-                    "side": "right",
-                },
-                # Position relative to whole figure
-                "x": 1.0,
-                "xanchor": "left",
-                "xpad": 0,
-                # Make height as tall asa heatmap
-                # "len": 1.0,
-                # "y": 0.5,
-                # "yanchor": "middle",
-            },
-        ),
-        row=1,
-        col=2,
+        col=3,
     )
 
     # Add quiver plots on top               ##################################
-    quiv1 = pff.create_quiver(
-        x1,
-        y1,
-        dx1,
-        dy1,
-        scale=2,
-        arrow_scale=0.3,
-        hoverinfo="skip",
-        showlegend=False,
-        # fill="white",
-    )
-    # Add the quiver to the figure
-    for trace in quiv1.data:
-        # Define arrow color and line width
-        trace.line.color = "white"
-        trace.line.width = 1.0
-        fig.add_trace(trace, row=1, col=1)
-    quiv2 = pff.create_quiver(
-        x2,
-        y2,
-        dx2,
-        dy2,
-        scale=2,
-        arrow_scale=0.3,
-        hoverinfo="skip",
-        showlegend=False,
-        # fill="white",
-    )
-    # Add the quiver to the figure
-    for trace in quiv2.data:
-        # Define arrow color and line width
-        trace.line.color = "white"
-        trace.line.width = 1.0
-        fig.add_trace(trace, row=1, col=2)
+    for col, plot_data in enumerate(
+        zip(
+            [x1, x2, x_diff],
+            [y1, y2, y_diff],
+            [dx1, dx2, dx_diff],
+            [dy1, dy2, dy_diff],
+            strict=True,
+        ),
+        start=1,
+    ):
+        x, y, dx, dy = plot_data
+        quiv = pff.create_quiver(
+            x,
+            y,
+            dx,
+            dy,
+            scale=2,
+            arrow_scale=0.3,
+            hoverinfo="skip",
+            showlegend=False,
+            # fill="white",
+        )
+        # Add the quiver to the figure
+        for trace in quiv.data:
+            # Define arrow color and line width
+            trace.line.color = "white"
+            trace.line.width = 1.0
+            fig.add_trace(trace, row=1, col=col)
 
     # Layout                                ##################################
+    # Ensure square plots
+    fig.update_yaxes(row=1, col=1, scaleanchor="x", scaleratio=1)
+    fig.update_yaxes(row=1, col=2, scaleanchor="x2", scaleratio=1)
+    fig.update_yaxes(row=1, col=3, scaleanchor="x3", scaleratio=1)
+    # Add subplot tiltes       -----------------------
+    for col, text in enumerate(
+        zip(
+            [date1, date2, ""],
+            [channel1, channel2, "Difference"],
+            strict=True,
+        ),
+        start=1,
+    ):
+        date, channel = text
+        if col == 1:
+            domain = ""
+        else:
+            domain = col
+        title = channel if date == "" else f"{date} - {channel}"
+        fig.add_annotation(
+            text=title,
+            xref=f"x{domain} domain",  # Relative to the panel's domain
+            x=0.5,  # centered horizontally
+            xanchor="center",
+            yref="paper",  # works well with y=1 and anchor=bottom
+            y=1,
+            yanchor="bottom",
+            showarrow=False,
+            font={"size": 18},  # match the font sizes
+        )
+
     mic = input.microscope()
     obj = input.objective()
     obj = get_nice_objective_name(objective_df, obj)
@@ -533,7 +636,15 @@ def create_distortion_plot():
     fig.update_layout(
         title={
             "text": f"Field Distortion: {mic} {obj} ({info})",
-            "y": 0.94,
+            "yref": "container",  # the full canvas
+            # Give a little space at the top
+            "pad": {
+                "b": 0,
+                "l": 0,
+                "r": 0,
+                "t": 10,
+            },
+            "y": 1,  # at the top
             "yanchor": "top",
             "x": 0.5,
             "xanchor": "center",
@@ -541,12 +652,33 @@ def create_distortion_plot():
         },
         plot_bgcolor="white",
         margin={
-            "l": 0,
-            "r": 80,
-            "t": 60,
+            "l": 25,
+            "r": 0,
+            "t": 70,  # min. title font + title top pad (empiric, 60 is not good anymore)
             "b": 0,
         },
         autosize=True,
+        # Shared coloraxis/colorbar for all plots
+        coloraxis={
+            "colorscale": "Viridis",
+            "cmin": 0,
+            "cmax": heat_max,
+            "colorbar": {
+                "title": {
+                    "text": "Magnitude [µm]",
+                    "side": "right",
+                },
+                # Position relative to whole figure
+                "x": 1.02,
+                "xanchor": "left",
+                "xpad": 0,
+                # middle of the row
+                "y": 0.5,
+                "yanchor": "middle",
+                "len": 0.8,  # 80% of plot height
+                "thickness": 15,  # Default = 30 (bar-width)
+            },
+        },
     )
     fig.update_xaxes(
         showgrid=False,
@@ -560,37 +692,12 @@ def create_distortion_plot():
         showticklabels=False,
         autorange="reversed",
     )
-    # Ensure square plots
-    fig.update_yaxes(row=1, col=1, scaleanchor="x", scaleratio=1)
-    fig.update_yaxes(row=1, col=2, scaleanchor="x2", scaleratio=1)
-    # Shift the plot a bit down (relative to title/top of the full figure)
-    # for ann in fig.layout.annotations:
-    #     ann.y -= 0.02
-    # Add subplot tiltes
-    fig.add_annotation(
-        text=f"{date1} - {channel1}",
-        xref="x domain",
-        yref="y domain",  # relative to subplot 1's own domain
-        x=0.5,  # centered horizontally
-        y=0.94,  # top of domain
-        xanchor="center",
-        yanchor="bottom",
-        yshift=-10,  # small pixel offset (to shift text down)
-        showarrow=False,
-        font={"size": 18},  # match default subplot title size if needed
-    )
-    fig.add_annotation(
-        text=f"{date2} - {channel2}",
-        xref="x2 domain",
-        yref="y2 domain",  # relative to subplot 2's own domain
-        x=0.5,  # centered horizontally
-        y=0.94,  # top of domain
-        xanchor="center",
-        yanchor="bottom",
-        yshift=-10,  # small pixel offset (to shift text down)
-        showarrow=False,
-        font={"size": 18},  # match default subplot title size if needed
-    )
+    # Make sure the 3 plots have the same size (does not work es expected)
+    n_rows, n_cols = heat1.shape
+    fig.update_xaxes(range=[0.5, n_cols + 0.5])
+    fig.update_yaxes(
+        range=[n_rows + 0.5, 0.5]
+    )  # reversed order, since y-axis is flipped
     return fig
 
 
@@ -1359,6 +1466,25 @@ def plot_uniformity_2_measurements_mpl():
 
 
 @reactive.calc
+def set_distortion_card_height() -> str:
+    """
+    Calculate the card display height based on the plot width.
+
+    For distortion plot (comparing dates and or channels).
+
+    Basically sets the card height = width / (3 cols)
+    minus a fixed value = 50
+
+    :return: str, e.g. 1000px
+    """
+    width = get_distortion_plot_width()
+    row_height = width // 3 - 50
+    row_height = f"{row_height}px"
+    dist_card_height.set(row_height)
+    return row_height
+
+
+@reactive.calc
 def set_card_height_uni_2date_comparison() -> str:
     """
     Calculate card display height based on plot's number of rows and plot width.
@@ -1396,6 +1522,16 @@ def set_card_height_uni_2channel_comparison() -> str:
     # print("Plot width = ", width)
     # print(f"Card height should be = {row_height}px")
     return f"{row_height}px"
+
+
+@reactive.calc
+def get_distortion_plot_width() -> Union[int, float]:
+    """Get the plot with for the Distortion plot."""
+    width = session.clientdata.output_width("plot_distortion")
+    if width is None:
+        # Set an arbitrary width
+        width = 800
+    return width
 
 
 @reactive.calc
@@ -1870,17 +2006,6 @@ def update_uni_channel_selectors():
         choices=channels,
         selected=None if len(channels) == 0 else channels[-1],
     )
-
-
-# TODO FIXME - not needed
-# @reactive.effect
-# @reactive.event(input.dist_date_selector_1, input.dist_date_selector_2)
-# def update_dist_channel_selector():
-#     """Update the channel choices for the Distortion plot."""
-#     channels = sorted(get_common_distortion_channels())
-#     dist_ch_selector = ui.update_select(
-#         "dist_ch_selector", choices=channels
-#     )
 
 
 @reactive.effect

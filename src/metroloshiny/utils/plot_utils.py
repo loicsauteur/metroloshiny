@@ -33,6 +33,13 @@ def normalize_df(
     """
     Normalize a dataframe by min/max values.
 
+    For vector normalization low should be 0, while high the absolute max.
+
+    When no low/high provided, takes the absolute min/max:
+        -> max-abs scaling (keeps the symmetry around 0)
+        attention in cases where values are all positive,
+        normalization low will not be 0.
+
     :param df: pd.DataFrame
     :param start_col: int, first column for normalization. Default = 0
     :param end_col: int, last column for normalization. Default = -1

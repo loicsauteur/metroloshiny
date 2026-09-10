@@ -28,6 +28,8 @@ from metroloshiny.utils.dataframe_utils import (
 )
 from metroloshiny.utils.read_file import get_sheet, load_doc
 
+# TODO: make line plots with averages of PSF (to see outliers/problems in analysis more easily)
+
 # Load Data
 use_dev_local_file = set_local_file()
 sheet_doc = load_doc(dev_local_file=use_dev_local_file)
