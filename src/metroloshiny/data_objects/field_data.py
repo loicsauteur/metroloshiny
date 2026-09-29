@@ -55,6 +55,8 @@ class FieldData:
         self.distortion_tables = {}
         # Uniformity tables {str(date): omero_table dataframe}
         self.uniformity_tables = {}
+        # Raw metrics tables {str(date): omero_table dataframe}
+        self.raw_metrics_tables = {}
         # Roi information dict {str(date): {str(roiID): (centroid )} }
         self.roi_detected = {}
         self.roi_ideal = {}
@@ -622,6 +624,58 @@ class FieldData:
                 df = pd.concat([df, row], ignore_index=True)
         return df
 
+    def get_rolloff_metrics_over_time(self) -> pd.DataFrame:
+        """
+        Get the roll-off metrics from the raw metrics over time.
+
+        :return: pd.DataFrame, with columns:
+            Date | Channel | Centering_Accuracy | RollOff_LR | RollOff_RL | RollOff_Abs
+        """
+        # Initialise final dataframe
+        df_final = pd.DataFrame()
+        # Define headers (without the date)
+        headers = [
+            "Channel",
+            "Centering_Accuracy",
+            "RollOff_LR",
+            "RollOff_RL",
+            "RollOff_Abs",
+        ]
+
+        for date, date__df in self.raw_metrics_tables.items():
+            date_df = pd.DataFrame(date__df)
+            if date_df is None:
+                # FIXME? currently omit the missing date
+                pass
+            else:
+                # Find the correct headers
+                c_a = ro_lr = ro_rl = ro_abs = None
+                for col in date_df.columns:
+                    if col.startswith("Centering_Accur"):
+                        c_a = col
+                    if col.startswith("RollOff_LR"):
+                        ro_lr = col
+                    if col.startswith("RollOff_RL"):
+                        ro_rl = col
+                    if col.startswith("RollOff_Abs"):
+                        ro_abs = col
+                if None in [c_a, ro_lr, ro_rl, ro_abs]:
+                    # Skip this entry
+                    self.problems.append(
+                        f"{date}: Does not have RollOff values!"
+                    )
+                    continue
+                # Create dataframe for the current date
+                df = date_df[["Channel", c_a, ro_lr, ro_rl, ro_abs]]
+                df.columns = headers
+                df.insert(0, "Date", [date] * len(df))
+                # Merge subsequent dates into final df
+                if df_final.empty:
+                    df_final = df
+                else:
+                    df_final = pd.concat([df_final, df], ignore_index=True)
+        return df_final
+
     def get_uniformity_over_time_melt(self) -> pd.DataFrame:
         """
         Get the uniformity over time melted.
@@ -728,6 +782,27 @@ class FieldData:
                 # Overwrite the data dict (necessary!)
                 self.uniformity_tables[date] = _df
 
+        # Adjust the raw metrics data
+        for date, df in self.raw_metrics_tables.items():
+            # Get the channel name mapping
+            ch_map = self._map_channel_names_(date=date)
+            if df is not None:
+                # Rename the channel column entries to match OMERO channel names
+                # i.e. "1.0" -> "ch1"
+                _df = pd.DataFrame(df)
+                _df["Channel"] = "ch" + _df["Channel"].astype(int).astype(str)
+                # Rename the channel name
+                new_names = []
+                for _idx, row in _df.iterrows():
+                    ch_omero = row["Channel"]
+                    if ch_omero not in ch_map.keys():
+                        raise ValueError(
+                            f"Cannot match <{ch_omero}> to a channel name."
+                        )
+                    new_names.append(ch_map.get(ch_omero))
+                _df["Channel"] = new_names
+                self.raw_metrics_tables[date] = _df
+
     def _set_data_(self):
         """
         Set the uniformity, distortion, detected and ideal roi dictionaries.
@@ -742,6 +817,7 @@ class FieldData:
         unif_dict = {}
         roi_detected_dict = {}
         roi_ideal_dict = {}
+        raw_metrics_dict = {}
         unique_ids = self._get_unique_image_ids_()
         # Collect all OMERO IDs and File IDs separately
         omero_ids = {}
@@ -787,17 +863,22 @@ class FieldData:
                     unif_df = get_omero_table(
                         conn, image_id, "Field_uniformity"
                     )
+                    raw_metrics_df = get_omero_table(
+                        conn, image_id, "_raw_metrics_"
+                    )
                     det_roi, ideal_roi = get_omero_ring_rois(conn, image_id)
                     dist_dict[date] = dist_df
                     unif_dict[date] = unif_df
                     roi_detected_dict[date] = det_roi
                     roi_ideal_dict[date] = ideal_roi
+                    raw_metrics_dict[date] = raw_metrics_df
                 except Exception as err:
                     # if exception, then something went wrong (e.g. ID is missing)
                     dist_dict[date] = None
                     unif_dict[date] = None
                     roi_detected_dict[date] = None
                     roi_ideal_dict[date] = None
+                    raw_metrics_dict[date] = None
                     self.problems.append(
                         f"{date}: Error could not get data from OMERO ({err})."
                     )
@@ -811,6 +892,7 @@ class FieldData:
             unif_dict[date] = None
             roi_detected_dict[date] = None
             roi_ideal_dict[date] = None
+            raw_metrics_dict[date] = None
             # print(f"Reading from file (for date {date}) is not implemented.")
             self.problems.append(f"{date}: NotImplemented reading from file.")
 
@@ -824,12 +906,15 @@ class FieldData:
                 roi_detected_dict[date] = None
             if date not in roi_ideal_dict.keys():
                 roi_ideal_dict[date] = None
+            if date not in raw_metrics_dict.keys():
+                raw_metrics_dict[date] = None
 
         # Set the class variables
         self.distortion_tables = dist_dict
         self.uniformity_tables = unif_dict
         self.roi_detected = roi_detected_dict
         self.roi_ideal = roi_ideal_dict
+        self.raw_metrics_tables = raw_metrics_dict
 
         # Update/match the channel names
         self._update_channel_names_()

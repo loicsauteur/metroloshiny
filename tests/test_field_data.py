@@ -105,7 +105,7 @@ def test_fielddata():
     """
     Test the FieldData object with OMERO connection.
 
-    Does only run in "pytest -m manual"
+    Runs only in "pytest -m manual", since OMERO connection required.
     Repeats test also from test_fielddata_pytest function.
     """
     # Create mock data
@@ -258,7 +258,7 @@ def test_get_distortion_dataframe_from_rois():
     """
     Test the arrow heat map test function.
 
-    Runs only with 'pixi run manual'
+    Runs only in "pytest -m manual", since OMERO connection required.
     """
     # Create mock data
     df = _create_mock_omero_df_()
@@ -321,6 +321,7 @@ def test_get_distortion_dataframe():
     Test the get_distortion_dataframe function.
 
     Which implements distortion for multiple channels.
+    Runs only in "pytest -m manual", since OMERO connection required.
     """
     # Create mock data
     df = _create_mock_omero_df_()
@@ -378,10 +379,40 @@ def test_get_distortion_dataframe():
         assert calc_mag == middle_row["Magnitude"]
 
 
+@pytest.mark.manual
+def test_rolloff():
+    """
+    Test functions related to RollOff dataframes.
+
+    Runs only in "pytest -m manual", since OMERO connection required.
+    """
+    # Create mock data
+    df = _create_mock_omero_df_()
+    # Create data object WITH loading from OMERO
+    data = FieldData(base_df=df, retrieve_omero=True)
+    date = "20260101"
+    expected_channels = ["488", "561", "Alexa 647", "DAPI"]
+    # Get the raw metrics table, the channels should have been renamed
+    df = data.raw_metrics_tables[date]
+    for ch in df["Channel"]:
+        assert ch in expected_channels
+
+    # Test roll-off table creation
+    df = data.get_rolloff_metrics_over_time()
+    assert len(df.columns) == 6
+    assert len(df) == 8
+    assert "20260101" in df["Date"].values
+    assert "20260103" in df["Date"].values
+    assert "20260102" not in df["Date"].values
+    for ch in expected_channels:
+        assert df["Channel"].value_counts().get(ch, 0) == 2
+
+
 if __name__ == "__main__":
     # test_fielddata_pytest()
     # test_fielddata()
     # test_heat_mapping()
     # test_get_distortion_dataframe_from_rois()
     # test_get_distortion_dataframe()
+    # test_rolloff()
     pass

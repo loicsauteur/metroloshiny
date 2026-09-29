@@ -118,6 +118,44 @@ with ui.nav_panel(title=""):
                     df_unif = filter_avg_unifomrmity_by_date()
                     return create_plot_over_time(df_unif)
 
+            with ui.nav_panel(title="Plot Roll-Off"):
+
+                @render_plotly
+                def show_rolloff_plot():
+                    """Show the roll off over time plot."""
+                    data = get_omero_data()
+                    if data is None:
+                        # Hide tool tip (does not do anything here...)
+                        ui.update_tooltip("rolloff_tooltip", show=False)
+                        return no_data_plotly()
+                    # Show tool tip
+                    ui.update_tooltip("rolloff_tooltip", show=False)
+                    df_roll = data.get_rolloff_metrics_over_time()
+                    return create_roll_off_plot(df_roll)
+
+                # Add a tooltip button with information about the metrics
+                with ui.tooltip(id="rolloff_tooltip", placement="right"):
+                    ui.input_action_button(
+                        "tooltip_btn",
+                        "ⓘ",
+                        class_="btn-sm btn-link align-self-end p-0",
+                    )
+                    ui.p(
+                        "Centering accuracy: how well the intensity is centered with respect to the field of view."
+                    )
+                    ui.p("    100% = perfect centering")
+                    ui.p(
+                        "RollOff: a measure of the intensity variation along a line intensity profile."
+                    )
+                    ui.p("    0% = perfect uniformity along the line")
+                    ui.p(
+                        "RollOff_LR: RollOff for a line profile from bottom left to top right."
+                    )
+                    ui.p(
+                        "RollOff_RL: RollOff for a line profile from top left to top right."
+                    )
+                    # FIXME not sure about the orientation
+
             with ui.nav_panel(title="Plot Field Distortion"):
 
                 @render.ui
@@ -1666,6 +1704,95 @@ def create_uniformity_plot():
     return fig
 
 
+def create_roll_off_plot(df: pd.DataFrame):
+    """
+    Create plot for roll off values over time.
+
+    Could be used for other OMERO "raw_metrics".
+    Info (from https://argolight.notion.site/Uniformity-of-field-47aa2b31cb9d4397898052273a4e88e0#e1256bd2dbda4dfabab0c97051b6e802):
+        - Centering accuracy = 100% = perfect
+        - RollOff = 0% = perfect
+
+    :param df: pd.DataFrame, with columns:
+        Date | Channel | Centering_Accuracy | RollOff_LR | RollOff_RL | RollOff_Abs
+
+    :return: plotly.express plot
+    """
+    if df.empty:
+        return no_data_plotly()
+
+    metrics = list(df.columns[2:])
+    # Melt the dataframe to have one "Value" column
+    df_melt = df.melt(
+        id_vars=["Date", "Channel"],
+        value_vars=metrics,
+        var_name="Metric",
+        value_name="Value",
+    )
+
+    # Convert dates
+    df_melt["Date"] = pd.to_datetime(df_melt["Date"].astype(str).str[:8])
+
+    plot = px.line(
+        data_frame=df_melt,
+        x="Date",
+        y="Value",
+        color="Channel",
+        symbol="Metric",
+        line_dash="Metric",
+        markers=True,
+    )
+    plot.update_layout(
+        # template="simple_white",
+        title={
+            "text": "Centering accuracy & Roll-off",
+            "yref": "container",  # the full canvas
+            "pad": {"b": 0, "l": 0, "r": 0, "t": 10},
+            "y": 1,  # at the top
+            "yanchor": "top",
+            "x": 0.5,
+            "xanchor": "center",
+            "font": {"size": 18},
+        },
+        plot_bgcolor="white",
+        margin={"l": 25, "r": 0, "t": 10, "b": 0},
+        autosize=True,
+        xaxis_title="Date",
+        yaxis_title="%",
+        legend_title="Channel, Metric",
+        xaxis={
+            "rangeselector": {
+                "buttons": [
+                    {
+                        "count": 1,
+                        "label": "1m",
+                        "step": "month",
+                        "stepmode": "backward",
+                    },
+                    {
+                        "count": 6,
+                        "label": "6m",
+                        "step": "month",
+                        "stepmode": "backward",
+                    },
+                    {
+                        "count": 1,
+                        "label": "1y",
+                        "step": "year",
+                        "stepmode": "backward",
+                    },
+                    {
+                        "step": "all",
+                    },
+                ],  # list of dicts (for selecting ranges)
+            },
+            "rangeslider": {"visible": True},
+            "type": "date",
+        },
+    )
+    return plot
+
+
 def create_plot_over_time(df: pd.DataFrame):
     """
     Create plot for average metrics over time.
@@ -1676,7 +1803,7 @@ def create_plot_over_time(df: pd.DataFrame):
     :param df: pd.DataFrame with columns:
         Date, Channel, Average**, STD**
 
-    :return: plotly.express plot (use in @render_widget)
+    :return: plotly.express plot (use in @render_widget, or @render_plotly)
     """
     if df.empty:
         return no_data_plotly()
@@ -1699,7 +1826,7 @@ def create_plot_over_time(df: pd.DataFrame):
     # Update the layout
     plot.update_layout(
         template="simple_white",
-        margin={"r": 200},
+        margin={"r": 20},
         # legend={ # not really necessary
         #     "yanchor": "top",
         #     "y": 1,
