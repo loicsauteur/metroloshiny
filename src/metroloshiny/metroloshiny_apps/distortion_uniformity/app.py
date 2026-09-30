@@ -1,13 +1,10 @@
 from typing import Optional, Union
 
-import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import plotly.express as px
 import plotly.figure_factory as pff
 import plotly.graph_objects as go
-from matplotlib.figure import Figure
-from matplotlib.quiver import Quiver
 from plotly.subplots import make_subplots
 from shiny import reactive
 from shiny.express import input, render, session, ui
@@ -25,7 +22,6 @@ from metroloshiny.utils.dataframe_utils import (
 from metroloshiny.utils.plot_utils import (
     add_center_cross_plotly,
     no_data_plotly,
-    no_data_seaborn,
     normalize_df,
     normalize_percentile,
 )
@@ -33,10 +29,7 @@ from metroloshiny.utils.read_file import get_sheet, load_doc
 
 # Ideas:
 # Uniformity        --------------
-# Line profiles (averages?) in different directions (also diagonal?) ?? TODO? probably not
 # TODO: Roll-off metrics instead of the current averages...
-
-# TODO distortion plots add difference plot (calculate new vectors from dx/dy)
 
 
 # Load Data
@@ -55,6 +48,11 @@ if dataframe["Objective"].str.startswith("ID").any():
 # Global variable       ------------------------------------------------------
 sites = np.unique(np.asarray(dataframe["Site"]))
 
+# Roll-off tooltip text as HTML
+rolloff_txt = """<div class="wide-tip" style="text-align: left";><p><strong>Centering accuracy</strong>: how well the intensity is centered with respect to the field of view.<br />&nbsp; &nbsp;&nbsp;&rarr;&nbsp;100% = perfect centering</p>
+<p><strong>RollOff</strong>: a measure of the intensity variation along a line intensity profile.<br />&nbsp; &nbsp;&nbsp;&rarr;&nbsp;0% = perfect uniformity along the line</p>
+<p><strong>RollOff_LR</strong>: RollOff for a line profile from bottom left to top right.</p>
+<p><strong>RollOff_RL</strong>: RollOff for a line profile from top left to top right.</p></div>"""
 
 # Reactive variables              --------------------------------------------
 # Remember choices for objectives (to maybe create an objective_db table)
@@ -69,6 +67,11 @@ ui.page_opts(
     title="Metrology: Field Uniformity and Distortion",
     footer=f"Version {get_version()}",
 )
+# Define specific styles        ##############
+# Increase the Roll-off tooltip windows width
+wide_tooltip = """.tooltip-inner:has(.wide-tip) {max-width: 400px;}"""
+ui.head_content(ui.tags.style(wide_tooltip))
+
 with ui.nav_panel(title=""):
     # Sidebar          -------------------------------------------------------
     with ui.layout_sidebar():
@@ -125,11 +128,8 @@ with ui.nav_panel(title=""):
                     """Show the roll off over time plot."""
                     data = get_omero_data()
                     if data is None:
-                        # Hide tool tip (does not do anything here...)
-                        ui.update_tooltip("rolloff_tooltip", show=False)
                         return no_data_plotly()
                     # Show tool tip
-                    ui.update_tooltip("rolloff_tooltip", show=False)
                     df_roll = data.get_rolloff_metrics_over_time()
                     return create_roll_off_plot(df_roll)
 
@@ -138,22 +138,10 @@ with ui.nav_panel(title=""):
                     ui.input_action_button(
                         "tooltip_btn",
                         "ⓘ",
-                        class_="btn-sm btn-link align-self-end p-0",
+                        # class_="btn-sm btn-link align-self-end p-0",
+                        class_="btn-sm align-self-end p-0",
                     )
-                    ui.p(
-                        "Centering accuracy: how well the intensity is centered with respect to the field of view."
-                    )
-                    ui.p("    100% = perfect centering")
-                    ui.p(
-                        "RollOff: a measure of the intensity variation along a line intensity profile."
-                    )
-                    ui.p("    0% = perfect uniformity along the line")
-                    ui.p(
-                        "RollOff_LR: RollOff for a line profile from bottom left to top right."
-                    )
-                    ui.p(
-                        "RollOff_RL: RollOff for a line profile from top left to top right."
-                    )
+                    ui.HTML(rolloff_txt)
                     # FIXME not sure about the orientation
 
             with ui.nav_panel(title="Plot Field Distortion"):
@@ -293,8 +281,6 @@ with ui.nav_panel(title=""):
                             _height = set_card_height_uni_2date_comparison()
 
                             # Show the plot
-                            # return create_uniformity_plot()
-                            # FIXME convert to plotly plots
                             fig, _ = plot_uniformity_2_measurements()
                             return fig
 
@@ -740,93 +726,6 @@ def create_distortion_plot():
 
 
 @reactive.calc
-def create_distortion_plot_old_mpl() -> tuple[
-    Figure,
-    Optional[Quiver],
-    Optional[pd.Series],
-    Optional[pd.Series],
-]:
-    """
-    Create a distortion quiver plot.
-
-    FIXME deprecated matplotlib version of the plot (uses info from ROIs)
-
-    Create a heat-map background for the magnitude.
-    Add arrows for the distortion direction (+ magnitude.)
-    Returns plotting relevant variables for the arrows,
-    which allows modification on the fly (within the plot UI function).
-    However, animated plots do not work on the VM.
-
-    :return: plt.Figure, if no data figure, other values are None
-    :return: Optional[plt.Quiver]
-    :return: Optional[pd.Series], dx values (aka U)
-    :return: Optional[pd.Series], dy values (aka V)
-    """
-    omero_data = get_omero_data()
-    date1 = input.dist_date_selector_1()
-    if omero_data is None or date1 is None:
-        return no_data_seaborn(), None, None, None
-
-    # Get the plotting data
-    df = omero_data.get_distortion_dataframe_from_rois(date1)
-    # Set the XY tiles to 0-based index
-    df["x"] = df["x"] - 1
-    df["y"] = df["y"] - 1
-
-    # Create magnitude heat-map
-    df_heat = df.pivot(index="y", columns="x", values="Magnitude")
-
-    df_heat = df_heat.to_numpy()
-
-    # Create quiver plot
-    fig, axes = plt.subplots()
-    heat_map = axes.imshow(
-        df_heat, interpolation="bicubic", origin="upper", cmap="viridis"
-    )
-
-    # Quiver = arrows with long shaft...
-    # Normalize the dataframe values (for arrow lengths)
-    df = normalize_df(df, start_col=3)
-    quiver = axes.quiver(
-        df["x"],
-        df["y"],
-        df["dx"],
-        df["dy"],
-        # df["Magnitude"], # for coloring arrows in viridis
-        color="white",
-        angles="xy",
-        scale_units="xy",
-        scale=0.5,  # inversly scales the length of arrows (2 looks not bad)
-        # Need a way to scale more dynamically!
-        pivot="tail",  # default = "tail", arrow anchoring part to xy tile
-        # width=0.003,  # default
-        alpha=1,
-        # label="test-label",
-        headwidth=5,  # default 3, Head width as multiple of shaft width.
-        headlength=7,  # default 5, Head length as multiple of shaft width.
-        headaxislength=5,  # default 4.5, Head length at shaft intersection as multiple of shaft width
-        minshaft=0.5,  # default 1, Length below which arrow scales, in units of head length - DONT use
-        # minlength=0.0001,  # doesnt really do anything
-        # width=0.0001,
-    )
-
-    axes.set_aspect("equal")
-    axes.axis("off")
-
-    # Add colorbar
-    cbar = plt.colorbar(heat_map)
-    # currently pixel units
-    cbar.set_label("Magnitude (currently in pixels)")
-    # ax.legend() # not needed
-    mic = input.microscope()
-    obj = input.objective()
-    obj = get_nice_objective_name(objective_df, obj)
-    info = input.info()
-    fig.suptitle(f"Field Distortion (from OMERO ROIs):\n{mic} {obj} ({info})")
-    return fig, quiver, df["dx"], df["dy"]
-
-
-@reactive.calc
 def plot_uniformity_between_channels():
     """
     Create heatmap like plots of the Field uniformity to compare 2 channels.
@@ -1049,108 +948,6 @@ def plot_uniformity_between_channels():
         font={"size": 18},
         textangle=-90,
     )
-    return fig
-
-
-@reactive.calc
-def plot_uniformity_between_channels_mpl():
-    """
-    Create heatmap like plots of the Field uniformity to compare 2 channels.
-
-    (On the same date)
-
-    FIXME DEPRECATED -> replaced with plotly plots
-
-    :return: matplotlib figure
-    """
-    # The the UI selections
-    ch1 = input.uni_ch_selector1()
-    ch2 = input.uni_ch_selector2()
-    date = input.uni_single_date_selector()
-    omero_data = get_omero_data()
-    if None in [ch1, ch2, date, omero_data]:
-        return no_data_seaborn()
-
-    # Don't bother plotting if there is only one channel
-    if len(omero_data.get_channel_names(date)) == 1:
-        msg = f"Only one channel ({omero_data.get_channel_names(date)[0]}) available for date {date}!"
-        return no_data_seaborn(msg)
-
-    # Get the data (convert unidata for heatmap)
-    uni_data = omero_data.get_uniformity()
-    df = omero_data.get_heat_map_dataframe(date=date, data_dict=uni_data)
-
-    # Create figure (4 rows, last one for the scale bar)
-    fig, axes = plt.subplots(
-        nrows=1,
-        ncols=4,
-        figsize=(12, 4),
-        gridspec_kw={"width_ratios": [1, 1, 1, 0.2]},
-    )
-
-    # Pivot the dfs for given channel (-> XY-table)
-    df1 = df.pivot(index="Y", columns="X", values=ch1)
-    df2 = df.pivot(index="Y", columns="X", values=ch2)
-    # Normalise the values (individually for each df)
-    df1 = normalize_percentile(df1).to_numpy()
-    df2 = normalize_percentile(df2).to_numpy()
-    # Create an image of the difference of the 2 (in %)
-    # FIXME not 100% correct since normalisation over percentile
-    diff = (df1 - df2) * 100
-
-    # Interpolation = bicubic for smooth interpolation
-    axes[0].imshow(
-        df1, interpolation="bicubic", origin="upper", cmap="viridis"
-    )
-    axes[1].imshow(
-        df2, interpolation="bicubic", origin="upper", cmap="viridis"
-    )
-
-    # Add date as title to the left
-    axes[0].text(
-        -0.05,
-        0.5,
-        date,
-        rotation="vertical",
-        transform=axes[0].transAxes,
-        va="center",
-        ha="center",
-        fontsize=12,
-    )
-
-    # Add the difference plot with colors blue>white>red (always show values -100 to + 100)
-    diff_img = axes[2].imshow(
-        diff,
-        interpolation="bicubic",
-        origin="upper",
-        cmap="bwr",
-        vmin=-100,
-        vmax=100,
-    )
-    # Add color bar for the difference plot
-    # Can't make it look better than that. Depends on the window size...
-    cbar = fig.colorbar(diff_img, ax=axes[3])
-    cbar.set_label("Difference [%]")
-
-    # Adjust titles
-    axes[0].set_title(f"{ch1}")
-    axes[1].set_title(f"{ch2}")
-    axes[2].set_title("Difference")
-
-    # Hide the frames / ticks except for the difference plot
-    for i, ax in enumerate(axes):
-        if i == 2:
-            ax.set_xticks([])
-            ax.set_yticks([])
-        else:
-            ax.axis("off")
-
-    mic = input.microscope()
-    obj = input.objective()
-    obj = get_nice_objective_name(objective_df, obj)
-    info = input.info()
-    fig.suptitle(f"Field Uniformity: {mic} {obj} ({info})")
-    fig.tight_layout(rect=[0, 0, 1, 0.96])
     return fig
 
 
@@ -1394,116 +1191,6 @@ def plot_uniformity_2_measurements():
 
 
 @reactive.calc
-def plot_uniformity_2_measurements_mpl():
-    """
-    Create heatmap like plots for the Field uniformity between 2 dates.
-
-    FIXME to be deprecated -> replace with plotly plots
-
-    For all common channels. I.e.:
-    DAPI | date1 | date2 | diff
-    488  | date1 | date2 | diff
-    ...
-
-    :return: matplotlib plot
-    """
-    # Get date selections
-    date1 = input.uni_date_selector_1()
-    date2 = input.uni_date_selector_2()
-    omero_data = get_omero_data()
-    if date1 is None or date2 is None or omero_data is None:
-        return no_data_seaborn()
-
-    # Check available channels for the dates
-    channels1 = omero_data.get_channel_names(date1)
-    channels2 = omero_data.get_channel_names(date2)
-    common_chs = sorted(set(channels1).intersection(channels2))
-    if len(common_chs) == 0:
-        return no_data_seaborn("No common channels between the 2 dates!")
-
-    # Get the data (convert unidata for heatmap)
-    uni_data = omero_data.get_uniformity()
-    df_1 = omero_data.get_heat_map_dataframe(date=date1, data_dict=uni_data)
-    df_2 = omero_data.get_heat_map_dataframe(date=date2, data_dict=uni_data)
-
-    # Create figure (4 rows, last one for the scale bar)
-    fig, axes = plt.subplots(
-        nrows=len(common_chs),
-        ncols=4,
-        figsize=(12, 4 * len(common_chs)),
-        gridspec_kw={"width_ratios": [1, 1, 1, 0.2]},
-    )
-    # Create figure: one channel per row
-    for row, channel in enumerate(common_chs):
-        # Pivot the dfs for given channel (-> XY-table)
-        df1 = df_1.pivot(index="Y", columns="X", values=channel)
-        df2 = df_2.pivot(index="Y", columns="X", values=channel)
-        # Normalise the values (individually for each df)
-        df1 = normalize_percentile(df1).to_numpy()
-        df2 = normalize_percentile(df2).to_numpy()
-        # Create an image of the difference of the 2 (in %)
-        # FIXME not 100% correct since normalisation over percentile
-        diff = (df1 - df2) * 100
-
-        # Interpolation = bicubic for smooth interpolation
-        axes[row][0].imshow(
-            df1, interpolation="bicubic", origin="upper", cmap="viridis"
-        )
-        axes[row][1].imshow(
-            df2, interpolation="bicubic", origin="upper", cmap="viridis"
-        )
-
-        # Add channel title to the left
-        # axes[row][0].set_title(channel, rotation="vertical", x=-0.05, y=0.5)
-        axes[row][0].text(
-            -0.05,
-            0.5,
-            channel,
-            rotation="vertical",
-            transform=axes[row][0].transAxes,
-            va="center",
-            ha="center",
-            fontsize=12,
-        )
-
-        # Add the difference plot with colors blue>white>red (always show values -100 to + 100)
-        diff_img = axes[row][2].imshow(
-            diff,
-            interpolation="bicubic",
-            origin="upper",
-            cmap="bwr",
-            vmin=-100,
-            vmax=100,
-        )
-        # Add color bar for the difference plot
-        # Can't make it look better than that. Depends on the window size...
-        cbar = fig.colorbar(diff_img, ax=axes[row][3])
-        cbar.set_label("Difference [%]")
-
-    # Adjust titles
-    axes[0][0].set_title(f"{date1}")
-    axes[0][1].set_title(f"{date2}")
-    axes[0][2].set_title("Difference")
-
-    # Hide the frames / ticks except for the difference plot
-    for row in axes:
-        for i, ax in enumerate(row):
-            if i == 2:
-                ax.set_xticks([])
-                ax.set_yticks([])
-            else:
-                ax.axis("off")
-
-    mic = input.microscope()
-    obj = input.objective()
-    obj = get_nice_objective_name(objective_df, obj)
-    info = input.info()
-    fig.suptitle(f"Field Uniformity: {mic} {obj} ({info})")
-    fig.tight_layout(rect=[0, 0, 1, 0.96])
-    return fig
-
-
-@reactive.calc
 def set_distortion_card_height() -> str:
     """
     Calculate the card display height based on the plot width.
@@ -1592,116 +1279,6 @@ def get_uniformity_2channels_plot_width() -> Union[int, float]:
         # Set an arbitrary width
         width = 800
     return width
-
-
-@reactive.calc
-def set_card_height_uni_2_dates_mpl() -> str:
-    """
-    Calculate card display height based on plot size.
-
-    FIXME DEPRECATED (old version for mpl plots)
-
-    Tries to set 400px height per row (channel).
-    FIXME: this is not optimal, since it should be in relation
-        to the window width. But it is not really possible to get it...
-
-    :return: str, e.g. 1000px (but stays unused I guess)
-        400px * number of figure rows
-    """
-    fig = plot_uniformity_2_measurements()
-
-    # Height is to be set 4x number of rows
-    _w, h = fig.get_size_inches()
-
-    # Empirically set min row height (in pixels)
-    row_height = 400
-    row_height = row_height * h // 4
-    # print(f"Row height set to: {row_height}px")
-    uni_2_dates_card_height.set(f"{row_height}px")
-    return f"{row_height}px"
-
-
-@reactive.calc
-def create_uniformity_plot():
-    """
-    Create a heat-map like plot for the Filed Uniformity between 2 dates.
-
-    # FIXME Deprecated: replaced by plot_uniformity_2_measurements()
-
-    FIXME: on VM when scaling the window, title gets bigger and bigger,
-        until it gives an error...
-
-    :return: matplotlib plot
-    """
-    # Get the date selections and channel selection
-    channel = input.uni_ch_selector()
-    date1 = input.uni_date_selector_1()
-    date2 = input.uni_date_selector_2()
-    omero_data = get_omero_data()
-    if channel is None or date1 is None or date2 is None or omero_data is None:
-        return no_data_seaborn()
-
-    # Get the data (convert unidata for heatmap)
-    uni_data = omero_data.get_uniformity()
-    df_1 = omero_data.get_heat_map_dataframe(date=date1, data_dict=uni_data)
-    df_2 = omero_data.get_heat_map_dataframe(date=date2, data_dict=uni_data)
-
-    # Pivot the dfs for given channel (-> XY-table)
-    df_1 = df_1.pivot(index="Y", columns="X", values=channel)
-    df_2 = df_2.pivot(index="Y", columns="X", values=channel)
-    # Normalise the values (individually for each df)
-    df_1 = normalize_percentile(df_1).to_numpy()
-    df_2 = normalize_percentile(df_2).to_numpy()
-
-    # Create an image with the difference of the two (in %)
-    diff = (df_1 - df_2) * 100
-
-    # Create plot (4 rows, last one for the scale bar)
-    fig, axes = plt.subplots(
-        nrows=1,
-        ncols=4,
-        figsize=(12, 4),
-        gridspec_kw={"width_ratios": [1, 1, 1, 0.2]},
-    )
-    # Interpolation = bicubic for smooth interpolation
-    axes[0].imshow(
-        df_1, interpolation="bicubic", origin="upper", cmap="viridis"
-    )
-    axes[0].set_title(f"{date1} - {channel}")
-    axes[1].imshow(
-        df_2, interpolation="bicubic", origin="upper", cmap="viridis"
-    )
-    axes[1].set_title(f"{date2} - {channel}")
-
-    # Add the difference plot with colors blue>white>red (always show values -100 to + 100)
-    diff_img = axes[2].imshow(
-        diff,
-        interpolation="bicubic",
-        origin="upper",
-        cmap="bwr",
-        vmin=-100,
-        vmax=100,
-    )
-    axes[2].set_title("Difference")
-    # Add color bar for the difference plot
-    # Can't make it look better than that. Depends on the window size...
-    cbar = fig.colorbar(diff_img, ax=axes[3])
-    cbar.set_label("Difference [%]")
-
-    # Hide the frames / ticks except for the difference plot
-    for i, ax in enumerate(axes):
-        if i == 2:
-            ax.set_xticks([])
-            ax.set_yticks([])
-        else:
-            ax.axis("off")
-
-    mic = input.microscope()
-    obj = input.objective()
-    obj = get_nice_objective_name(objective_df, obj)
-    info = input.info()
-    fig.suptitle(f"Field Uniformity: {mic} {obj} ({info})")
-    return fig
 
 
 def create_roll_off_plot(df: pd.DataFrame):
