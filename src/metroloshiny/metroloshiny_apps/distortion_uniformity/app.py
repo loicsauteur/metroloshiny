@@ -31,7 +31,6 @@ from metroloshiny.utils.read_file import get_sheet, load_doc
 # Uniformity        --------------
 # TODO: Roll-off metrics instead of the current averages...
 
-# TODO: change all plots to be more similar to rolloff (date selection...)
 
 # Load Data
 use_dev_local_file = set_local_file()
@@ -145,9 +144,12 @@ with ui.nav_panel(title=""):
                     df_dist = data.get_distortion_over_time_melt()
                     df_unif = data.get_uniformity_over_time_melt()
                     df = df_dist.merge(df_unif, on=["Date", "Channel"])
+                    # Merge also the rolloff dataframe
+                    df_roll = data.get_rolloff_metrics_over_time()
+                    df = df.merge(df_roll, on=["Date", "Channel"])
                     # Sort the dataframe properly
                     df = df.sort_values(by=["Date", "Channel"])
-                    return df
+                    return render.DataGrid(df, filters=True)
 
             with ui.nav_panel(title="Objective information"):
 
@@ -498,8 +500,6 @@ def create_distortion_plot():
             col=col,
         )
     # Heat-map for the difference   ------------------
-    # Get the plot y location for the color bar
-    # diff_domain = fig.layout["yaxis"].domain # FIXME not used anymore
     fig.add_trace(
         go.Heatmap(
             z=heat_diff,
@@ -518,23 +518,6 @@ def create_distortion_plot():
                 "Magnitude=%{z:.3f}<br>"
                 "Angle=%{customdata:.1f}°<extra></extra>"
             ),
-            # colorbar={  # Old, individual colorbar
-            #     "title": {
-            #         "text": "Magnitude [µm]",
-            #         "side": "right",
-            #     },
-            #     # Position relative to whole figure
-            #     "x": 1.02,
-            #     "xanchor": "left",
-            #     "xpad": 0,
-            #     "yref": "paper",
-            #     # middle of the row
-            #     "y": (diff_domain[1] - diff_domain[0]) / 2,
-            #     "yanchor": "middle",
-            #     # 80% of the row height
-            #     "len": (diff_domain[1] - diff_domain[0]) * 0.8,
-            #     "thickness": 15,  # Default = 30 (bar-width)
-            # },
         ),
         row=1,
         col=3,
@@ -1397,7 +1380,7 @@ def create_plot_over_time(df: pd.DataFrame):
             "type": "date",
         },
     )
-    # Rotate x-axis labels
+    # Rotate x-axis labels (not necessary anymore)
     # plot.update_xaxes(
     #     tickangle=45,
     #     # Reduce number of displayed ticks
