@@ -58,7 +58,7 @@ def test_basic_app(page: Page, local_app: ShinyAppProc) -> None:
     date = ctrl.InputSelect(page, "single_date_selection")
     date.expect_label("Select a date")
     date.expect_choices(["20190910text", "20191008", "20150101-sort"])
-    date.expect_selected("20190910text")
+    date.expect_selected("20150101-sort")
 
     # Power linearity table output          ##################################
     # Navset card underline need ids  (needs to be selected/clicked)
@@ -67,7 +67,7 @@ def test_basic_app(page: Page, local_app: ShinyAppProc) -> None:
 
     table = ctrl.OutputDataFrame(page, "show_power_linearity")
     table.expect_ncol(3)
-    table.expect_column_labels(["LED Line [nm]", "Power [%]", "20190910text"])
+    table.expect_column_labels(["LED Line [nm]", "Power [%]", "20150101-sort"])
     # One wavelength * 5 powers
     table.expect_nrow(5)
     w.set("All")
@@ -76,8 +76,6 @@ def test_basic_app(page: Page, local_app: ShinyAppProc) -> None:
 
     # Power stability table output          ##################################
     w.set("475.0")
-    date_range = ctrl.InputDateRange(page, "date_range_selection")
-    date_range.expect_value(["20150101", "20191008"])
 
     # Select the Table tab
     stability_card = ctrl.NavsetCardUnderline(page, "stability_card")

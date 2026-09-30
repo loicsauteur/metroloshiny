@@ -5,7 +5,7 @@ import plotly.express as px
 import seaborn as sns
 from shiny import reactive
 from shiny.express import input, render, ui
-from shinywidgets import render_widget
+from shinywidgets import render_plotly
 
 from metroloshiny.utils.common_utils import (
     create_css_color_dict,
@@ -15,10 +15,8 @@ from metroloshiny.utils.common_utils import (
 )
 from metroloshiny.utils.dataframe_utils import (
     filter_by_column_value,
-    filter_by_date_range,
     get_power_over_time_data,
     keep_non_nan_rows,
-    parse_dates,
 )
 from metroloshiny.utils.read_file import (
     get_sheet,
@@ -74,10 +72,12 @@ with ui.nav_panel(title="Light Source Power"):
                 @render.ui
                 def show_single_date_selection():
                     """Show selection UI for picking a date."""
+                    choices = get_measurement_dates()
                     sds = ui.input_select(
                         "single_date_selection",
                         "Select a date",
-                        choices=get_measurement_dates(),
+                        choices=choices,
+                        selected=None if len(choices) == 0 else choices[-1],
                     )
                     return sds
 
@@ -92,7 +92,8 @@ with ui.nav_panel(title="Light Source Power"):
                 @render.data_frame
                 def show_power_linearity():
                     """Show the filtered data table."""
-                    return create_power_linearity_table()
+                    df = create_power_linearity_table()
+                    return render.DataGrid(df, filters=True)
 
         # Plot stability        ----------------------------------------------
         with ui.navset_card_underline(
@@ -100,20 +101,7 @@ with ui.nav_panel(title="Light Source Power"):
         ):
             with ui.nav_panel(title="Plot"):
 
-                @render.ui
-                def show_date_range():
-                    """Show date range selection UI element."""
-                    dr = ui.input_date_range(
-                        "date_range_selection",
-                        "Select a date range",
-                        start=None,
-                        end=None,
-                        format="yyyymmdd",
-                    )
-                    return dr
-
-                # @render.plot
-                @render_widget
+                @render_plotly
                 def plot_power_stability():
                     """Render the power stability plot."""
                     df = create_power_stability_table()
@@ -125,28 +113,26 @@ with ui.nav_panel(title="Light Source Power"):
                 @render.data_frame
                 def show_power_stability():
                     """Show the filtered data table."""
-                    return create_power_stability_table()
+                    df = create_power_stability_table()
+                    return render.DataGrid(df, filters=True)
 
 
 # Reactive functions        --------------------------------------------------
 
 
 @reactive.calc
-@reactive.event(df_data, input.date_range_selection)
 def create_power_stability_table() -> pd.DataFrame:
     """
     Create a dataframe for power stability.
 
-    Sorts the date columns and filters dates by date range.
+    Sorts the date columns.
     Does not pivot the table.
 
     :return: pd.DataFrame
     """
     df = df_data.get()
-    start_date = input.date_range_selection()[0]
-    end_date = input.date_range_selection()[1]
-    # Return empty df, if data/selection not ready
-    if None in [start_date, end_date] or df is None or df.empty:
+    # Return empty df, if data not ready
+    if df is None or df.empty:
         return pd.DataFrame()
 
     # Sort the dates
@@ -155,27 +141,7 @@ def create_power_stability_table() -> pd.DataFrame:
     for d in sorted(df.columns[2:]):
         sorted_headers.append(d)
     df = df.reindex(sorted_headers, axis=1)
-
-    # Remove date columns outside selected date range
-    start_date = input.date_range_selection()[0].strftime("%Y%m%d")
-    end_date = input.date_range_selection()[1].strftime("%Y%m%d")
-    df = filter_by_date_range(df=df, min=start_date, max=end_date)
     return df
-
-
-@reactive.effect
-@reactive.event(df_data)
-def set_date_range():
-    """Update the date range selection."""
-    df = df_data.get()
-    # Set start and end to None, if no data or empty dataframe
-    if df is None or df.empty:
-        ui.update_date_range("date_range_selection", start=None, end=None)
-        return
-    # Parse the dates (on headers except first 2)
-    d = parse_dates(list(df.columns[2:]))
-    # Update the UI selection
-    ui.update_date_range("date_range_selection", start=d[0], end=d[-1])
 
 
 @reactive.calc
@@ -444,6 +410,7 @@ def create_power_linearity_plot(df: pd.DataFrame):  # -> sns.lineplot:
     legend = ax.get_legend()
     legend.set_bbox_to_anchor((1.05, 1))
     legend.set_loc("upper left")
+    legend.set_frame_on(False)
     fig.tight_layout()
     return plot
 
@@ -482,6 +449,9 @@ def create_power_stability_plot(df: pd.DataFrame):  # -> sns.lineplot:
     # line and power cannot be both None
     df = get_power_over_time_data(df=df, line=line, power_prct=prct)
 
+    # Convert dates
+    df["Date"] = pd.to_datetime(df["Date"].astype(str).str[:8])
+
     # Create a plot with plotly
     group_col = df.columns[1] if input.line() == "All" else df.columns[2]
     wavelengths = np.unique(np.asarray(df[df.columns[1]]))
@@ -515,17 +485,47 @@ def create_power_stability_plot(df: pd.DataFrame):  # -> sns.lineplot:
             "xanchor": "left",
             "x": 1.02,
         },
-        margin={"r": 200},
+        margin={"r": 20},
+        xaxis_title="",
+        xaxis={
+            "rangeselector": {
+                "buttons": [
+                    {
+                        "count": 1,
+                        "label": "1m",
+                        "step": "month",
+                        "stepmode": "backward",
+                    },
+                    {
+                        "count": 6,
+                        "label": "6m",
+                        "step": "month",
+                        "stepmode": "backward",
+                    },
+                    {
+                        "count": 1,
+                        "label": "1y",
+                        "step": "year",
+                        "stepmode": "backward",
+                    },
+                    {
+                        "step": "all",
+                    },
+                ],  # list of dicts (for selecting ranges)
+            },
+            "rangeslider": {"visible": True},
+            "type": "date",
+        },
     )
 
     # Rotate x-axis labels
-    plot.update_xaxes(
-        tickangle=45,
-        # Reduce number of displayed ticks
-        nticks=10,
-        showgrid=False,
-        title="",
-    )
+    # plot.update_xaxes(
+    #     tickangle=45,
+    #     # Reduce number of displayed ticks
+    #     nticks=10,
+    #     showgrid=False,
+    #     title="",
+    # )
     plot.update_yaxes(showgrid=True, gridcolor="lightgrey")
 
     # Custom hover template
