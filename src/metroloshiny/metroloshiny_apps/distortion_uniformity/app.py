@@ -31,6 +31,7 @@ from metroloshiny.utils.read_file import get_sheet, load_doc
 # Uniformity        --------------
 # TODO: Roll-off metrics instead of the current averages...
 
+# TODO: change all plots to be more similar to rolloff (date selection...)
 
 # Load Data
 use_dev_local_file = set_local_file()
@@ -48,7 +49,7 @@ if dataframe["Objective"].str.startswith("ID").any():
 # Global variable       ------------------------------------------------------
 sites = np.unique(np.asarray(dataframe["Site"]))
 
-# Roll-off tooltip text as HTML
+# Roll-off tooltip text as HTML   # FIXME not sure about the orientation
 rolloff_txt = """<div class="wide-tip" style="text-align: left";><p><strong>Centering accuracy</strong>: how well the intensity is centered with respect to the field of view.<br />&nbsp; &nbsp;&nbsp;&rarr;&nbsp;100% = perfect centering</p>
 <p><strong>RollOff</strong>: a measure of the intensity variation along a line intensity profile.<br />&nbsp; &nbsp;&nbsp;&rarr;&nbsp;0% = perfect uniformity along the line</p>
 <p><strong>RollOff_LR</strong>: RollOff for a line profile from bottom left to top right.</p>
@@ -87,38 +88,14 @@ with ui.nav_panel(title=""):
         ):
             with ui.nav_panel(title="Plot Field Uniformity"):
 
-                @render.ui
-                def show_uniformity_date_range():
-                    """Show Uniformity date range selector."""
-                    # For sanity check the same as in show_distortion_date_range
-                    data = get_omero_data()
-                    if data is None:
-                        uni_date_range = ui.input_date_range(
-                            "uni_date_range",
-                            "Select a date range",
-                            format="yyyymmdd",
-                        )
-                        return uni_date_range
-                    # Specify date range
-                    dates = data.get_uniformity().keys()
-                    dates = sorted([str(x)[:8] for x in dates])
-                    uni_date_range = ui.input_date_range(
-                        "uni_date_range",
-                        "Select a date range",
-                        format="yyyymmdd",
-                        start=dates[0],
-                        end=dates[-1],
-                    )
-                    return uni_date_range
-
-                @render_widget
+                @render_plotly
                 def show_field_uniformity_over_time_plot():
                     """Show field uniformity average over time plot."""
                     data = get_omero_data()
                     if data is None:
                         return no_data_plotly()
-                    # Get the dataframe and filter by date
-                    df_unif = filter_avg_unifomrmity_by_date()
+                    # Get the dataframe
+                    df_unif = data.get_uniformity_over_time_melt()
                     return create_plot_over_time(df_unif)
 
             with ui.nav_panel(title="Plot Roll-Off"):
@@ -142,44 +119,17 @@ with ui.nav_panel(title=""):
                         class_="btn-sm align-self-end p-0",
                     )
                     ui.HTML(rolloff_txt)
-                    # FIXME not sure about the orientation
 
             with ui.nav_panel(title="Plot Field Distortion"):
 
-                @render.ui
-                def show_distortion_date_range():
-                    """Show Distortion date range selector."""
-                    # Reactive event for date range may have been triggered before date_range ui render
-                    data = get_omero_data()
-                    # No initial date range specification
-                    if data is None:
-                        dist_date_range = ui.input_date_range(
-                            "dist_date_range",
-                            "Select a date range",
-                            format="yyyymmdd",
-                        )
-                        return dist_date_range
-                    # Specify date range
-                    dates = data.get_distortion().keys()
-                    dates = sorted([str(x)[:8] for x in dates])
-                    dist_date_range = ui.input_date_range(
-                        "dist_date_range",
-                        "Select a date range",
-                        format="yyyymmdd",
-                        start=dates[0],
-                        end=dates[-1],
-                    )
-                    return dist_date_range
-
-                @render_widget
+                @render_plotly
                 def show_field_distortion_over_time_plot():
                     """Show field distortion average over time plot."""
                     data = get_omero_data()
                     if data is None:
                         return no_data_plotly()
                     # Get the dataframe and filter by date
-                    # df_dist = data.get_distortion_over_time_melt()
-                    df_dist = filter_avg_distortion_by_date()
+                    df_dist = data.get_distortion_over_time_melt()
                     return create_plot_over_time(df_dist)
 
             with ui.nav_panel(title="Table"):
@@ -1324,7 +1274,7 @@ def create_roll_off_plot(df: pd.DataFrame):
         title={
             "text": "Centering accuracy & Roll-off",
             "yref": "container",  # the full canvas
-            "pad": {"b": 0, "l": 0, "r": 0, "t": 10},
+            "pad": {"b": 10, "l": 0, "r": 0, "t": 10},
             "y": 1,  # at the top
             "yanchor": "top",
             "x": 0.5,
@@ -1332,9 +1282,9 @@ def create_roll_off_plot(df: pd.DataFrame):
             "font": {"size": 18},
         },
         plot_bgcolor="white",
-        margin={"l": 25, "r": 0, "t": 10, "b": 0},
+        margin={"l": 0, "r": 20, "t": 10, "b": 0},
         autosize=True,
-        xaxis_title="Date",
+        xaxis_title="",
         yaxis_title="%",
         legend_title="Channel, Metric",
         xaxis={
@@ -1367,6 +1317,8 @@ def create_roll_off_plot(df: pd.DataFrame):
             "type": "date",
         },
     )
+    # Update y-axis
+    plot.update_yaxes(showgrid=True, gridcolor="lightgrey")
     return plot
 
 
@@ -1388,6 +1340,9 @@ def create_plot_over_time(df: pd.DataFrame):
     # Create line plot for Average with STD
     average = next(x for x in df.columns if "Average" in x)
     std = next(x for x in df.columns if "STD" in x)
+    # Convert the dates
+    df["Date"] = pd.to_datetime(df["Date"].astype(str).str[:8])
+
     plot = px.line(
         data_frame=df,
         x="Date",
@@ -1404,79 +1359,58 @@ def create_plot_over_time(df: pd.DataFrame):
     plot.update_layout(
         template="simple_white",
         margin={"r": 20},
+        xaxis_title="",
         # legend={ # not really necessary
         #     "yanchor": "top",
         #     "y": 1,
         #     "xanchor": "left",
         #     "x": 1.02,
         # },
+        # 'Date' selector in plotly figure
+        xaxis={
+            "rangeselector": {
+                "buttons": [
+                    {
+                        "count": 1,
+                        "label": "1m",
+                        "step": "month",
+                        "stepmode": "backward",
+                    },
+                    {
+                        "count": 6,
+                        "label": "6m",
+                        "step": "month",
+                        "stepmode": "backward",
+                    },
+                    {
+                        "count": 1,
+                        "label": "1y",
+                        "step": "year",
+                        "stepmode": "backward",
+                    },
+                    {
+                        "step": "all",
+                    },
+                ],  # list of dicts (for selecting ranges)
+            },
+            "rangeslider": {"visible": True},
+            "type": "date",
+        },
     )
     # Rotate x-axis labels
-    plot.update_xaxes(
-        tickangle=45,
-        # Reduce number of displayed ticks
-        nticks=10,
-        showgrid=False,
-        title="",
-    )
+    # plot.update_xaxes(
+    #     tickangle=45,
+    #     # Reduce number of displayed ticks
+    #     nticks=10,
+    #     showgrid=False,
+    #     title="",
+    # )
     # Update y-axis
     plot.update_yaxes(showgrid=True, gridcolor="lightgrey")
     return plot
 
 
 # Reactive calcs            --------------------------------------------------
-
-
-@reactive.calc
-def filter_avg_unifomrmity_by_date() -> pd.DataFrame:
-    """
-    Filter the average uniformity dataframe by date range.
-
-    Gets the dataframe from the OMERO data, then filters
-    out the rows, that are not in the date range selector.
-    """
-    date_range = input.uni_date_range()
-    data = get_omero_data()
-    if data is None:
-        return pd.DataFrame()
-    df = data.get_uniformity_over_time_melt().copy()
-    date_min = int(date_range[0].strftime("%Y%m%d"))
-    date_max = int(date_range[1].strftime("%Y%m%d"))
-
-    # Get the date column in format YYYYmmdd as integer
-    date_col = df["Date"].astype(str).str.extract(r"(\d{8})")[0]
-    date_col = date_col.astype(int)
-    # Remove the rows which are not within the date range
-    df = df[(date_col >= date_min) & (date_col <= date_max)].reset_index(
-        drop=True
-    )
-    return df
-
-
-@reactive.calc
-def filter_avg_distortion_by_date() -> pd.DataFrame:
-    """
-    Filter the average uniformity dataframe by date range.
-
-    Gets the dataframe from the OMERO data, then filters
-    out the rows, that are not in the date range selector.
-    """
-    date_range = input.dist_date_range()
-    data = get_omero_data()
-    if data is None:
-        return pd.DataFrame()
-    df = data.get_distortion_over_time_melt().copy()
-    date_min = int(date_range[0].strftime("%Y%m%d"))
-    date_max = int(date_range[1].strftime("%Y%m%d"))
-
-    # Get the date column in format YYYYmmdd as integer
-    date_col = df["Date"].astype(str).str.extract(r"(\d{8})")[0]
-    date_col = date_col.astype(int)
-    # Remove the rows which are not within the date range
-    df = df[(date_col >= date_min) & (date_col <= date_max)].reset_index(
-        drop=True
-    )
-    return df
 
 
 @reactive.calc
@@ -1665,28 +1599,6 @@ def create_objective_db_table() -> tuple[pd.DataFrame, list[dict]]:
 
 
 # Reactive functions - UI           ------------------------------------------
-
-
-@reactive.effect
-@reactive.event(get_omero_data)
-def update_date_range_selector_for_averages():
-    """Update date range selectors for avg. Uniformity & Distortion."""
-    data = get_omero_data()
-    if data is None:
-        return
-
-    # Get the dates
-    uni_dates = data.get_uniformity().keys()
-    dist_dates = data.get_distortion().keys()
-    # Make sure that they are in YYYYmmdd format
-    uni_dates = sorted([str(x)[:8] for x in uni_dates])
-    dist_dates = sorted([str(x)[:8] for x in dist_dates])
-    ui.update_date_range(
-        "uni_date_range", start=uni_dates[0], end=uni_dates[-1]
-    )
-    ui.update_date_range(
-        "dist_date_range", start=dist_dates[0], end=dist_dates[-1]
-    )
 
 
 @reactive.effect
