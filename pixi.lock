@@ -5435,7 +5435,7 @@ packages:
   name: metroloshiny
   requires_dist:
   - tables>=3.11.1,<4
-  requires_python: '>=3.11'
+  requires_python: ==3.11.*
 - pypi: https://files.pythonhosted.org/packages/25/95/d64f680ea1fc56d165457287e0851d6708800f9fcea346fc1b9957942ee6/numexpr-2.14.1-cp311-cp311-macosx_11_0_arm64.whl
   name: numexpr
   version: 2.14.1

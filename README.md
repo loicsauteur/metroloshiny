@@ -1,6 +1,7 @@
 ![GitHub Tag](https://img.shields.io/github/v/tag/loicsauteur/metroloshiny)
 ![License](https://img.shields.io/github/license/loicsauteur/metroloshiny)
 ![Python](https://img.shields.io/badge/dynamic/toml?url=https%3A%2F%2Fraw.githubusercontent.com%2Floicsauteur%2Fmetroloshiny%2Fmain%2Fpyproject.toml&query=%24.project%5B%22requires-python%22%5D&label=python&logo=python&logoColor=white&color=blue)
+[![CI](https://github.com/loicsauteur/metroloshiny/actions/workflows/ci.yml/badge.svg)](https://github.com/loicsauteur/metroloshiny/actions/workflows/ci.yml)
 [![codecov](https://codecov.io/gh/loicsauteur/metroloshiny/branch/main/graph/badge.svg)](https://codecov.io/gh/loicsauteur/metroloshiny)
 
 <!--[![PyPI](https://img.shields.io/pypi/v/metroloshiny.svg?color=green)](https://pypi.org/project/metroloshiny)-->
