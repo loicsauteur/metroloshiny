@@ -1,3 +1,17 @@
+![License](https://img.shields.io/github/license/loicsautuer/metroloshiny)
+![Python](https://img.shields.io/badge/dynamic/toml?url=https%3A%2F%2Fraw.githubusercontent.com%2Floicsauteur%2Fmetroloshiny%2Fmain%2Fpyproject.toml&query=%24.project%5B%22requires-python%22%5D&label=python&logo=python&logoColor=white&color=blue)
+[![PyPI](https://img.shields.io/pypi/v/metroloshiny.svg?color=green)](https://pypi.org/project/metroloshiny)
+[![codecov](https://codecov.io/gh/loicsauteur/metroloshiny/branch/main/graph/badge.svg)](https://codecov.io/gh/loicsauteur/metroloshiny)
+
+# Metroloshiny
+
+Metroloshiny allows you to visualise microscope metrology data interactively.
+
+It makes use of a google sheet as "database", where new metrology measurements can be uploaded directly from the Shiny app (metroloshiny).
+
+![Metroloshiny - Light Source Power Measurements](./resources/metroloshiny_power_example.png "Metroloshiny - Light Source Power Measurements")
+
+
 # Table of Contents
 1. [Overview](#Overview) <!--This works!-->
 2. [Usage](#Usage)
@@ -20,15 +34,6 @@
    5. [Deploying the Shiny apps](#Deploying-the-Shiny-apps)
       1. [Deployment automation with pixi](#Deployment-automation-with-pixi)
       2. [Updating metroloshiny](#Updating-metroloshiny)
-
-
-# Overview
-
-Metroloshiny allows you to visualise microscope metrology data interactively.
-
-It makes use of a google sheet as "database", where new metrology measurements can be uploaded directly from the Shiny app (metroloshiny).
-
-![Metroloshiny - Light Source Power Measurements](./resources/metroloshiny_power_example.png "Metroloshiny - Light Source Power Measurements")
 
 
 # Usage
