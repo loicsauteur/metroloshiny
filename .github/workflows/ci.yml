@@ -2,8 +2,10 @@ name: CI
 
 on:
   push:
-    branches:
-      - main
+    # Don't run CI on every commit on the main branch
+    #branches:
+    # - main
+    # Only on tagged commits
     tags:
       - "v*"
   pull_request:
