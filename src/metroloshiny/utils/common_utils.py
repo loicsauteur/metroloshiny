@@ -77,7 +77,7 @@ def theo_fwhm_2photon(ex: int, na: float, ri: float) -> tuple[float, float]:
     else:
         lat = 0.325 * ex * 2 / (2**0.5 * na**0.91)
     ax = 0.532 * ex * 2 / (2**0.5 * (ri - (ri * ri - na * na) ** 0.5))
-    return lat, ax
+    return round(lat, 2), round(ax, 2)
 
 
 def theo_fwhm_spinning(ex: int, na: float, ri: float) -> tuple[float, float]:
@@ -104,7 +104,7 @@ def theo_fwhm_spinning(ex: int, na: float, ri: float) -> tuple[float, float]:
     em = ex + 40
     lat = 0.51 * em / na
     ax = em / (ri - (ri * ri - na * na) ** 0.5)
-    return lat, ax
+    return round(lat, 2), round(ax, 2)
 
 
 def theo_fwhm_pointscanner(
@@ -133,7 +133,7 @@ def theo_fwhm_pointscanner(
     """
     lat = 0.51 * ex / na
     ax = 0.88 * ex / (ri - (ri * ri - na * na) ** 0.5)
-    return lat, ax
+    return round(lat, 2), round(ax, 2)
 
 
 def theo_fwhm_widefield(ex: int, na: float, ri: float) -> tuple[float, float]:
@@ -159,7 +159,7 @@ def theo_fwhm_widefield(ex: int, na: float, ri: float) -> tuple[float, float]:
     em = ex + 40
     lat = 0.51 * em / na
     ax = 1.77 * ri * em / (na * na)
-    return lat, ax
+    return round(lat, 2), round(ax, 2)
 
 
 def theo_fwhm_quarep(ex: int, na: float, ri: float) -> tuple[float, float]:
@@ -183,7 +183,7 @@ def theo_fwhm_quarep(ex: int, na: float, ri: float) -> tuple[float, float]:
     """
     lat = 0.51 * ex / na
     ax = 0.88 * ex / (ri - (ri**2 - na**2) ** 0.5)
-    return lat, ax
+    return round(lat, 2), round(ax, 2)
 
 
 def get_today() -> str:
