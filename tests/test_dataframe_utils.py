@@ -2,6 +2,7 @@
 
 import os
 from datetime import datetime
+from pathlib import Path
 
 import pandas as pd
 import pytest
@@ -15,27 +16,33 @@ from metroloshiny.utils.dataframe_utils import (
     parse_dates,
 )
 
+__data_path__ = Path(__file__)
+__data_path__ = (
+    __data_path__.parent.parent
+    / "example_files"
+    / "metroloshiny_data_example.xlsx"
+)
+__data_path__ = __data_path__.absolute()
+
 
 def test_filter_by_column_value():
     """Test filter_by_column_value function."""
     # Check if the file is present
-    path = "./data/metroloshiny_data.xlsx"
-    assert os.path.exists(path), f"Could not find: {path}"
+    assert os.path.exists(__data_path__), f"Could not find: {__data_path__}"
 
-    df = pd.read_excel(path)
-    result = len(filter_by_column_value(df, "Microscope", "Ti2 Righty"))
+    df = pd.read_excel(__data_path__)
+    result = len(filter_by_column_value(df, "Microscope", "Ti2 BSL2"))
     assert result == 25, f"Expected 25, but got {result}"
 
 
 def test_parse_dates():
     """Test parse_dates function."""
     # Check if the file is present
-    path = "./data/metroloshiny_data.xlsx"
-    assert os.path.exists(path), f"Could not find: {path}"
+    assert os.path.exists(__data_path__), f"Could not find: {__data_path__}"
 
     import random
 
-    df = pd.read_excel(path)
+    df = pd.read_excel(__data_path__)
     # Extract dates and make sure it is all strings
     dates = [str(d) for d in df.columns[7:]]
     # Shuffle the list
