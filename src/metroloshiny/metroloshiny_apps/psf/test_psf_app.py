@@ -57,13 +57,11 @@ def test_basic_app(page: Page, local_app: ShinyAppProc) -> None:
     # Test plotting options             ######################################
     ch_sel = ctrl.InputCheckboxGroup(page, "ch_selection")
     fwhm_sel = ctrl.InputCheckboxGroup(page, "fwhm_selection")
-    date_range = ctrl.InputDateRange(page, "date_range_selection")
     ch_calc_sel = ctrl.InputSelect(page, "ch_calc_selection")
     theo_sel = ctrl.InputCheckboxGroup(page, "theoretical")
 
     ch_sel.expect_choices(["Cy3", "Cy5", "DAPI", "GFP"])
     fwhm_sel.expect_choices(["FWHM-X", "FWHM-Y", "FWHM-Z"])
-    date_range.expect_value(["20100101", "20200101"])
     ch_calc_sel.expect_choices(["Cy3", "Cy5", "DAPI", "GFP"])
     theo_sel.expect_choices(["lateral", "axial"])
     theo_sel.expect_selected(["lateral", "axial"])
@@ -76,6 +74,8 @@ def test_basic_app(page: Page, local_app: ShinyAppProc) -> None:
     # Should have 2 rows for ID1 and ID5
     obj_table.expect_nrow(2)
     # I dont know how to check for highlighted rows...
+    # Go back to the Options tab
+    option_card.set("Options")
 
     # Check the chromatic over time table       #####################
     ref_ch = ctrl.OutputText(page, "show_ref_channel")
@@ -83,12 +83,11 @@ def test_basic_app(page: Page, local_app: ShinyAppProc) -> None:
         "Reference channel: ERROR: could not determine ref channel"
     )
     # Filter by date range to get ref channel = Cy5
-    # Make sure we are on the Options tab to make date range changes
-    option_card.set("Options")
-    # Date range values must be format: yyyy-mm-dd
-    date_range.set(value=("2009-12-12", "2014-01-01"))
-    ref_ch.expect_value("Reference channel: Cy5")
-    date_range.set(value=("2009-12-12", "2021-01-01"))
+    # Cannot do that anymore with date-range selector removed
+    # # Date range values must be format: yyyy-mm-dd
+    # date_range.set(value=("2009-12-12", "2014-01-01"))
+    # ref_ch.expect_value("Reference channel: Cy5")
+    # date_range.set(value=("2009-12-12", "2021-01-01"))
 
     # Check the XY plot
     chromatic_card = ctrl.NavsetCardUnderline(page, "chromatic_over_time")

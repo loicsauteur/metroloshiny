@@ -23,12 +23,12 @@ from metroloshiny.utils.common_utils import (
 )
 from metroloshiny.utils.dataframe_utils import (
     filter_by_column_value,
-    filter_by_date_range,
-    parse_dates,
 )
 from metroloshiny.utils.read_file import get_sheet, load_doc
 
 # TODO: make line plots with averages of PSF (to see outliers/problems in analysis more easily)
+
+# TODO: continue switching the plotly date range selectors... (not shiny but plotly)
 
 # Load Data
 use_dev_local_file = set_local_file()
@@ -87,19 +87,11 @@ with ui.nav_panel(title="PSF"):
                         fwhm_selection = ui.input_checkbox_group(
                             "fwhm_selection", "", choices={}
                         )
-                        date_range_selection = ui.input_date_range(
-                            "date_range_selection",
-                            "Select date range:",
-                            start=None,
-                            end=None,
-                            format="yyyymmdd",
-                        )
                         return (
                             "Select channels for plotting:",
                             ch_selection,
                             "FWHM to display:",
                             fwhm_selection,
-                            date_range_selection,
                         )
 
                     @render.ui
@@ -357,6 +349,9 @@ def create_plot(
         y_max = cur_max if input_max < cur_max else input_max
         y_range = [y_range[0], y_max * 1.05]
 
+    # Convert dates
+    df["Date"] = pd.to_datetime(df["Date"].astype(str).str[:8])
+
     # Create the plot
     plot = px.line(
         df,
@@ -383,16 +378,46 @@ def create_plot(
         },
         margin={"r": 200},
         yaxis_range=y_range,
+        xaxis_title="",
+        xaxis={
+            "rangeselector": {
+                "buttons": [
+                    {
+                        "count": 1,
+                        "label": "1m",
+                        "step": "month",
+                        "stepmode": "backward",
+                    },
+                    {
+                        "count": 6,
+                        "label": "6m",
+                        "step": "month",
+                        "stepmode": "backward",
+                    },
+                    {
+                        "count": 1,
+                        "label": "1y",
+                        "step": "year",
+                        "stepmode": "backward",
+                    },
+                    {
+                        "step": "all",
+                    },
+                ],  # list of dicts (for selecting ranges)
+            },
+            "rangeslider": {"visible": True},
+            "type": "date",
+        },
     )
 
-    # Rotate x-axis labels
-    plot.update_xaxes(
-        tickangle=45,
-        # Reduce number of displayed ticks
-        nticks=10,
-        showgrid=False,
-        title="",
-    )
+    # # Rotate x-axis labels
+    # plot.update_xaxes(
+    #     tickangle=45,
+    #     # Reduce number of displayed ticks
+    #     nticks=10,
+    #     showgrid=False,
+    #     title="",
+    # )
     plot.update_yaxes(showgrid=True, gridcolor="lightgrey")
 
     # Custom hover template
@@ -541,7 +566,7 @@ def get_objective_table() -> tuple[pd.DataFrame, list[dict]]:
 
 
 @reactive.calc
-@reactive.event(df_ref, input.date_range_selection)
+@reactive.event(df_ref)
 def check_shift_ref_ch():
     """
     Identify the reference channel.
@@ -571,10 +596,6 @@ def check_shift_ref_ch():
 
     if df.empty:
         return False, "No shift data"
-    # Remove date columns outside selected date range
-    start_date = input.date_range_selection()[0].strftime("%Y%m%d")
-    end_date = input.date_range_selection()[1].strftime("%Y%m%d")
-    df = filter_by_date_range(df=df, min=start_date, max=end_date)
 
     # Keep only rows which have NaN values (may have been text, or missing values)
     df_nan = df[df.isnull().any(axis=1)]
@@ -603,7 +624,6 @@ def check_shift_ref_ch():
     input.ri_selection,
     input.ch_selection,
     input.fwhm_selection,
-    input.date_range_selection,
 )
 def add_theoretical_fwhm() -> tuple[pd.DataFrame, pd.DataFrame]:
     """
@@ -668,7 +688,7 @@ def add_theoretical_fwhm() -> tuple[pd.DataFrame, pd.DataFrame]:
 
 
 @reactive.calc
-@reactive.event(df_data, input.ch_selection, input.date_range_selection)
+@reactive.event(df_data, input.ch_selection)
 def get_shift_data() -> tuple[pd.DataFrame, pd.DataFrame]:
     """
     Filter the dataframe for shift values.
@@ -682,10 +702,6 @@ def get_shift_data() -> tuple[pd.DataFrame, pd.DataFrame]:
         return pd.DataFrame(), pd.DataFrame()
 
     df = pd.DataFrame(df)
-    # Remove date columns outside selected date range
-    start_date = input.date_range_selection()[0].strftime("%Y%m%d")
-    end_date = input.date_range_selection()[1].strftime("%Y%m%d")
-    df = filter_by_date_range(df=df, min=start_date, max=end_date)
 
     # Remove non Shift rows
     with warnings.catch_warnings():
@@ -729,7 +745,7 @@ def get_shift_data() -> tuple[pd.DataFrame, pd.DataFrame]:
 
 
 @reactive.calc
-@reactive.event(df_data, input.date_range_selection)
+@reactive.event(df_data)
 def get_raw_fwhm_data() -> pd.DataFrame:
     """
     Filter the dataframe for FWHM values.
@@ -743,10 +759,6 @@ def get_raw_fwhm_data() -> pd.DataFrame:
         return pd.DataFrame()
 
     df = pd.DataFrame(df)
-    # Remove date columns outside selected date range
-    start_date = input.date_range_selection()[0].strftime("%Y%m%d")
-    end_date = input.date_range_selection()[1].strftime("%Y%m%d")
-    df = filter_by_date_range(df=df, min=start_date, max=end_date)
 
     # Remove non FWHM rows
     with warnings.catch_warnings():
@@ -868,20 +880,6 @@ def filter_by_sidebar_selections():
         cols.append(c)
     df = df.reindex(cols, axis=1)
     df_data.set(df)
-
-
-@reactive.effect
-@reactive.event(df_data)
-def update_date_range_ui():
-    """Update the date range selection based on available dates."""
-    df = df_data.get()
-    if df is None or df.empty:
-        return
-    # Update the date range selections
-    dates = parse_dates(list(df.columns[2:]))
-    if len(dates) == 0:
-        return
-    ui.update_date_range("date_range_selection", start=dates[0], end=dates[-1])
 
 
 @reactive.effect
