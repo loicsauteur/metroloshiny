@@ -58,3 +58,11 @@ repos:
     entry: pixi run test
     types: [python]
     pass_filenames: false
+
+  - id: pytest-apps
+    name: pytest-apps
+    stages: [pre-commit, pre-push]
+    language: system
+    entry: pixi run manual
+    types: [python]
+    pass_filenames: false
