@@ -35,8 +35,9 @@ types = { cmd="ty check ." }
 black = { cmd="black ." }
 spell = { cmd="typos ." }
 test = { cmd="pytest" }
-manual = { cmd="pytest -m manual"}
-all = { depends-on = ["fmt", "lint", "types", "black", "spell", "test"] }
+manual = { cmd="pytest -m manual"}  # Test functions which relay on private-data / specific for my setup
+# all will also run the pytest -m manual, which is specific for my setup
+all = { depends-on = ["fmt", "lint", "types", "black", "spell", "test", "manual"] }
 
 [tool.pixi.feature.dev.dependencies]
 pytest = ">=9.0.2,<10"
@@ -143,7 +144,7 @@ unresolved-attribute = "warn" # thrown by omero API
 
 [tool.pytest.ini_options]
 markers = [
-    "manual: tests that are run explicitly rather than during normal pytest runs",
+    "manual: tests that are run explicitly rather than during normal pytest runs.",
 ]
 addopts = "-m 'not manual'"
 

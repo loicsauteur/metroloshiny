@@ -2,11 +2,13 @@
 
 from pathlib import Path
 
+import pytest
 from playwright.sync_api import Page
 from shiny.playwright import controller as ctrl
 from shiny.run import ShinyAppProc
 
 
+@pytest.mark.manual
 def test_basic_app(page: Page, local_app: ShinyAppProc) -> None:
     """
     Test if app starts as expected.
@@ -23,6 +25,7 @@ def test_basic_app(page: Page, local_app: ShinyAppProc) -> None:
     category.set("Power")
 
 
+@pytest.mark.manual
 def test_better(page: Page, local_app: ShinyAppProc) -> None:
     """
     Test more extensively.
