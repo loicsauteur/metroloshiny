@@ -87,7 +87,12 @@ line-length = 79
 [tool.ruff.lint]
 select = [
     "B",  # bugbear
+    # enable pydocstyle --->>>>> TODO uncomment all D lines to have ruff check them!
     "D",  # pydocstyle
+    # "D212", # summary lines must be on the first physical line of the docstring
+    # "D401", # imperative mood for all docstrings
+    # "D415", # summary line has to end in a punctuation mark
+    # "D417", # require documentation for *all* function parameters
     "E",  # pycodestyle errors
     "F",  # pyflakes
     "I",  # isort
