@@ -1,10 +1,10 @@
 Key,Value
 GoogleServiceEmail,something@something-project.iam.gserviceaccount.com
 PathToServiceAccountJSON,/full/path/to/local_service_account.json
-Sheet ID,google_sheet_document_ID
 Sheet URL,https://docs.google.com/spreadsheets/d/someID/edit?gid=0#gid=0
 Upload password,password
 OMERO HOST,omero.idr.com
 OMERO PORT,4064
 OMERO USER,user
 OMERO PASSWORD,password
+Settings password,password
