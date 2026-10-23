@@ -32,12 +32,13 @@ playwright = { cmd="playwright install" }
 fmt = { cmd="ruff format ." }
 lint = { cmd="ruff check . --fix" }
 types = { cmd="ty check ." }
-black = { cmd="black ." }
+#black = { cmd="black ." }
 spell = { cmd="typos ." }
 test = { cmd="pytest" }
 manual = { cmd="pytest -m manual"}  # Test functions which relay on private-data / specific for my setup
 # all will also run the pytest -m manual, which is specific for my setup
-all = { depends-on = ["fmt", "lint", "types", "black", "spell", "test", "manual"] }
+# all = { depends-on = ["fmt", "lint", "types", "black", "spell", "test", "manual"] }
+all = { depends-on = ["fmt", "lint", "types", "spell", "test", "manual"] }
 
 [tool.pixi.feature.dev.dependencies]
 pytest = ">=9.0.2,<10"
