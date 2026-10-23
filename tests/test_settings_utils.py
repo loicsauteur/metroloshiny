@@ -127,21 +127,21 @@ def test_compare_passwords():
     assert check
 
 
-# Test I should implement...
-# def test_final_check_settings_pwd():
-#     """Test final_check_settings_pwd()."""
-#     pass
+def test_final_check_pwd():
+    """Test final_check_pwd()."""
+    assert not su.final_check_pwd(None, "a", "a")[0]
+    assert su.final_check_pwd("b", "b", "b")[0]
+    assert su.final_check_pwd("a", "", "")[0]
+    assert not su.final_check_pwd("a", "b", "a")[0]
 
+
+# Test I should implement...
 # def test_final_check_google():
 #     """Test final_check_google()."""
 #     pass
 
 # def test_final_check_omero():
 #     """Test final_check_omero()."""
-#     pass
-
-# def test_final_check_upload_pwd():
-#     """Test final_check_upload_pwd()."""
 #     pass
 
 # def test_save_private_data():
