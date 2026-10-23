@@ -146,6 +146,8 @@ def compare_passwords(pwd_1: str, pwd_2: str) -> tuple[bool, str]:
     """
     if pwd_1 is None or pwd_2 is None:
         return False, "Passwords cannot be of None-type!"
+    if pwd_1 == pwd_2 == "":
+        return False, "Passwords need to be set."
     if pwd_1 == "" or pwd_2 == "":
         return False, "Password cannot be empty."
     if pwd_1 != pwd_2:
@@ -154,88 +156,63 @@ def compare_passwords(pwd_1: str, pwd_2: str) -> tuple[bool, str]:
         return True, ""
 
 
-def final_check_settings_pwd(
-    file_path: str,
-    final_pwd: Optional[str],
-    input_cur_pwd: str,
-    input_new_pwd_1: str,
-    input_new_pwd_2: str,
+def final_check_pwd(
+    new_pwd: Optional[str],
+    input_pwd_1: str,
+    input_pwd_2: str,
 ) -> tuple[bool, str]:
     """
-    Check if setting the settings password is valid.
+    Check if setting a password is valid.
 
-    :file_path: str, path to private_data.csv
-    :final_pwd: str, currently remembered pwd (reactive value)
-    :input_cur_pwd: str, user input for the current pwd
-    :input_new_pwd_1: str, user input for the new pwd
-    :input_new_pwd_2: str, user input for the new pwd (repeated entry)
+    Info: Ignores the from file loaded password...
+
+    :new_pwd: str
+        Currently remembered pwd (reactive value)
+    :input_pwd_1: str
+        User input for the new pwd
+    :input_pwd_2: str
+        User input for the new pwd (repeated entry)
 
     :return:
         - bool, if everything is correct
         - str, message what is wrong
     """
-    # No private_data.csv file yet
-    if not os.path.exists(file_path):
-        if final_pwd is None:
-            return (
-                False,
-                "New 'Settings password' has not been set/checked!",
-            )
-        elif input_new_pwd_1 == input_new_pwd_2 == final_pwd:
-            return True, ""
-        else:
-            # Should not get here...
-            return False, "New 'Settings password' has not been checked!"
-
+    if new_pwd is None:
+        # Fail if reactive variable is not set.
+        return False, "Password has not been set/checked!"
+    if new_pwd == input_pwd_1 == input_pwd_2:
+        return True, ""
+    if input_pwd_1 == input_pwd_2 == "":
+        # Allow keepting the same password
+        return True, ""
     else:
-        # Check if input_cur_pwd is correct
-        # Allow empty new password fields
-        #   --> make sure final_pwd == input_cur_pwd
-        # TODO implement
-        return False, "NOT IMPLEMENTED YET!"
+        return False, "Password has not been set/checked!"
 
 
 def final_check_google(
     final_mail: Optional[str],
-    input_mail: str,
     final_json: Optional[str],
-    input_json: str,
     final_url: Optional[str],
-    input_url: str,
 ) -> tuple[bool, str]:
     """
     Check if google settings are valid.
 
     Tries also to connect.
+    Info: mail is actually not necessary...
 
     :final_mail: str, remembered mail (reactive value)
-    :input_mail: str, user input mail
     :final_json: str, remembered JSON file path (reactive value)
-    :input_json: str, user input JSON file path
     :final_url: str, remembred google sheet URL (reactive value)
-    :input_url: str, user input google sheet URL
 
     :return:
         - bool, if everything is correct
         - str, message what is wrong
     """
-    # Allow mail to be unset
-    msg = "Google Service Email is not set/checked!!"
-    if final_mail is not None and final_mail != input_mail:
+    # Fail message: always the same (except connection error)
+    msg = "Google are not set/checked!!"
+    variables = (final_mail, final_json, final_url)
+    if any(x is None for x in variables):
         return False, msg
-    if final_mail is None and input_mail != "":
-        return False, msg
-
-    # Allow JSON path to be unset
-    msg = "Path to Service Account JSON file is not set/checked!!"
-    if final_json is not None and final_json != input_json:
-        return False, msg
-    if final_json is None and input_json != "":
-        return False, msg
-
-    # Check if URL is good
-    if final_url != input_url:
-        return False, "Google spreadsheet URL is not set/checked!!"
 
     # Check if it can connect to Google
     _mail = "" if final_mail is None else final_mail
@@ -245,18 +222,14 @@ def final_check_google(
         return False, "[Error Google Connect]: " + msg
 
     # All is fine
-    return True, ""
+    return check, ""
 
 
 def final_check_omero(
     final_host: Optional[str],
-    input_host: str,
     final_port: Optional[int],
-    input_port: int,
     final_usr: Optional[str],
-    input_usr: str,
     final_pwd: Optional[str],
-    input_pwd: str,
 ) -> tuple[bool, str]:
     """
     Check if OMERO settings are valid.
@@ -264,13 +237,9 @@ def final_check_omero(
     Tries also to connect, but allow OMERO connection to be unset.
 
     :final_host: str, remembered OMERO host (reactive value)
-    :input_host: str, user input OMERO host
     :final_port: int, remembered OMERO port (reactive value)
-    :input_port: int, user input OMERO port
     :final_usr: str, remembered OMERO user (reactive value)
-    :input_usr: str, user input OMERO user
     :final_pwd: str, remembered OMERO pwd (reactive value)
-    :input_pwd: str, user input OMERO pwd
 
     :return:
         - bool, if everything is correct
@@ -278,38 +247,12 @@ def final_check_omero(
     """
     # Allow OMERO not to be set
     optional_vars = (final_host, final_usr, final_pwd)
-    if all(x is None for x in optional_vars) or all(
-        x == "" for x in optional_vars
-    ):
+    if all(x == "" for x in optional_vars):
         return True, "No OMERO settings provided"
 
-    # Check the host
-    msg = "OMERO HOST is not set/checked!"
-    if final_host is None and input_host != "":
-        return False, msg
-    if final_host != input_host:
-        return False, msg
-
-    # Check the Port (can never be None/empty string)
-    msg = "OMERO port is not set/checked!"
-    if final_port is None:
-        # This should always be set (defaults to 4064)
-        return False, msg
-    if final_port != input_port:
-        return False, msg
-
-    # Check user
-    msg = "OMERO User is not set/checked!"
-    if final_usr is None and input_usr != "":
-        return False, msg
-    if final_usr != input_usr:
-        return False, msg
-
-    # Check pwd
-    msg = "OMERO Password is not set/checked!"
-    if final_pwd is None and input_pwd != "":
-        return False, msg
-    if final_pwd != input_pwd:
+    # Have the settings been checked?
+    msg = "OMERO settings are not set/checked!"
+    if any(x is None for x in optional_vars):
         return False, msg
 
     # Try to check if OMERO connection works
@@ -329,6 +272,8 @@ def final_check_upload_pwd(
 ) -> tuple[bool, str]:
     """
     Check if setting the settings password is valid.
+
+    FIXME deprecated!
 
     :pwd_from_file: str
         password that was loaded from the file
