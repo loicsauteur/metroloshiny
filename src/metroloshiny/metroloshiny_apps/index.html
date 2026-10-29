@@ -34,9 +34,16 @@
       color: #EEE;
       text-align: center;
     }
-    #intro {
-      background-color: #DDD;
+    #intro-row {
+      display: flex;
+      align-items: center;
       margin: 1em 1em 0 1em;
+    }
+    #intro {
+      flex: 1;
+      background-color: #DDD;
+      /*margin: 1em 1em 0 1em;*/
+      margin: 0;
       padding: .75em;
       text-align: center;
       border: 1px solid #CCC;
@@ -67,6 +74,16 @@
     }
     .bullets li {
       padding-bottom: 20px;
+    }
+    .gear {
+      margin-left: .6em;
+      font-size: 1.6em;
+      line-height: 1;
+      color: #3475b4;
+    }
+    .gear:hover {
+      color: #114;
+      text-decoration: none;
     }
 
     footer {
@@ -114,8 +131,11 @@
     </div>
   </div>
   <div id="outer-content">
-    <div id="intro">
-      <p>This is the home of Metroloshiny.</p>
+    <div id="intro-row">
+      <div id="intro">
+        <p>This is the home of Metroloshiny.</p>
+      </div>
+      <a class="gear" href="./settings/" title="Settings" aria-label="Settings">&#9881;</a>
     </div>
     <div id="content">
       <div id="main">
