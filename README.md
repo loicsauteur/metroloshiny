@@ -67,7 +67,7 @@ Alternatively, new entries (e.g. for a new microscope) can be specified by selec
 Upload is protected by password, which is configured in the `private_data.csv` [see here](#Configure-private_data-csv-file).
 
 > [!TIP]
-> * Providing some information for the `Info` columns is strongly recommended.
+> * Providing some information for the `Info` columns is necessary.
 
 ### Data upload for PSF measurements
 
