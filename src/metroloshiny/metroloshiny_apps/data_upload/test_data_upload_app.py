@@ -103,8 +103,14 @@ def test_better(page: Page, local_app: ShinyAppProc) -> None:
 
     # Set the file to an example file
     table = ctrl.OutputDataFrame(page, "csv_data")
-    path = Path(__file__).parent.parent.parent.parent.parent
-    path = path / "example_files" / "example_simple_power_measurement.xlsx"
+    path = Path(__file__).parents[4]
+    path = (
+        path
+        / "example_files"
+        / "power_at_objective_examples"
+        / "example_simple_power_measurement.xlsx"
+    )
+    print(path)
     assert path.exists()
     table.expect_ncol(0)
     table.expect_nrow(0)

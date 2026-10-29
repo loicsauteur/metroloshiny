@@ -32,7 +32,11 @@ def test_read_data_dict():
         su.read_data_dict(str(path))
 
     # Wrong csv file
-    path = path_dir / "example_thorlabs_powermeter_linearity-DAPI.csv"
+    path = (
+        path_dir
+        / "power_at_objective_examples"
+        / "example_thorlabs_powermeter_linearity-DAPI.csv"
+    )
     with pytest.raises(ValueError, match=r"File does not have 2 columns."):
         su.read_data_dict(str(path))
 

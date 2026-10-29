@@ -29,7 +29,7 @@ def test_get_cred():
     # Test on wrong file
     with pytest.raises(ValueError, match=r"Wrong private_data.csv file*"):
         ou.get_cred(
-            path_private_data="./example_files/example_thorlabs_powermeter_linearity-DAPI.csv"
+            path_private_data="./example_files/power_at_objective_examples/example_thorlabs_powermeter_linearity-DAPI.csv"
         )
 
 

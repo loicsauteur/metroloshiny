@@ -37,7 +37,7 @@ def test_get_private_data():
     with pytest.raises(ValueError, match=r"Wrong private_data.csv file*"):
         refi.get_private_data(
             key="OMERO PORT",
-            data_path="./example_files/example_thorlabs_powermeter_linearity-DAPI.csv",
+            data_path="./example_files/power_at_objective_examples/example_thorlabs_powermeter_linearity-DAPI.csv",
         )
 
 

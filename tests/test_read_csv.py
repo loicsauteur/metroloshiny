@@ -12,7 +12,11 @@ def test_read_thorlabs_csv():
     """Test reading Simone's thorlabs power measurement file."""
     # Get the example file relative from this file
     example_dir = Path(__file__).parent.parent / "example_files"
-    path = example_dir / "example_thorlabs_powermeter_linearity-DAPI.csv"
+    path = (
+        example_dir
+        / "power_at_objective_examples"
+        / "example_thorlabs_powermeter_linearity-DAPI.csv"
+    )
 
     # Make sure that the file exists
     assert path.exists(), f"Could not find the test file: {path}"
@@ -50,7 +54,9 @@ def test_read_nis_job_xlsx():
     example_dir = Path(__file__).parent.parent / "example_files"
     # Path to single objective measurement      ##############################
     path = (
-        example_dir / "SoRa_SCF_TLPM_PowerCalibrationOutputFile_20260715.xlsx"
+        example_dir
+        / "power_at_objective_examples"
+        / "SoRa_SCF_TLPM_PowerCalibrationOutputFile_20260715.xlsx"
     )
 
     # Read the file
@@ -68,7 +74,11 @@ def test_read_nis_job_xlsx():
     assert len(list(objectives)) == 1
 
     # Path to multi objective test file         ##############################
-    path = example_dir / "SCF_TLPM_PowerCalibrationOutputFile_test_file.xlsx"
+    path = (
+        example_dir
+        / "power_at_objective_examples"
+        / "SCF_TLPM_PowerCalibrationOutputFile_test_file.xlsx"
+    )
     df = rc.read_nis_job_xlsx(path=str(path))
 
     # There should be 4 sheets (objectives)
@@ -87,7 +97,11 @@ def test_read_simple_xlsx():
     """Test reading a simple power measurement xlsx file."""
     # Get the example file relative from this file
     example_dir = Path(__file__).parent.parent / "example_files"
-    path = example_dir / "example_simple_power_measurement.xlsx"
+    path = (
+        example_dir
+        / "power_at_objective_examples"
+        / "example_simple_power_measurement.xlsx"
+    )
 
     df = rc.read_simple_xlsx(path=str(path))
     assert len(df) == 8

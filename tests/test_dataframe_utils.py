@@ -163,7 +163,7 @@ def test_filter_by_nested_dict():
 
 def test_convert_date_column():
     """Test convert_date_columns function."""
-    path = "./example_files/example_thorlabs_powermeter_linearity-DAPI.csv"
+    path = "./example_files/power_at_objective_examples/example_thorlabs_powermeter_linearity-DAPI.csv"
     df = pd.read_csv(path, sep=";", header=12)
     df_conv = convert_date_column(df)
     for i in range(len(df)):
@@ -174,7 +174,7 @@ def test_convert_date_column():
 
 def test_convert_power_column():
     """Test convert_power_column function."""
-    path = "./example_files/example_thorlabs_powermeter_linearity-DAPI.csv"
+    path = "./example_files/power_at_objective_examples/example_thorlabs_powermeter_linearity-DAPI.csv"
     df = pd.read_csv(path, sep=";", header=12)
     df_conv = convert_power_column(df)
 
