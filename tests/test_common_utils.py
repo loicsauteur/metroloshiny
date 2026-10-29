@@ -264,5 +264,49 @@ def test_point_2d_point_distance():
         cu.point_2d_point_distance([1, 2], ["r", 5])
 
 
+def test_identify_date_format():
+    """Test the identify_date_format() function."""
+    # Wrong inputs
+    with pytest.raises(ValueError, match=r"Cannot parse dateformat from*"):
+        cu.identify_date_format("Date MM-YYYY-dd")
+    with pytest.raises(ValueError, match=r"Not a valid date format*"):
+        cu.identify_date_format("Date (mm-tt-d)")
+    test_str = ["Date (mm-y-d-)", "Date (mm-d)", "Date (mmdd-yyyy)"]
+    for s in test_str:
+        with pytest.raises(
+            RuntimeError, match=r"Could not identify format for*"
+        ):
+            cu.identify_date_format(s)
+
+    # Test the function
+    dform = cu.identify_date_format("Date (MM/dd/yyyy)")
+    assert dform == "%m/%d/%Y"
+    dform = cu.identify_date_format("Date (YYYYMMdd)")
+    assert dform == "%Y%m%d"
+    dform = cu.identify_date_format("Date (MM?dd-yyyy)")
+    assert dform == "%m?%d-%Y"
+
+
+def test_identify_time_format():
+    """Test the identify_time_format() function."""
+    # Wrong inputs
+    with pytest.raises(ValueError, match=r"Cannot parse timeformat from*"):
+        cu.identify_time_format("Time hh:mm:ss")
+    with pytest.raises(ValueError, match=r"Not a valid time format*"):
+        cu.identify_time_format("Time (mm-tt-ss)")
+    test_str = ["Time (hh:mm)", "Time (HHmmss)"]
+    for s in test_str:
+        with pytest.raises(
+            RuntimeError, match=r"Could not identify format for*"
+        ):
+            cu.identify_time_format(s)
+
+    # Test the function
+    tform = cu.identify_time_format("Time (hh:mm:ss)")
+    assert tform == "%H:%M:%S"
+    tform = cu.identify_time_format("Time (hh-mm:ss.ff)")
+    assert tform == "%H-%M:%S"
+
+
 if __name__ == "__main__":
     pass

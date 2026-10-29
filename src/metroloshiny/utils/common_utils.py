@@ -770,5 +770,116 @@ def point_2d_point_distance(
     return ((p2[0] - p1[0]) ** 2 + (p2[1] - p1[1]) ** 2) ** 0.5
 
 
+def identify_date_format(text: str) -> str:
+    """Identify the date format from a string.
+
+    Find the datetime compatible format.
+
+    Parameters
+    ----------
+    text : str
+        The format enclosed in brackets "()".
+        E.g., "Date (MM/dd/yyyy)"
+
+    Returns
+    -------
+    str
+        datetime compatible format. E.g. "%m/%d/%Y"
+
+    Raises
+    ------
+    ValueError
+        - If text does not have brackets
+        - Or not a valid date format (not containing m, d, or y)
+    RuntimeError
+        If date identifiers are not 3 and separators are not 2 or 0.
+    """
+    if "(" not in text or ")" not in text:
+        raise ValueError(
+            "Cannot parse dateformat from input as it does not have brackets."
+        )
+
+    text = text.split(")", maxsplit=1)[0]
+    text = text.rsplit("(", maxsplit=1)[-1].lower()
+    ids = []
+    separators = []
+    for c in text:
+        if c.isalpha():
+            if c not in ids:
+                ids.append(c)
+        else:
+            separators.append(c)
+    # Sanity checks
+    if len(ids) != 3 or (len(separators) != 2 and len(separators) != 0):
+        raise RuntimeError(f"Could not identify format for: {text}")
+    if not all(c in ids for c in ["m", "d", "y"]):
+        raise ValueError(f"Not a valid date format ({text})")
+
+    dform = ""
+    for idx, i in enumerate(ids):
+        if i == "y":
+            dform = dform + "%Y"
+        else:
+            dform = dform + f"%{i}"
+        if idx < 2 and len(separators) == 2:
+            dform = dform + separators[idx]
+    return dform
+
+
+def identify_time_format(text: str) -> str:
+    """Identify the time format from a string.
+
+    Find the datetime compatible format.
+
+    Parameters
+    ----------
+    text : str
+        The format enclosed in brackets "()".
+        E.g., "Time (hh:mm:ss)"
+
+    Returns
+    -------
+    str
+        datetime compatible format. E.g. "%H:%M:%S"
+
+    Raises
+    ------
+    ValueError
+        - If text does not have brackets
+        - Or not a valid date format (not containing h, m or s)
+    RuntimeError
+        If date identifiers are not 3 and separators are not 2 or 0.
+    """
+    if "(" not in text or ")" not in text:
+        raise ValueError(
+            "Cannot parse timeformat from input as it does not have brackets."
+        )
+
+    text = text.split(")", maxsplit=1)[0]
+    text = text.rsplit("(", maxsplit=1)[-1].lower()
+    ids = []
+    separators = []
+    for c in text:
+        if c.isalpha():
+            if c not in ids:
+                ids.append(c)
+        else:
+            separators.append(c)
+        if len(ids) == 3:
+            break
+    # Sanity checks
+    if len(ids) < 3 or len(separators) != 2:
+        raise RuntimeError(f"Could not identify format for: {text}")
+    if not all(c in ids for c in ["m", "h", "s"]):
+        raise ValueError(f"Not a valid time format ({text})")
+
+    dform = ""
+    for idx, i in enumerate(ids):
+        dform = dform + f"%{i.upper()}"
+        if idx < 2:
+            dform = dform + separators[idx]
+    return dform
+
+
 if __name__ == "__main__":
     pass
