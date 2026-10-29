@@ -21,8 +21,7 @@ __sheet_names__ = {
 
 
 def get_private_data(key: str, data_path: Optional[str] = None) -> str:
-    """
-    Load 'private data' saved from a csv file.
+    """Load 'private data' saved from a csv file.
 
     If data_path is not provided, will check:
         - "./data/private_data.csv"
@@ -30,9 +29,17 @@ def get_private_data(key: str, data_path: Optional[str] = None) -> str:
         - if neither of these 2 paths exist, will check the
           path defined in __linux_private_data_path__ (global variable)
 
-    :param key: str key to look for value
-    :param data_path: str path to the csv file
-    :return: str value for the key
+    Parameters
+    ----------
+    key : str
+        Key to look for value
+    data_path : str
+        Path to the csv file
+
+    Returns
+    -------
+    str
+        Value for the key
     """
     # To read 'private' data (csv with key value pairs)
     # excepts the file ./data/private_data.csv, if not specified with data_path
@@ -89,22 +96,29 @@ def load_doc(
     data_path: Optional[str] = None,
     dev_local_file: bool = False,
 ) -> Optional[gspread.Spreadsheet]:
-    """
-    Get the google spreadsheet document.
+    """Get the google spreadsheet document.
 
     Needs a service account, see here: https://docs.gspread.org/en/latest/oauth2.html#for-bots-using-service-account
 
-    :param gsheet_url: optional, str url to the google sheet.
+    Parameters
+    ----------
+    gsheet_url : Optional[str]
+        URL to the google sheet.
         Default = None -> gets the url from private data.
-    :param path_service_account: optional, str path to google-service-account JSON file.
+    path_service_account : Optional[str]
+        Path to google-service-account JSON file.
         Default = None -> gets the JSON file path from private data.
         If "", will use the 'default' location of the JSON file:
         `~/.config/gspread/service_account.json`
-    :param data_path: optional, str path to the private_data.csv.
+    data_path : Optional[str]
+        Path to the private_data.csv.
         Default = None -> uses default path.
-    :param dev_local_file: bool. Default = False, if True returns None.
+    dev_local_file : bool
+        Default = False, if True returns None.
 
-    :return: Spreadsheet
+    Returns
+    -------
+    gspread.Spreadsheet
     """
     if dev_local_file:
         return None
@@ -126,15 +140,24 @@ def load_doc(
 def get_sheet(
     doc: Optional[gspread.Spreadsheet], kind: str, dev_local_file: bool = False
 ) -> tuple[Optional[gspread.Worksheet], pd.DataFrame]:
-    """
-    Get a specific Worksheet from a google spreadsheet document.
+    """Get a specific Worksheet from a google spreadsheet document.
 
-    :param doc: gspread.Spreadsheet
-    :param kind: str, key to get the name from __sheet_names__
-    :param dev_local_file: bool, to use local excel file.
+    Parameters
+    ----------
+    doc : Optional[gspread.Spreadsheet]
+        Google document.
+    kind : str
+        Key to get the name from __sheet_names__
+    dev_local_file : bool
+        To use local excel file.
         Default False. If true, returns (None, pd.DataFrame)
 
-    :return: gspread.Worksheet, pd.DataFrame
+    Returns
+    -------
+    Optional[gspread.Worksheet]
+        None for local option.
+    pd.DataFrame
+        Sheet as dataframe
     """
     # Check if the kind is implemented
     if kind not in __sheet_names__.keys():
@@ -179,22 +202,28 @@ def load_gspread(
     path_service_account: Optional[str] = None,
     whole_document: bool = False,
 ) -> Union[gspread.Worksheet, gspread.Spreadsheet]:
-    """
-    Load a worksheet from a google sheet document.
+    """Load a worksheet from a google sheet document.
 
     Needs a service account, see here: https://docs.gspread.org/en/latest/oauth2.html#for-bots-using-service-account
     Optionally, allows getting the full document instead of just a sheet.
 
-    :param gsheet_url: str url to the google sheet.
-    :param sheet_name: str name of the google worksheet to load.
-    :param path_service_account: str path to google-service-account JSON file.
-                                 Can be None if the JSON is installed in the
-                                 intended folder:
-                                `~/.config/gspread/service_account.json`
-    :param whole_document: boolean, whether to return the whole document
-                           or just a sheet.
+    Parameters
+    ----------
+    gsheet_url : str
+        URL to the google sheet.
+    sheet_name : str
+        Name of the google worksheet to load.
+    path_service_account : str
+        Path to google-service-account JSON file.
+        Can be None if the JSON is installed in the
+        intended folder:
+        `~/.config/gspread/service_account.json`
+    whole_document : boolean
+        whether to return the whole document or just a sheet.
 
-    :return: gspread.Worksheet or gspread.Spreadsheet
+    Returns
+    -------
+    gspread.Worksheet or gspread.Spreadsheet
     """
     if path_service_account is None:
         gc = gspread.service_account()
@@ -217,16 +246,22 @@ def get_gspread(
     data_path: Optional[str] = None,
     dev_local_file: Optional[str] = None,
 ) -> Union[gspread.Spreadsheet, gspread.Worksheet, pd.DataFrame]:
-    """
-    Get a whole gspread document.
+    """Get a whole gspread document.
 
     Uses information provided in private_data.csv.
 
-    :param sheet_name: str name of the google sheet.
-    :param data_path: str path to csv file with key-value to access sheet.
-    :param dev_local_file: str, for testing using a local excel file (path).
+    Parameters
+    ----------
+    sheet_name : str
+        Name of the google sheet.
+    data_path : str
+        Path to csv file with key-value to access sheet.
+    dev_local_file : str
+        for testing using a local excel file (path).
 
-    :return: gspread.Spreadsheet or DataFrame for dev_local_file
+    Returns
+    -------
+    gspread.Spreadsheet or DataFrame for dev_local_file
     """
     if dev_local_file is not None:
         return pd.read_excel(dev_local_file)
@@ -244,19 +279,26 @@ def get_gspread(
 def ensure_numeric_data(
     df: pd.DataFrame, first_column: int = 7, verbose: bool = False
 ) -> pd.DataFrame:
-    """
-    Make sure / parse dataframe values to numeric.
+    """Make sure / parse dataframe values to numeric.
 
     My data frames my contain non-numeric entries.
     This will try to separate string from numbers, and make empty cells NaNs.
     It will not work for values e.g. `(SW=333) 4.05`,
     where it will yield 333.0.
 
-    :param df: pd.DataFrame
-    :param first_column: int start index for parsing.
-                         (Default = 7 > first date column).
+    Parameters
+    ----------
+    df : pd.DataFrame
+        Input dataframe
+    first_column : int
+        Start index for parsing.
+        (Default = 7 > first date column).
+    verbose : bool
+        Prints more information.
 
-    :return: pd.DataFrame
+    Returns
+    -------
+    pd.DataFrame
     """
     # Make all column names strings
     df.columns = [str(c) for c in df.columns]
@@ -277,14 +319,19 @@ def ensure_numeric_data(
 
 
 def check_upload_password(pwd: str, data_path: Optional[str] = None) -> bool:
-    """
-    Check if password for data upload matches.
+    """Check if password for data upload matches.
 
-    :param pwd: str input password
-    :param data_path: str path to private_data.csv
-                      containing the key/value for "Upload password"
+    Parameters
+    ----------
+    pwd : str
+        Input password
+    data_path : str
+        Path to private_data.csv
+        containing the key/value for "Upload password"
 
-    :return: boolean
+    Returns
+    -------
+    boolean
     """
     return pwd == get_private_data("Upload password", data_path=data_path)
 

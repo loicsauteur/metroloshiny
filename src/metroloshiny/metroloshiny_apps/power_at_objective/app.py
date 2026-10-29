@@ -122,13 +122,14 @@ with ui.nav_panel(title="Light Source Power"):
 
 @reactive.calc
 def create_power_stability_table() -> pd.DataFrame:
-    """
-    Create a dataframe for power stability.
+    """Create a dataframe for power stability.
 
     Sorts the date columns.
     Does not pivot the table.
 
-    :return: pd.DataFrame
+    Returns
+    -------
+    pd.DataFrame
     """
     df = df_data.get()
     # Return empty df, if data not ready
@@ -147,12 +148,13 @@ def create_power_stability_table() -> pd.DataFrame:
 @reactive.calc
 @reactive.event(df_data, input.single_date_selection)
 def create_power_linearity_table() -> pd.DataFrame:
-    """
-    Create a power linearity table.
+    """Create a power linearity table.
 
     Removes not-selected date columns.
 
-    :return: pd.DataFrame
+    Returns
+    -------
+    pd.DataFrame
     """
     df = df_data.get()
     date = input.single_date_selection()
@@ -179,12 +181,14 @@ def create_power_linearity_table() -> pd.DataFrame:
 @reactive.calc
 @reactive.event(df_data)
 def get_measurement_dates() -> list[str]:
-    """
-    Get a list of dates where measurements were done.
+    """Get a list of dates where measurements were done.
 
     Keeps all power rows in the DataFrame, but filters by wavelength.
 
-    :return: list[str], dates to select in format as table (YYYYmmdd)
+    Returns
+    -------
+    list[str]
+        Dates to select in format as table (YYYYmmdd)
     """
     df = df_data.get()
     if df is None or input.kind() not in df.columns:
@@ -360,12 +364,16 @@ def update_power_choices():
 
 
 def create_power_linearity_plot(df: pd.DataFrame):  # -> sns.lineplot:
-    """
-    Create the power linearty line plot.
+    """Create the power linearty line plot.
 
-    :param df: pd.DataFrame, with 3 columns: [Line, Power, Date]
+    Parameters
+    ----------
+    df : pd.DataFrame
+        With 3 columns: [Line, Power, Date]
 
-    :return: sns.lineplot
+    Returns
+    -------
+    sns.lineplot
     """
     fig, ax = plt.subplots()
     if df.empty:
@@ -416,13 +424,16 @@ def create_power_linearity_plot(df: pd.DataFrame):  # -> sns.lineplot:
 
 
 def create_power_stability_plot(df: pd.DataFrame):  # -> sns.lineplot:
-    """
-    Create the power stability line plot.
+    """Create the power stability line plot.
 
-    :param df: pd.DataFrame, with columns: [Line, Power]
-        and multiple Date columns
+    Parameters
+    ----------
+    df : pd.DataFrame
+        With columns: [Line, Power] and multiple Date columns
 
-    :return: sns.lineplot
+    Returns
+    -------
+    sns.lineplot
     """
     # Show not plot if there is no or not enough data
     if df.empty or len(df.columns) < 3:
@@ -538,12 +549,16 @@ def create_power_stability_plot(df: pd.DataFrame):  # -> sns.lineplot:
 
 
 def no_data_fig_simple(message: str = "No data to visualise!"):
-    """
-    Show a no data plot with matplotlib.
+    """Show a no data plot with matplotlib.
 
-    :param message: str, to display in the plot.
+    Parameters
+    ----------
+    message : str
+        To display in the plot.
 
-    :return: matplot fig
+    Returns
+    -------
+    matplot fig
     """
     fig, ax = plt.subplots()
     ax.text(0.5, 0.5, message, ha="center", va="center")
@@ -552,12 +567,16 @@ def no_data_fig_simple(message: str = "No data to visualise!"):
 
 
 def no_data_fig(message: str = "No data to visualise!"):
-    """
-    Show a no data plot with plotly.
+    """Show a no data plot with plotly.
 
-    :param message: str, to display in the plot.
+    Parameters
+    ----------
+    message : str
+        To display in the plot.
 
-    :return: plotly.plot
+    Returns
+    -------
+    plotly.plot
     """
     fig = px.line(pd.DataFrame({"x": [], "y": []}), x="x", y="y")
     fig.add_annotation(

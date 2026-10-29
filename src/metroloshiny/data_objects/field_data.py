@@ -15,22 +15,21 @@ from metroloshiny.utils.omero_utils import (
 
 
 class FieldData:
-    """
-    Class that represents Fild uniformity & distortion over time.
+    """Class that represents Fild uniformity & distortion over time.
 
     Tries to be flexible, i.e. if there are problems (e.g. a OMERO ID does not exist anymore),
     it will still try to get some date. And at the same time it will populate a "log" list
     (a list of strings; variable name = problems).
 
     FIXME: not tested on dates that have missing channel(s).
-
     """
 
     def __init__(self, base_df: pd.DataFrame, retrieve_omero: bool = True):
-        """
-        Initialise the FieldData object from a DataFrame.
+        """Initialise the FieldData object from a DataFrame.
 
-        :param base_df: pd.Dataframe
+        Parameters
+        ----------
+        base_df : pd.Dataframe
             with columns:
                 - "Channel": Channel name to be displayed (**all str**)
                 - "Dates": measurements dates
@@ -39,7 +38,8 @@ class FieldData:
                     - the origin (omero)
                     - the image ID
                     - the omero channel to be associated with the display channel
-        :param get_from_omero: bool, if True retrieves data from OMERO
+        retrieve_omero : bool
+            if True retrieves data from OMERO
         """
         # Make sure that there are not nan columns in the input dataframe
         base_df = base_df.replace("", np.nan)
@@ -70,10 +70,17 @@ class FieldData:
 
     # Getters/Setters           ##############################################
     def get_channel_names(self, date: str) -> list[str]:
-        """
-        Getter for channels for a specific date.
+        """Getter for channels for a specific date.
 
-        :return: list[str], of channels or empty
+        Parameters
+        ----------
+        date : str
+            Date string
+
+        Returns
+        -------
+        list[str]
+            Of channels or empty
         """
         try:
             return list(self._map_channel_names_(date).values())
@@ -81,21 +88,25 @@ class FieldData:
             return []
 
     def get_distortion(self) -> dict[str, Optional[pd.DataFrame]]:
-        """
-        Getter for the distortion data.
+        """Getter for the distortion data.
 
-        :return: dict of str date with pd.DataFrame
-            DataFrame with columns: Ring_ID & Channels
+        Returns
+        -------
+        dict
+            with key strings of date and values = pd.DataFrame.
+            DataFrames have columns: Ring_ID & Channels
         """
         if not self.distortion_tables:
             raise RuntimeError("Distortion data is not set yet.")
         return self.distortion_tables
 
     def get_uniformity(self) -> dict[str, Optional[pd.DataFrame]]:
-        """
-        Getter for the uniformity data.
+        """Getter for the uniformity data.
 
-        :return: dict of str date with pd.DataFrame
+        Returns
+        -------
+        dict
+            of str date with pd.DataFrame.
             DataFrame with columns: Ring_ID & Channels
         """
         if not self.uniformity_tables:
@@ -123,16 +134,23 @@ class FieldData:
     def get_heat_map_dataframe(
         self, date: str, data_dict: dict[str, pd.DataFrame], test: bool = False
     ) -> pd.DataFrame:
-        """
-        Create heat-map dataframe for a date and a metric (distortion or uniformity).
+        """Create heat-map dataframe for a date and a metric (distortion or uniformity).
 
         Calculates also the missing middle value (4-connected (+) average)
 
-        :param date: str, date to create the heatmap for
-        :param data_dict: e.g. distortion_tables or uniformity_tables
-        :param test: bool, option only for testing. Should always be Default = False
+        Parameters
+        ----------
+        date : str
+            date to create the heatmap for
+        data_dict : dict
+            e.g. distortion_tables or uniformity_tables
+        test : bool
+            option only for testing. Should always be Default = False
 
-        :return: pd.DataFrame, with columns:
+        Returns
+        -------
+        pd.DataFrame
+            with columns:
             - Ring_ID,
             - Channels* values
             - X (1-based tile index)
@@ -204,25 +222,31 @@ class FieldData:
         return df_out
 
     def get_distortion_dataframe(self, date: str) -> pd.DataFrame:
-        """
-        Create distortion dataframe for visualisation.
+        """Create distortion dataframe for visualisation.
 
         Per ring AND channel get ∆x, ∆y, and magnitude (absolute distance).
         Averages in 4-connected manner the middle (missing) ring.
 
-        :raises:
-            RuntimeError if:
+        Parameters
+        ----------
+        date : str
+            Date to calculate the df from
+
+        Returns
+        -------
+        pd.DataFame
+            with columns:
+            - Ring_ID, Channel, x, y, dx, dy, magnitude
+
+        Raises
+        ------
+        RuntimeError
             - OMERO data is not loaded (i.e. self.distortion_tables is empty)
             - If there is no missing middle ring (x * y -1 != detected rings)
-            NotImplementedError if:
+        NotImplementedError
             - No missing middle ring (even number of XY tiles)
-            ValueError if:
-            - the date has no associated distortion table
-
-        :param date: str, date to calculate the df from
-
-        :return: pd.DataFame with columns:
-            - Ring_ID, Channel, x, y, dx, dy, magnitude
+        ValueError
+            - The date has no associated distortion table
         """
         # Sanity checks
         if not self.distortion_tables:
@@ -334,17 +358,22 @@ class FieldData:
         return df_final
 
     def get_distortion_dataframe_from_rois(self, date: str) -> pd.DataFrame:
-        """
-        Create distortion dataframe for visualisation.
+        """Create distortion dataframe for visualisation.
 
         Per ring get ∆x, ∆y, and magnitude (absolute distance).
         Averages in 4-connected manner the middle (missing) ring.
 
         # FIXME this will be deprecated, since I can calculate it by channel from table data
 
-        :param date: str, date to calculate the df from
+        Parameters
+        ----------
+        date : str
+            Date to calculate the df from
 
-        :return: pd.DataFame with columns:
+        Return
+        ------
+        pd.DataFame
+            with columns:
             - Ring_ID, x, y, dx, dy, magnitude
         """
         # Sanity checks
@@ -461,14 +490,19 @@ class FieldData:
         return pd.DataFrame().from_dict(df_dict)
 
     def get_field_of_rings_grid_size(self, date: str) -> tuple[float, float]:
-        """
-        Calculate the number of dtected rings in X and Y.
+        """Calculate the number of dtected rings in X and Y.
 
         With the argolight slide, the middle ring is missing (there's a cross).
 
-        :param date: str, date for the rings
+        Parameters
+        ----------
+        date : str
+            Date for the rings
 
-        :return: tuple, ring count in x and y
+        Returns
+        -------
+        tuple
+            Ring count in x and y
         """
         # Sanity check
         if date not in self.roi_detected.keys():
@@ -501,11 +535,15 @@ class FieldData:
         return x_count, y_count
 
     def get_distortion_over_time(self) -> pd.DataFrame:
-        """
-        Calculate average and STD distoriotn per channel per date.
+        """Calculate average and STD distoriotn per channel per date.
 
-        return: pd.DataFrame with columns:
-            Date, ch_name1-AVG, ch_name1-STD, ...
+        Returns
+        -------
+        pd.DataFrame
+            With columns:
+            - Date
+            - ch_name1-AVG
+            - ch_name1-STD, ...
         """
         # Use getter to make sure the data is set
         try:
@@ -545,13 +583,15 @@ class FieldData:
         return df
 
     def get_distortion_over_time_melt(self) -> pd.DataFrame:
-        """
-        Get the distortion over time melted.
+        """Get the distortion over time melted.
 
         Same data but with columns:
             Date, Channel, Average*, STD*
 
-        :return: pd.DataFrame
+        Returns
+        -------
+        pd.DataFrame
+            - see description
         """
         df = self.get_distortion_over_time()
         # Change the dataframe layout to have columns: date, channel, avg, std
@@ -581,11 +621,15 @@ class FieldData:
         return df_long
 
     def get_uniformity_over_time(self) -> pd.DataFrame:
-        """
-        Calculate average and STD uniformity per channel per date.
+        """Calculate average and STD uniformity per channel per date.
 
-        return: pd.DataFrame with columns:
-            Date, ch_name1-AVG, ch_name1-STD, ...
+        Returns
+        -------
+        pd.DataFrame
+            With columns:
+            - Date
+            - ch_name1-AVG
+            - ch_name1-STD, ...
         """
         # Use getter to make sure the data is set
         try:
@@ -625,11 +669,18 @@ class FieldData:
         return df
 
     def get_rolloff_metrics_over_time(self) -> pd.DataFrame:
-        """
-        Get the roll-off metrics from the raw metrics over time.
+        """Get the roll-off metrics from the raw metrics over time.
 
-        :return: pd.DataFrame, with columns:
-            Date | Channel | Centering_Accuracy | RollOff_LR | RollOff_RL | RollOff_Abs
+        Returns
+        -------
+        pd.DataFrame
+            With columns:
+            - Date
+            - Channel
+            - Centering_Accuracy
+            - RollOff_LR
+            - RollOff_RL
+            - RollOff_Abs
         """
         # Initialise final dataframe
         df_final = pd.DataFrame()
@@ -677,13 +728,15 @@ class FieldData:
         return df_final
 
     def get_uniformity_over_time_melt(self) -> pd.DataFrame:
-        """
-        Get the uniformity over time melted.
+        """Get the uniformity over time melted.
 
         Same data but with columns:
             Date, Channel, Average*, STD*
 
-        :return: pd.DataFrame
+        Returns
+        -------
+        pd.DataFrame
+            - see description
         """
         df = self.get_uniformity_over_time()
         # Change the dataframe layout to have columns: date, channel, avg, std
@@ -715,12 +768,17 @@ class FieldData:
     # Functions for data setting           ###################################
 
     def _map_channel_names_(self, date: str) -> dict[str, str]:
-        """
-        Map OMERO channel to channel name.
+        """Map OMERO channel to channel name.
 
-        :param date: str, date for the omero channels
+        Parameters
+        ----------
+        date : str
+            date for the omero channels
 
-        :return: dict, {omero ch: channel name}
+        Returns
+        -------
+        dict
+            {omero ch: channel name}
         """
         channel_df = self._get_channel_name_dataframe_()
         # Sanity check
@@ -804,8 +862,7 @@ class FieldData:
                 self.raw_metrics_tables[date] = _df
 
     def _set_data_(self):
-        """
-        Set the uniformity, distortion, detected and ideal roi dictionaries.
+        """Set the uniformity, distortion, detected and ideal roi dictionaries.
 
         Each dict has
             key = date,
@@ -920,10 +977,12 @@ class FieldData:
         self._update_channel_names_()
 
     def _get_channel_name_dataframe_(self) -> pd.DataFrame:
-        """
-        Match the channel column to the omero channel name.
+        """Match the channel column to the omero channel name.
 
-        :return: pd.DataFrame, same as input but the IDs removed
+        Returns
+        -------
+        pd.DataFrame
+            Same as input but the IDs removed
         """
         df = self.base_df.copy()
         for col in df.columns[1:]:
@@ -934,13 +993,16 @@ class FieldData:
         return df
 
     def _get_unique_image_ids_(self) -> dict[str, Optional[str]]:
-        """
-        Get the unique image IDs.
+        """Get the unique image IDs.
 
         # FIXME i am not sure if the _ch-0: will match the OMERO table head (ch0)
-        :return: dict, with:
-            key = str, date
-            value = str, omero/file ID
+
+        Returns
+        -------
+        dict
+            With:
+            - key = str, date
+            - value = str, omero/file ID
         """
         df = self.base_df.copy()
         df = df[df.columns[1:]]

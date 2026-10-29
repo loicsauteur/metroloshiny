@@ -11,8 +11,7 @@ def get_power_over_time_data(
     line: Optional[int] = None,
     power_prct: Optional[int] = None,
 ) -> pd.DataFrame:
-    """
-    Create a table of power measurements over time.
+    """Create a table of power measurements over time.
 
     Keeps only rows for specified wavelength (line), and or
     power_percentage. Combines these column values into a new column.
@@ -20,12 +19,18 @@ def get_power_over_time_data(
     The DataFrame will be "pivoted", giving a mW column with
     measurements per date/line/power.
 
-    :param df: pd.DataFrame with columns = ["Line", "Power", "Date"]
-               multiple date columns.
-    :param line: int of single line too keep.
-    :param power_prct: int of single power to keep.
+    Parameters
+    ----------
+    df : pd.DataFrame
+        With columns = ["Line", "Power", "Date"] (multiple date columns).
+    line : int
+        Of single line too keep.
+    power_prct : int
+        Of single power to keep.
 
-    :result: pd.DataFrame
+    Returns
+    -------
+    pd.DataFrame
     """
     # Sanity checks
     if line is None and power_prct is None:
@@ -65,17 +70,25 @@ def filter_by_column_value(
     value: Union[str, float],
     drop_column: bool = True,
 ) -> pd.DataFrame:
-    """
-    Filter a dataframe for rows according to column entry.
+    """Filter a dataframe for rows according to column entry.
 
     e.g. keeps only the rows which have `value` in column of interest.
 
-    :param df: pd.DataFrame.
-    :param column_name: str name of the column.
-    :param value: str or float column entries to keeps rows.
-    :param drop_column: boolean, whether to keep the column or remove it.
+    Parameters
+    ----------
+    df : pd.DataFrame
+        Input dataframe
+    column_name : str
+        Name of the column.
+    value : str
+        Or float column entries to keeps rows.
+    drop_column : boolean
+        Whether to keep the column or remove it.
 
-    :return: pd.DataFrame (new)
+    Returns
+    -------
+    pd.DataFrame
+        New & filtered dataframe.
     """
     # Filter rows where column contains search value
     df_filtered = df[df[column_name] == value]
@@ -86,12 +99,17 @@ def filter_by_column_value(
 
 
 def get_light_source_kinds(df: pd.DataFrame) -> list:
-    """
-    Check if the data frame columns for Laser and LED contain values.
+    """Check if the data frame columns for Laser and LED contain values.
 
-    :param df: pd.DataFrame
+    Parameters
+    ----------
+    df : pd.DataFrame
+        Input dataframe
 
-    :return: list of column names with values
+    Returns
+    -------
+    list
+        Of column names with values
     """
     kinds = []
     if not df["Laser Line [nm]"].isna().all():
@@ -102,13 +120,18 @@ def get_light_source_kinds(df: pd.DataFrame) -> list:
 
 
 def keep_non_nan_rows(df: pd.DataFrame, column_name: str) -> pd.DataFrame:
-    """
-    Keep only rows with non NaNs for the specified column.
+    """Keep only rows with non NaNs for the specified column.
 
-    :param df: pd.DataFrame
-    :param column_name: str name of column
+    Parameters
+    ----------
+    df : pd.DataFrame
+        Input dataframe.
+    column_name : str
+        Name of column
 
-    :return: pd.DataFrame
+    Returns
+    -------
+    pd.DataFrame
     """
     if column_name not in df.columns:
         raise RuntimeError(f"Column <{column_name}> not found.")
@@ -116,12 +139,17 @@ def keep_non_nan_rows(df: pd.DataFrame, column_name: str) -> pd.DataFrame:
 
 
 def parse_dates(dates: list[str]) -> list[str]:
-    """
-    Sort and ensure a list of yyyymmdd dates.
+    """Sort and ensure a list of yyyymmdd dates.
 
-    :param dates: list of str dates (yyyymmddx*)
+    Parameters
+    ----------
+    dates : list
+        Of str dates (yyyymmddx*)
 
-    :return: list of sorted str dates all in yyyymmdd
+    Returns
+    -------
+    list
+        Of sorted str dates all in yyyymmdd
     """
     new_dates = [d[0:8] for d in dates]
     new_dates.sort()
@@ -131,25 +159,38 @@ def parse_dates(dates: list[str]) -> list[str]:
 def nested_dict_to_table(
     nested_dict: dict, headers: list[str], val_header: str = "Value"
 ) -> pd.DataFrame:
-    """
-    Convert a nested dictionary to a (flat) dataframe.
+    """Convert a nested dictionary to a (flat) dataframe.
 
-    :param nested_dict: dict, e.g. {
+    Parameters
+    ----------
+    nested_dict : dict
+        e.g.
+        {
             "C1" : {'FWHM-X': 911.0, 'FWHM-Y': 852.0, 'FWHM-Z': 1260.0},
             ...
         }
-    :param headers: list[str], for the table headers, e.g.
+    headers : list[str]
+        For the table headers, e.g.
         ["h1", "h2"]
-    :param val_header: str, header for the values. Default = Value
+    val_header : str
+        Header for the values. Default = Value
 
-    :return: pd.DataFrame, e.g.
+    Returns
+    -------
+    pd.DataFrame
+        e.g.
+
         h1  |   h2   |  Value
-        -----------------------
-        C1  | FWHM-X |  911.0
-        C1  | FWHM-Y |  852.0
-        C1  | FWHM-Z |  1260.0
-        ...
 
+        -----------------------
+
+        C1  | FWHM-X |  911.0
+
+        C1  | FWHM-Y |  852.0
+
+        C1  | FWHM-Z |  1260.0
+
+        ...
     """
 
     def dict_to_rows(d, path=()):
@@ -173,8 +214,7 @@ def identify_target_rows(
     headers: list[str],
     table_out: bool = False,
 ) -> Union[dict, pd.DataFrame]:
-    """
-    Get indices of the dataframe for values in a nested_dict.
+    """Get indices of the dataframe for values in a nested_dict.
 
     Used to idientify the rows where to put data into a table.
     The nested_dict contains keys to idientify specific row values,
@@ -186,26 +226,41 @@ def identify_target_rows(
     If an entry form the nested dict cannot be matched into the table,
     the index will be negative (decreasing by unmatched counts).
 
-    INFO: replaced filter_by_nested_dict()
+    INFO: replaced filter_by_nested_dict() ?? FIXME ??
 
-    :param df: pd.DataFrame
-    :param nested_dict: e.g. {
+    Parameters
+    ----------
+    df : pd.DataFrame
+        Input dataframe
+    nested_dict : dict
+        e.g. {
             "C1" : {'FWHM-X': 911.0, 'FWHM-Y': 852.0, 'FWHM-Z': 1260.0}
         }
-    :param headers: list for matching the df columns with
+    headers : list[str]
+        for matching the df columns with
         the nested_dict keys.
-    :param table_out: bool (default False), will return the full pd.Dataframe
+    table_out : bool
+        (default False), will return the full pd.Dataframe
+
         h1  |   h2   |  Value  | match_index
+
         ------------------------------------
+
         C1  | FWHM-X |  911.0  |     2
+
         C1  | FWHM-Y |  852.0  |     5
+
         C1  | FWHM-Z |  1260.0 |    -1
+
         ...
 
-    :return: dict {pd.DataFrame index : value of nested_dict}
-        sorted by index value. Or
-        pd.DataFrame if table_out == True
+    Returns
+    -------
+    Union[dict, pd.DataFrame]
+        {pd.DataFrame index : value of nested_dict}
 
+        Sorted by index value. Or
+        pd.DataFrame if table_out == True
     """
     # Ensure there is no duplicate entries
     try:
@@ -250,10 +305,9 @@ def identify_target_rows(
 def filter_by_nested_dict(
     df: pd.DataFrame, nested_dict: dict, headers: list[str]
 ) -> dict:
-    """
-    Get indices of the dataframe for values in a nested_dict.
+    """Get indices of the dataframe for values in a nested_dict.
 
-    ! Deprecated !
+    ! FIXME Deprecated !
 
     Used to idientify the rows where to put data into a table.
     The nested_dict contains keys to idientify specific row values,
@@ -265,15 +319,24 @@ def filter_by_nested_dict(
     If an entry form the nested dict cannot be matched into the table,
     the index will be negative (decreasing by unmatched counts).
 
-    :param df: pd.DataFrame
-    :param nested_dict: e.g. {
+    Parameters
+    ----------
+    df : pd.DataFrame
+        Input dataframe
+    nested_dict : dict
+         e.g. {
             "C1" : {'FWHM-X': 911.0, 'FWHM-Y': 852.0, 'FWHM-Z': 1260.0}
         }
-    :param headers: list for matching the df columns with
+    headers : list[str]
+        For matching the df columns with
         the nested_dict keys.
 
-    :return: dict {pd.DataFrame index : value of nested_dict}
-        sorted by index value
+    Returns
+    -------
+    dict
+        {pd.DataFrame index : value of nested_dict}
+
+        Sorted by index value
     """
     # Ensure there is no duplicate entries
     try:
@@ -329,15 +392,23 @@ def filter_by_nested_dict(
 def filter_by_date_range(
     df: pd.DataFrame, min: str, max: str, start_col: int = 2
 ) -> pd.DataFrame:
-    """
-    Filter dataframe date columns by date range.
+    """Filter dataframe date columns by date range.
 
-    :param df: pd.Dataframe
-    :param min: str first date to include in format YYYYmmdd
-    :param max: str last date to include in format YYYYmmdd
-    :param start_col: int, 0-based index of the first date column
+    Parameters
+    ----------
+    df : pd.DataFrame
+        Input dataframe
+    min : str
+        First date to include in format YYYYmmdd
+    max : str
+        Last date to include in format YYYYmmdd
+    start_col : int
+        0-based index of the first date column
 
-    :return: filtered pd.DataFrame
+    Returns
+    -------
+    pd.DataFrame
+        Filtered
     """
     date_headers = [d[:8] for d in df.columns[start_col:]]
     # Create a list of date columns to be removed
@@ -366,15 +437,20 @@ def filter_by_date_range(
 
 
 def convert_date_column(df: pd.DataFrame) -> pd.DataFrame:
-    """
-    Convert date entries to YYYYmmdd format.
+    """Convert date entries to YYYYmmdd format.
 
     Used for parsing csv files from thorlabs power meter.
 
-    :param df: pd.DataFrame, containing column e.g. "Date (MM/dd/yyyy)",
+    Parameters
+    ----------
+    df : pd.DataFrame
+        Containing column e.g. "Date (MM/dd/yyyy)",
         i.e. column that starts with "Date"
 
-    :return: pd.DataFrame with column changed to "Date (YYYYmmdd)"
+    Returns
+    -------
+    pd.DataFrame
+        With column changed to "Date (YYYYmmdd)"
     """
     # Ensure there is only one "Date..." column and its format enclosed by '('
     date_col = [x for x in df.columns if x.startswith("Date")]
@@ -427,15 +503,20 @@ def convert_date_column(df: pd.DataFrame) -> pd.DataFrame:
 
 
 def convert_power_column(df: pd.DataFrame) -> pd.DataFrame:
-    """
-    Convert power entries to mW units.
+    """Convert power entries to mW units.
 
     Used for parsing csv files from thorlabs power meter.
 
-    :param df: pd.DataFrame, containing column e.g. "Power (W)",
+    Parameters
+    ----------
+    df : pd.DataFrame
+        Containing column e.g. "Power (W)",
         i.e. column that stats with "Power"
 
-    :return: pd.DataFrame with column changed to "Power (mW)"
+    Returns
+    -------
+    pd.DataFrame
+        With column changed to "Power (mW)"
     """
     # Ensure there is only one "Power..." column and its unit enclosed by '('
     cols = [x for x in df.columns if x.startswith("Power")]

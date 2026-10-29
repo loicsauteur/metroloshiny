@@ -1,5 +1,4 @@
-"""
-Tests for OMERO utils.
+"""Tests for OMERO utils.
 
 Most tests will not run in pytest,
 as they require login credentials and connection to an OMERO instance.
@@ -36,8 +35,7 @@ def test_get_cred():
 
 @pytest.mark.manual
 def test_get_images_in_dataset_by_tag():
-    """
-    Test get_images_in_dataset_by_tag function.
+    """Test get_images_in_dataset_by_tag function.
 
     Does only run in "pytest -m manual"
 
@@ -95,8 +93,7 @@ def test_get_images_in_dataset_by_tag():
 
 @pytest.mark.manual
 def test_get_omero_ring_rois():
-    """
-    Test field uniformity and distortion function.
+    """Test field uniformity and distortion function.
 
     Tests:
     - get_omero_ring_rois
@@ -150,8 +147,7 @@ def test_get_omero_ring_rois():
 
 @pytest.mark.manual
 def test_get_dates():
-    """
-    Test the get_dates function.
+    """Test the get_dates function.
 
     Does only run in "pytest -m manual"
 
@@ -186,8 +182,7 @@ def test_get_dates():
 
 @pytest.mark.manual
 def test_get_voxel_and_channel_names():
-    """
-    Test the get_dates function.
+    """Test the get_dates function.
 
     Does only run in "pytest -m manual"
 
@@ -221,8 +216,7 @@ def test_get_voxel_and_channel_names():
 
 @pytest.mark.manual
 def test_getting_metric_functions():
-    """
-    Test the functions related to getting metric data.
+    """Test the functions related to getting metric data.
 
     Does only run in "pytest -m manual"
 

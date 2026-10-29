@@ -10,8 +10,7 @@ from shiny.run import ShinyAppProc
 
 @pytest.mark.manual
 def test_basic_app(page: Page, local_app: ShinyAppProc) -> None:
-    """
-    Test if app starts as expected.
+    """Test if app starts as expected.
 
     In addition, check if it can swap between PSF and Power
     category selections.
@@ -27,8 +26,7 @@ def test_basic_app(page: Page, local_app: ShinyAppProc) -> None:
 
 @pytest.mark.manual
 def test_better(page: Page, local_app: ShinyAppProc) -> None:
-    """
-    Test more extensively.
+    """Test more extensively.
 
     FYI: this test runs on the local file!
     """

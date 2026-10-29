@@ -65,8 +65,7 @@ def test_parse_dates():
 
 
 def is_valid_yyyymmdd(date: str) -> bool:
-    """
-    Check if a string is a date in format YYYYMMDD.
+    """Check if a string is a date in format YYYYMMDD.
 
     :param date: str date
 
@@ -82,8 +81,7 @@ def is_valid_yyyymmdd(date: str) -> bool:
 
 
 def test_filter_by_nested_dict():
-    """
-    Test filter_by_nested_dict function.
+    """Test filter_by_nested_dict function.
 
     Deprecated function.
     """

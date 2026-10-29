@@ -206,8 +206,7 @@ with ui.nav_panel(title=""):
 
                 @render.ui
                 def animateed_distortion():
-                    """
-                    Test.
+                    """Test.
 
                     # FIXME
                     """
@@ -279,8 +278,7 @@ def animate_invalidation():
 
 
 def coordinate_space():
-    """
-    Create an example plot.
+    """Create an example plot.
 
     Found somewhere on a forum...
     """
@@ -400,8 +398,7 @@ def coordinate_space():
 
 
 def create_arrow_data(x, y, dx, dy, scale):
-    """
-    Test.
+    """Test.
 
     #FIXME
     """
@@ -431,8 +428,7 @@ def create_arrow_data(x, y, dx, dy, scale):
 
 @reactive.calc
 def animated_distortion_plot():
-    """
-    Test with plotly.
+    """Test with plotly.
 
     # FIXME
     """
@@ -725,8 +721,7 @@ def animated_distortion_plot():
 
 
 def fig_to_data_uri(fig) -> str:
-    """
-    Convert a Matplotlib figure to a PNG data URI.
+    """Convert a Matplotlib figure to a PNG data URI.
 
     #FIXME
     """
@@ -753,8 +748,7 @@ def create_distortion_plot() -> tuple[
     Optional[pd.Series],
     Optional[pd.Series],
 ]:
-    """
-    Create a distortion quiver plot.
+    """Create a distortion quiver plot.
 
     TODO: maybe the coloring as heat-map background and arrows just one color?
         Make a few different versions
@@ -867,8 +861,7 @@ def create_distortion_plot() -> tuple[
 
 @reactive.calc
 def create_uniformity_plot():
-    """
-    Create a heat-map like plot for the Filed Uniformity between 2 dates.
+    """Create a heat-map like plot for the Filed Uniformity between 2 dates.
 
     :return: matplotlib plot
     """
@@ -944,8 +937,7 @@ def create_uniformity_plot():
 
 
 def create_plot_over_time(df: pd.DataFrame):
-    """
-    Create plot for average metrics over time.
+    """Create plot for average metrics over time.
 
     Line of the column that contains "Average",
     with STD of column that contains "STD"
@@ -1002,8 +994,7 @@ def create_plot_over_time(df: pd.DataFrame):
 
 @reactive.calc
 def get_valid_uniformity_dataframes() -> dict[str, pd.DataFrame]:
-    """
-    Get the uniformity tables, excluding the dates are None.
+    """Get the uniformity tables, excluding the dates are None.
 
     :return: dict, same as get_uniformity() but date always has a pd.DataFrame
     """
@@ -1013,8 +1004,7 @@ def get_valid_uniformity_dataframes() -> dict[str, pd.DataFrame]:
 
 @reactive.calc
 def get_common_uniformity_channels() -> list[str]:
-    """
-    Get a list of common uniformity channels (between 2 dats).
+    """Get a list of common uniformity channels (between 2 dats).
 
     Reacts on inputs uni_date_selector_1 & uni_date_selector_2
 
@@ -1052,8 +1042,7 @@ def get_common_uniformity_channels() -> list[str]:
 
 @reactive.calc
 def get_omero_data() -> Optional[FieldData]:
-    """
-    Load all the data from OMERO, but only once selections are ready.
+    """Load all the data from OMERO, but only once selections are ready.
 
     Reminder distortion values are actually um (if gotten from tables)
 
@@ -1108,8 +1097,7 @@ def get_sidebar_filtered_dataframe() -> pd.DataFrame:
 
 @reactive.calc
 def create_objective_db_table() -> tuple[pd.DataFrame, list[dict]]:
-    """
-    Create a table of objectives in database for the selected microscope.
+    """Create a table of objectives in database for the selected microscope.
 
     Creates also styles to highlight the selected objective
 

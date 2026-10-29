@@ -48,8 +48,7 @@ def test_check_duplicate_dict_values():
 
 
 def test_invert_nested_dict():
-    """
-    Test invert_nested_dict function.
+    """Test invert_nested_dict function.
 
     Deprecated function.
     """

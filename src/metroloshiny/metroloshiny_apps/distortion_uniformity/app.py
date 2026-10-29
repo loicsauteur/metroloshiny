@@ -345,8 +345,7 @@ with ui.nav_panel(title=""):
 
                         @render_widget
                         def plot_distortion():
-                            """
-                            Plot distortion for a channel.
+                            """Plot distortion for a channel.
 
                             Free choice between dates and channel.
                             """
@@ -362,16 +361,22 @@ def calculate_distortion_difference(
     df_date1: pd.DataFrame,
     df_date2: pd.DataFrame,
 ) -> pd.DataFrame:
-    """
-    Calculate the difference of 2 distortion dataframes.
+    """Calculate the difference of 2 distortion dataframes.
 
     Calculates differences between ∆x and ∆y; calculates magnitude.
 
-    :param df_date1: pd.DataFrame of a first date
-    :param df_date2: pd.DataFrame of a second date
+    Parameters
+    ----------
+    df_date1 : pd.DataFrame
+        Of a first date
+    df_date2 : pd.DataFrame
+        Of a second date
 
-    :return: pd.DataFrame with the same columns as inputs
-        Headers:    Ring_ID | x | y | dx | dy | Magnitude
+    Returns
+    -------
+    pd.DataFrame
+        With the same columns as inputs
+        - Headers:    Ring_ID | x | y | dx | dy | Magnitude
     """
     if len(df_date1) != len(df_date2):
         raise ValueError("The dataframes do not have the same length.")
@@ -395,10 +400,11 @@ def calculate_distortion_difference(
 
 @reactive.calc
 def create_distortion_plot():
-    """
-    Create a distortion (quiver) plot with plotly.
+    """Create a distortion (quiver) plot with plotly.
 
-    :return: plotly plot
+    Returns
+    -------
+    plotly plot
     """
     # Get the data and necessary inputs
     omero_data = get_omero_data()
@@ -660,12 +666,13 @@ def create_distortion_plot():
 
 @reactive.calc
 def plot_uniformity_between_channels():
-    """
-    Create heatmap like plots of the Field uniformity to compare 2 channels.
+    """Create heatmap like plots of the Field uniformity to compare 2 channels.
 
     On the same date.
 
-    :return: plotly figure
+    Returns
+    -------
+    plotly figure
     """
     # The the UI selections
     ch1 = input.uni_ch_selector1()
@@ -886,15 +893,16 @@ def plot_uniformity_between_channels():
 
 @reactive.calc
 def plot_uniformity_2_measurements():
-    """
-    Create heatmap like plots for the Field uniformity between 2 dates.
+    """Create heatmap like plots for the Field uniformity between 2 dates.
 
     For all common channels. I.e.:
     DAPI | date1 | date2 | diff
     488  | date1 | date2 | diff
     ...
 
-    :return: tuple,
+    Returns
+    -------
+    tuple
         - plotly figure
         - int, number of plot rows
     """
@@ -1125,15 +1133,17 @@ def plot_uniformity_2_measurements():
 
 @reactive.calc
 def set_distortion_card_height() -> str:
-    """
-    Calculate the card display height based on the plot width.
+    """Calculate the card display height based on the plot width.
 
     For distortion plot (comparing dates and or channels).
 
     Basically sets the card height = width / (3 cols)
     minus a fixed value = 50
 
-    :return: str, e.g. 1000px
+    Returns
+    -------
+    str
+        e.g. 1000px
     """
     width = get_distortion_plot_width()
     row_height = width // 3 - 50
@@ -1144,14 +1154,16 @@ def set_distortion_card_height() -> str:
 
 @reactive.calc
 def set_card_height_uni_2date_comparison() -> str:
-    """
-    Calculate card display height based on plot's number of rows and plot width.
+    """Calculate card display height based on plot's number of rows and plot width.
 
     For Uniformity plot that compares 2 dates.
     Basically sets the card height = width / (3 cols) * n rows.
     (minus a fixed value = 50)
 
-    :return: str, e.g. 1000px
+    Returns
+    -------
+    str
+        e.g. 1000px
     """
     _, rows = plot_uniformity_2_measurements()
     width = get_uniformity_2dates_plot_width()
@@ -1165,14 +1177,16 @@ def set_card_height_uni_2date_comparison() -> str:
 
 @reactive.calc
 def set_card_height_uni_2channel_comparison() -> str:
-    """
-    Calculate card display height based on plot's number of rows and plot width.
+    """Calculate card display height based on plot's number of rows and plot width.
 
     For Uniformity plot that compares 2 channels.
     Basically sets the card height = width / (3 cols) for one row
     (minus a fixed value = 50)
 
-    :return: str, e.g. 1000px
+    Returns
+    -------
+    str
+        e.g. 1000px
     """
     width = get_uniformity_2channels_plot_width()
     row_height = width // 3 - 50
@@ -1215,18 +1229,22 @@ def get_uniformity_2channels_plot_width() -> Union[int, float]:
 
 
 def create_roll_off_plot(df: pd.DataFrame):
-    """
-    Create plot for roll off values over time.
+    """Create plot for roll off values over time.
 
     Could be used for other OMERO "raw_metrics".
     Info (from https://argolight.notion.site/Uniformity-of-field-47aa2b31cb9d4397898052273a4e88e0#e1256bd2dbda4dfabab0c97051b6e802):
         - Centering accuracy = 100% = perfect
         - RollOff = 0% = perfect
 
-    :param df: pd.DataFrame, with columns:
+    Parameters
+    ----------
+    df : pd.DataFrame
+        With columns:
         Date | Channel | Centering_Accuracy | RollOff_LR | RollOff_RL | RollOff_Abs
 
-    :return: plotly.express plot
+    Returns
+    -------
+    plotly.express plot
     """
     if df.empty:
         return no_data_plotly()
@@ -1306,16 +1324,24 @@ def create_roll_off_plot(df: pd.DataFrame):
 
 
 def create_plot_over_time(df: pd.DataFrame):
-    """
-    Create plot for average metrics over time.
+    """Create plot for average metrics over time.
 
     Line of the column that contains "Average",
     with STD of column that contains "STD"
 
-    :param df: pd.DataFrame with columns:
-        Date, Channel, Average**, STD**
+    Parameters
+    ----------
+    df : pd.DataFrame
+        With columns:
+        - Date
+        - Channel
+        - Average**
+        - STD**
 
-    :return: plotly.express plot (use in @render_widget, or @render_plotly)
+    Returns
+    -------
+    plotly.express plot
+        (use in @render_widget, or @render_plotly)
     """
     if df.empty:
         return no_data_plotly()
@@ -1398,13 +1424,15 @@ def create_plot_over_time(df: pd.DataFrame):
 
 @reactive.calc
 def get_common_distortion_channels() -> list[str]:
-    """
-    Get a list of common distortion channels (between 2 dates).
+    """Get a list of common distortion channels (between 2 dates).
 
     Reacts on inputs uni_date_selector_1 & uni_date_selector_2
     Function is shortened compared to the uniformity analog (below).
 
-    :return: list[str] of channels or empty list
+    Returns
+    -------
+    list[str]
+        Of channels or empty list
     """
     # Get the date inputs
     date1 = input.dist_date_selector_1()
@@ -1431,12 +1459,14 @@ def get_common_distortion_channels() -> list[str]:
 
 @reactive.calc
 def get_common_uniformity_channels() -> list[str]:
-    """
-    Get a list of common uniformity channels (between 2 dates).
+    """Get a list of common uniformity channels (between 2 dates).
 
     Reacts on inputs uni_date_selector_1 & uni_date_selector_2
 
-    :return: list[str] of channels or empty list
+    Returns
+    -------
+    list[str]
+        Of channels or empty list
     """
     # Get the date strings
     date1 = input.uni_date_selector_1()
@@ -1479,12 +1509,14 @@ def get_common_uniformity_channels() -> list[str]:
 
 @reactive.calc
 def get_omero_data() -> Optional[FieldData]:
-    """
-    Load all the data from OMERO, but only once selections are ready.
+    """Load all the data from OMERO, but only once selections are ready.
 
     Reminder distortion values are actually um (if gotten from tables)
 
-    :return: FieldData object, with metrics loaded from OMERO
+    Returns
+    -------
+    FieldData object
+        With metrics loaded from OMERO
     """
     df = get_sidebar_filtered_dataframe()
     if df.empty:
@@ -1526,7 +1558,15 @@ def get_omero_data() -> Optional[FieldData]:
 
 @reactive.calc
 def get_sidebar_filtered_dataframe() -> pd.DataFrame:
-    """Filter the google sheet data by the sidebar selection."""
+    """Filter the google sheet data by the sidebar selection.
+
+    Returns
+    -------
+    pd.DataFrame
+        with:
+        - columns = Channel & dates
+        - rows = entries
+    """
     df = dataframe.copy()
     _site = input.site()
     df = filter_by_column_value(df, "Site", _site)
@@ -1543,14 +1583,16 @@ def get_sidebar_filtered_dataframe() -> pd.DataFrame:
 
 @reactive.calc
 def create_objective_db_table() -> tuple[pd.DataFrame, list[dict]]:
-    """
-    Create a table of objectives in database for the selected microscope.
+    """Create a table of objectives in database for the selected microscope.
 
     Creates also styles to highlight the selected objective
 
-    :return:
-        pd.DataFrame, of available objectives
-        list[dict], of styles to highlight row of the DataGrid
+    Returns
+    -------
+    pd.DataFrame
+        Of available objectives
+    list[dict]
+        Of styles to highlight row of the DataGrid
     """
     # Filter the dataframe by site & microscope
     _site = input.site()
@@ -1610,8 +1652,7 @@ def update_uni_channel_selectors():
 @reactive.effect
 @reactive.event(get_omero_data)
 def update_distortion_dates():
-    """
-    Update distortion date selectors on OMERO data changes.
+    """Update distortion date selectors on OMERO data changes.
 
     Sets date selectors, to compare first and last date initially.
     """
@@ -1636,8 +1677,7 @@ def update_distortion_dates():
 @reactive.effect
 @reactive.event(input.dist_date_selector_1)
 def update_distortion_channels_on_date_1():
-    """
-    Update distortion channel selection on date 1 changes.
+    """Update distortion channel selection on date 1 changes.
 
     Matches the channel selection between the 2 dates if possible.
     """
@@ -1663,8 +1703,7 @@ def update_distortion_channels_on_date_1():
 @reactive.effect
 @reactive.event(input.dist_date_selector_2)
 def update_distortion_channels_on_date_2():
-    """
-    Update distortion channel selection on date 2 changes.
+    """Update distortion channel selection on date 2 changes.
 
     Matches date 1 channel selection if possible
     """

@@ -9,8 +9,7 @@ from metroloshiny.utils.common_utils import get_today
 
 
 class PSFData:
-    """
-    Class that represents PSF data retrieved from OMERO.
+    """Class that represents PSF data retrieved from OMERO.
 
     Currently only for PSF_Inspector.py generated data.
     """
@@ -182,8 +181,7 @@ class PSFData:
     def _set_final_fwhm_data_(
         self, min_fwhm: int = 150, compare: bool = False
     ):
-        """
-        Check if average the average is correct.
+        """Check if average the average is correct.
 
         Sets the final fwhm_data dictionary.
         This function will never allow the OMERO averaged FWHM values
@@ -193,9 +191,17 @@ class PSFData:
         the OMERO calculated values.
         It removes "wrong" values, if they are below 150 (nm).
 
-        :param min_fwhm: int minimal fwhm value to beconiderd as "not wrong"
-        :param compare: bool, will compare to OMERO average data and
-            raise RuntimeWarnings if values are not the same.
+        Parameters
+        ----------
+        min_fwhm : int
+            minimal fwhm value to beconiderd as "not wrong"
+        compare : bool
+            will compare to OMERO average data and
+
+        Raises
+        ------
+        RuntimeWarnings
+            if values are not the same.
         """
         # Check if there is multiple values to average
         v = self.individual_data[next(iter(self.individual_data))].get(
@@ -241,15 +247,21 @@ class PSFData:
                         )
 
     def _average_values_(self, values: list, min_fwhm: int):
-        """
-        Average a list of values if value > min_fwhm.
+        """Average a list of values if value > min_fwhm.
 
         Returns 0.0 if all values are below min_fwhm.
 
-        :param values: list of values
-        :param min_fwhm: int min value
+        Parameters
+        ----------
+        values : list
+            Of values
+        min_fwhm : int
+            min value
 
-        :return: float of rounded int
+        Returns
+        -------
+        float
+            of rounded int
         """
         count = 0
         sum = 0

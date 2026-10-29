@@ -17,12 +17,17 @@ def get_version() -> str:
 
 
 def get_ui_id(input) -> str:
-    """
-    Return the ID string from an ui.input* object.
+    """Return the ID string from an ui.input* object.
 
-    :param input: ui.input* object
+    Parameters
+    ----------
+    input : ui.input* object
+        The ui.input object
 
-    :return: str id of ui.input* object
+    Returns
+    -------
+    str
+        ID of ui.input* object
     """
     soup = BeautifulSoup(str(input), "html.parser")
     try:
@@ -35,13 +40,19 @@ def get_ui_id(input) -> str:
 
 
 def is_input_select_in_list(l: list, id: str) -> bool:
-    """
-    Check if a input_select (id) is in a list.
+    """Check if a input_select (id) is in a list.
 
-    :param l: list of input_select objects
-    :param id: str id of searched input_select
+    Parameters
+    ----------
+    l : list
+        Of input_select objects
+    id : str
+        ID of searched input_select
 
-    :return: bool if in the list
+    Returns
+    -------
+    bool
+        If the id is in the list
     """
     for i in l:
         if get_ui_id(i) == id:
@@ -50,8 +61,7 @@ def is_input_select_in_list(l: list, id: str) -> bool:
 
 
 def theo_fwhm_2photon(ex: int, na: float, ri: float) -> tuple[float, float]:
-    """
-    Calculate theoretical lateral and axial FWHM for point scanning confocals.
+    """Calculate theoretical lateral and axial FWHM for point scanning confocals.
 
     Using Zipfel, W.R. et al, Nonlinear magic: multiphoton microscopy
     in the biosciences Nat Biotechnol. 2003 Nov;21(11):1369-77
@@ -64,13 +74,23 @@ def theo_fwhm_2photon(ex: int, na: float, ri: float) -> tuple[float, float]:
     FHMWax          = 0.532 * ex / (2^0.5 (n - (n^2 - NA^2)^0.5) )
     *ex wavelength is multiplied by 2 because of 2-photons.
 
-    :param ex: Excitation wavelength in nm (int).
+    Parameters
+    ----------
+    ex : int
+        Excitation wavelength in nm.
         For calculation using the emission wavelength
         40nm are added to the excitation wavelength.
-    :param na: NA of the objective.
-    :param ri: Refractive index of objective.
+    na : float
+        NA of the objective.
+    ri : float
+        Refractive index of objective.
 
-    :return: tuple (FHMW lateral, FHMW axial) in nm.
+    Returns
+    -------
+    float
+        FHMW lateral in nm.
+    float
+        FHMW axial in nm.
     """
     if na <= 0.7:
         lat = 0.32 * ex * 2 / (2**0.5 * na)
@@ -81,8 +101,7 @@ def theo_fwhm_2photon(ex: int, na: float, ri: float) -> tuple[float, float]:
 
 
 def theo_fwhm_spinning(ex: int, na: float, ri: float) -> tuple[float, float]:
-    """
-    Calculate theoretical lateral and axial FWHM for point scanning confocals.
+    """Calculate theoretical lateral and axial FWHM for point scanning confocals.
 
     Using the MetroloJ_QC v1.3.1.1 Oct 21. 2024:
     https://github.com/MontpellierRessourcesImagerie/MetroloJ_QC/blob/Current_version/manual.pdf
@@ -93,13 +112,23 @@ def theo_fwhm_spinning(ex: int, na: float, ri: float) -> tuple[float, float]:
     FHMWlat = 0.51 * em / NA
     FHMWax  = em / (ri - (ri^2 - NA^2)^0.5)
 
-    :param ex: Excitation wavelength in nm (int).
+    Parameters
+    ----------
+    ex : int
+        Excitation wavelength in nm.
         For calculation using the emission wavelength
         40nm are added to the excitation wavelength.
-    :param na: NA of the objective.
-    :param ri: Refractive index of objective.
+    na : float
+        NA of the objective.
+    ri : float
+        Refractive index of objective.
 
-    :return: tuple (FHMW lateral, FHMW axial) in nm.
+    Returns
+    -------
+    float
+        FHMW lateral in nm.
+    float
+        FHMW axial in nm.
     """
     em = ex + 40
     lat = 0.51 * em / na
@@ -110,8 +139,7 @@ def theo_fwhm_spinning(ex: int, na: float, ri: float) -> tuple[float, float]:
 def theo_fwhm_pointscanner(
     ex: int, na: float, ri: float
 ) -> tuple[float, float]:
-    """
-    Calculate theoretical lateral and axial FWHM for point scanning confocals.
+    """Calculate theoretical lateral and axial FWHM for point scanning confocals.
 
     Using the MetroloJ_QC v1.3.1.1 Oct 21. 2024:
     https://github.com/MontpellierRessourcesImagerie/MetroloJ_QC/blob/Current_version/manual.pdf
@@ -123,13 +151,23 @@ def theo_fwhm_pointscanner(
     FHMWlat = 0.51 * ex / NA
     FHMWax  = 0.88 * ex / (ri - (ri^2 - NA^2)^0.5)
 
-    :param ex: Excitation wavelength in nm (int).
+    Parameters
+    ----------
+    ex : int
+        Excitation wavelength in nm.
         For calculation using the emission wavelength
         40nm are added to the excitation wavelength.
-    :param na: NA of the objective.
-    :param ri: Refractive index of objective.
+    na : float
+        NA of the objective.
+    ri : float
+        Refractive index of objective.
 
-    :return: tuple (FHMW lateral, FHMW axial) in nm.
+    Returns
+    -------
+    float
+        FHMW lateral in nm.
+    float
+        FHMW axial in nm.
     """
     lat = 0.51 * ex / na
     ax = 0.88 * ex / (ri - (ri * ri - na * na) ** 0.5)
@@ -137,8 +175,7 @@ def theo_fwhm_pointscanner(
 
 
 def theo_fwhm_widefield(ex: int, na: float, ri: float) -> tuple[float, float]:
-    """
-    Calculate theoretical lateral and axial FWHM for widefield system.
+    """Calculate theoretical lateral and axial FWHM for widefield system.
 
     Using the MetroloJ_QC v1.3.1.1 Oct 21. 2024:
     https://github.com/MontpellierRessourcesImagerie/MetroloJ_QC/blob/Current_version/manual.pdf
@@ -148,13 +185,23 @@ def theo_fwhm_widefield(ex: int, na: float, ri: float) -> tuple[float, float]:
     FHMWlat = 0.51 * em / NA
     FHMWax  = 1.77 * ri * em / NA^2
 
-    :param ex: Excitation wavelength in nm (int).
+    Parameters
+    ----------
+    ex : int
+        Excitation wavelength in nm.
         For calculation using the emission wavelength
         40nm are added to the excitation wavelength.
-    :param na: NA of the objective.
-    :param ri: Refractive index of objective.
+    na : float
+        NA of the objective.
+    ri : float
+        Refractive index of objective.
 
-    :return: tuple (FHMW lateral, FHMW axial) in nm.
+    Returns
+    -------
+    float
+        FHMW lateral in nm.
+    float
+        FHMW axial in nm.
     """
     em = ex + 40
     lat = 0.51 * em / na
@@ -163,8 +210,7 @@ def theo_fwhm_widefield(ex: int, na: float, ri: float) -> tuple[float, float]:
 
 
 def theo_fwhm_quarep(ex: int, na: float, ri: float) -> tuple[float, float]:
-    """
-    Calculate theoretical lateral and axial FWHM with QUAREP formula.
+    """Calculate theoretical lateral and axial FWHM with QUAREP formula.
 
     Using the formulas found in the QUAREP PSF protocols.io (v1, page 12):
     https://quarep.org/wp-content/uploads/Monitoring-the-point-spread-function-for-quality-for-quality-control-of-confocal-microscopes.pdf
@@ -173,13 +219,21 @@ def theo_fwhm_quarep(ex: int, na: float, ri: float) -> tuple[float, float]:
     FHMWlat = 0.51 * ex / NA
     FHMWax = 0.88 * ex / (ri -(ri^2 - NA^2)^1/2)
 
-    :param ex: Excitation wavelength in nm (int).
-    :param na: NA of the objective.
-    :param ri: Refractive index of objective.
-    :param k: Constant for axial FHMW. Default = 2.0 (widefield),
-              set to 1.4 for confocal.
+    Parameters
+    ----------
+    ex : int
+        Excitation wavelength in nm.
+    na : float
+        NA of the objective.
+    ri : float
+        Refractive index of objective.
 
-    :return: tuple (FHMW lateral, FHMW axial) in nm.
+    Returns
+    -------
+    float
+        FHMW lateral in nm.
+    float
+        FHMW axial in nm.
     """
     lat = 0.51 * ex / na
     ax = 0.88 * ex / (ri - (ri**2 - na**2) ** 0.5)
@@ -187,10 +241,11 @@ def theo_fwhm_quarep(ex: int, na: float, ri: float) -> tuple[float, float]:
 
 
 def get_today() -> str:
-    """
-    Get today's date in format YYYYMMDD.
+    """Get today's date in format YYYYMMDD.
 
-    :return: str
+    Returns
+    -------
+    str
     """
     today = datetime.date.today()
     today = today.strftime("%Y%m%d")
@@ -198,14 +253,19 @@ def get_today() -> str:
 
 
 def check_if_date(date: str) -> bool:
-    """
-    Check if a string can be converted to a date.
+    """Check if a string can be converted to a date.
 
     Expects date string in format YYYYmmdd.
 
-    :param date: str, of possible date
+    Parameters
+    ----------
+    date : str
+        Of possible date
 
-    :return: bool, True if it can be a date
+    Returns
+    -------
+    bool
+        True if it can be a date
     """
     try:
         datetime.datetime.strptime(date, "%Y%m%d")
@@ -217,16 +277,22 @@ def check_if_date(date: str) -> bool:
 def check_duplicate_dict_values(
     d: dict[str, str], exclude: Optional[str] = "None"
 ) -> Optional[dict]:
-    """
-    Check if a dictionary contains duplicate values.
+    """Check if a dictionary contains duplicate values.
 
     Used for checking if a channel identifier (C1 = values)
     was selected for multiple channel names (DAPI/GFP = keys)
 
-    :param d: dict with single str for keys and values.
-    :param exclude: Optional str, to exclude a specific value item.
+    Parameters
+    ----------
+    d : dict
+        With single str for keys and values.
+    exclude : Optional str
+        To exclude a specific value item.
 
-    :return: None if no duplicate,
+    Returns
+    -------
+    Optional[dict]
+        None if no duplicate,
         otherwise a dict of the first duplicate value.
     """
     # Group keys by value
@@ -243,22 +309,30 @@ def check_duplicate_dict_values(
 
 @DeprecationWarning
 def invert_nested_dict(nested_dict: dict) -> dict:
-    """
-    Invert nested dicts to {value: path of keys}.
+    """Invert nested dicts to {value: path of keys}.
 
     ! Deprecated !
 
-    :param nested_dict: e.g. {
+    Parameters
+    ----------
+    nested_dict : dict
+        e.g. {
             "C1" : {'FWHM-X': 911.0, 'FWHM-Y': 852.0, 'FWHM-Z': 1260.0}
         }
 
-    :raises KeyError if the final value happens to occur more than once.
-
-    :return: dict e.g. {
+    Returns
+    -------
+    dict
+        e.g. {
             911.0:  ['C1', 'FWHM-X']
             852.0:  ['C1', 'FWHM-Y']
             1260.0: ['C1', 'FWHM-Z']
         }
+
+    Raises
+    ------
+    KeyError
+        If the final value happens to occur more than once.
     """
     inverted = defaultdict(list)
 
@@ -284,15 +358,19 @@ def invert_nested_dict(nested_dict: dict) -> dict:
 
 
 def check_if_sequence(seq: list[str]) -> bool:
-    """
-    Check if a list of strings of cell addresses is continuous.
+    """Check if a list of strings of cell addresses is continuous.
 
     True for: [A1, A2, B3, ...]
     False for [A1, A3, B4, ...]
 
-    :param seq: list of cell addresses
+    Parameters
+    ----------
+    seq : list[str]
+        Of cell addresses
 
-    :return: bool
+    Returns
+    -------
+    bool
     """
     # Remove characters from strings to keep only numbers
     numbers = []
@@ -324,27 +402,36 @@ def check_if_sequence(seq: list[str]) -> bool:
 
 
 def list_duplicates(arr: list) -> list:
-    """
-    Get a list of duplicate items within a list.
+    """Get a list of duplicate items within a list.
 
-    :param arr: list, of values
+    Parameters
+    ----------
+    arr : list
+        Of values
 
-    :return: list, of duplicate values (may be empty)
+    Returns
+    -------
+    list
+        Of duplicate values (may be empty)
     """
     dup = [i for i, count in Counter(arr).items() if count > 1]
     return dup
 
 
 def set_local_file(default: Optional[bool] = False) -> bool:
-    """
-    Return True if in pytest.
+    """Return True if in pytest.
 
     Used for setting local file usage (excel sheet instead of google sheet).
 
-    :param default: Optional bool, if True returns True.
+    Parameters
+    ----------
+    default : Optional bool
+        If True returns True.
         To overwrite the logic.
 
-    :return: bool
+    Returns
+    -------
+    bool
     """
     if default:
         if os.environ.get("PYTEST_VERSION") is not None:
@@ -365,19 +452,27 @@ def create_css_color_dict(
     min_val: Optional[int] = 380,
     max_val: Optional[int] = 700,
 ) -> dict:
-    """
-    Map input values do CSS colors.
+    """Map input values do CSS colors.
 
     To create color dictionaries for plotly plots (up to 14 colors).
     Suggestion: use it only for matching colors to wavelength values.
 
-    :param range_list: list of numbers to map colors to.
-    :param min_val: int, lowest input number to map color to.
+    Parameters
+    ----------
+    range_list : list
+        Of numbers to map colors to.
+    min_val : int
+        Lowest input number to map color to.
         Default 380. If None, will check min value of the input array.
-    :param max_val: int, highest input number to map color to.
+    max_val : int
+        Highest input number to map color to.
         Default 700. If None, will check max value of the input array.
-    :return: dict, key = input numbers, values = CSS color names.
-        return empty dict if request color number > max color numbers
+
+    Returns
+    -------
+    dict
+        key = input numbers, values = CSS color names.
+        Returns empty dict if request color number > max color numbers
     """
     # Make sure all values are numbers
     try:
@@ -463,15 +558,22 @@ def create_css_color_dict(
 def get_objective_info(
     df: pd.DataFrame, id_name: str, info: str
 ) -> Union[str, int, float]:
-    """
-    Load any of the values from the objective database for an objective.
+    """Load any of the values from the objective database for an objective.
 
-    :param df: pd.DataFrame, of the objecive database
-    :param id_name: str, objective id number, e.g. "ID17" or "ID17 40x/1.3",
+    Parameters
+    ----------
+    df : pd.DataFrame
+        Of the objecive database
+    id_name : str
+        Objective id number, e.g. "ID17" or "ID17 40x/1.3".
         Should/must always start with "ID"
-    :param info: str, any of the column headers of the objecitve database
+    info : str
+        Any of the column headers of the objecitve database
 
-    :return: the value for row with "id" and column "info"
+    Returns
+    -------
+    Union[str, int, float]
+        the value for row with "id" and column "info"
     """
     # Make sure it is the correct dataframe
     if "ID" != df.columns[0]:
@@ -497,14 +599,20 @@ def get_objective_info(
 
 
 def get_objective_na(df: pd.DataFrame, id_name: str) -> Optional[float]:
-    """
-    Get the NA for objective in the database.
+    """Get the NA for objective in the database.
 
-    :param df: pd.DataFrame, of the objecive database
-    :param id_name: str, objective id number, e.g. "ID17" or "ID17 40x/1.3",
+    Parameters
+    ----------
+    df : pd.DataFrame
+        Of the objecive database
+    id_name : str
+        Objective id number, e.g. "ID17" or "ID17 40x/1.3".
         Should/must always start with "ID"
 
-    :return: float, NA of the objective, or None if parsing error
+    Returns
+    -------
+    Optional[float]
+        NA of the objective, or None if parsing error
     """
     # Get the NA of the objective
     try:
@@ -521,14 +629,20 @@ def get_objective_na(df: pd.DataFrame, id_name: str) -> Optional[float]:
 
 
 def get_objective_ri(df: pd.DataFrame, id_name: str) -> Optional[float]:
-    """
-    Get the refractive index for objective in the database.
+    """Get the refractive index for objective in the database.
 
-    :param df: pd.DataFrame, of the objecive database
-    :param id_name: str, objective id number, e.g. "ID17" or "ID17 40x/1.3",
+    Parameters
+    ----------
+    df : pd.DataFrame
+        Of the objecive database
+    id_name : str
+        Objective id number, e.g. "ID17" or "ID17 40x/1.3".
         Should/must always start with "ID"
 
-    :return: float, RI of the objective, or None if parsing error
+    Returns
+    -------
+    Optional[float]
+        RI of the objective, or None if parsing error
     """
     try:
         ri = get_objective_info(df, id_name, "Refractive Index")
@@ -544,14 +658,20 @@ def get_objective_ri(df: pd.DataFrame, id_name: str) -> Optional[float]:
 
 
 def get_objective_mag(df: pd.DataFrame, id_name: str) -> Optional[int]:
-    """
-    Get the magnification for objective in the database.
+    """Get the magnification for objective in the database.
 
-    :param df: pd.DataFrame, of the objecive database
-    :param id_name: str, objective id number, e.g. "ID17" or "ID17 40x/1.3",
+    Parameters
+    ----------
+    df : pd.DataFrame
+        Of the objecive database
+    id_name : str
+        Objective id number, e.g. "ID17" or "ID17 40x/1.3".
         Should/must always start with "ID"
 
-    :return: int, magnification of the objective, or None if parsing error
+    Returns
+    -------
+    Optional[int]
+        magnification of the objective, or None if parsing error
     """
     try:
         x = get_objective_info(df, id_name, "Magnification")
@@ -568,17 +688,23 @@ def get_objective_mag(df: pd.DataFrame, id_name: str) -> Optional[int]:
 
 
 def get_nice_objective_name(df: Optional[pd.DataFrame], id_name: str) -> str:
-    """
-    Get a nice name for an objective in the database.
+    """Get a nice name for an objective in the database.
 
     Returns e.g. 40x/1.25 (ID1)
         if id_name not in database, returns ?x/? (ID1)
         if id_name does not start with "ID", returns input id_name
 
-    :param df: pd.DataFrame, of the objective database
-    :param id_name: str, objective ID
+    Parameters
+    ----------
+    df : pd.DataFrame
+        Of the objective database
+    id_name : str
+        Objective ID
 
-    :return: str, e.g. "40x/1.25 (ID1)"
+    Returns
+    -------
+    str
+        e.g. "40x/1.25 (ID1)"
     """
     # Allow inputs with more than just the ID number
     if " " in id_name:
@@ -607,13 +733,19 @@ def point_2d_point_distance(
     p1: Union[tuple[float, float], list[float]],
     p2: Union[tuple[float, float], list[float]],
 ) -> float:
-    """
-    Calculate the distance between 2 points.
+    """Calculate the distance between 2 points.
 
-    :param p1: XY of point 1
-    :param p2: XY of point 2
+    Parameters
+    ----------
+    p1 : list[float, float]
+        XY of point 1
+    p2 : list[float, float]
+        XY of point 1
 
-    :return: float, distance
+    Returns
+    -------
+    float
+        distance
     """
     # 3D points not implemented
     if len(p1) == 3 and len(p2) == 3:

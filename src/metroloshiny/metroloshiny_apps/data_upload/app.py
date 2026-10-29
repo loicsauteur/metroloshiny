@@ -71,8 +71,7 @@ with ui.nav_panel(title="Data Upload"):
             @render.text
             @reactive.event(input.upload_pwd)
             def password_check():
-                """
-                Check the password input.
+                """Check the password input.
 
                 Minimal 5 character to show whether correct or wrong.
                 """
@@ -231,12 +230,13 @@ with ui.nav_panel(title="Data Upload"):
 
 @reactive.calc
 def create_csv_table_style() -> Optional[list[dict]]:
-    """
-    Create styles for highlighting cells in a DataGrid.
+    """Create styles for highlighting cells in a DataGrid.
 
     This is depending on the category.
 
-    :return: Optional, list[dict]
+    Returns
+    -------
+    Optional, list[dict]
     """
     # Get csv dataframe (not the shown data since it may not be there yet)
     df = create_csv_table()
@@ -291,14 +291,19 @@ def create_csv_table_style() -> Optional[list[dict]]:
 def update_csv_table(
     *, patches: list[render.CellPatch]
 ) -> list[render.CellPatch]:
-    """
-    Specify how chells in the csv table change.
+    """Specify how chells in the csv table change.
 
     Depends on the category and kind of loaded csv file.
 
-    :param patches: list[render.CellPatch]
+    Parameters
+    ----------
+    patches : list[render.CellPatch]
+        Cell patches to apply to the table.
 
-    :return: list[render.CellPatch]
+    Returns
+    -------
+    list[render.CellPatch]
+        The updated cell patches.
     """
     # Reset the check-box for csv data check
     ui.update_checkbox("csv_table_checked", value=False)
@@ -396,15 +401,20 @@ def update_csv_table(
 def update_patches_omero(
     *, patches: list[render.CellPatch]
 ) -> list[render.CellPatch]:
-    """
-    Specify how cells in the OMERO table change.
+    """Specify how cells in the OMERO table change.
 
     Only supports single patch input (e.g. pasting multiple cells is not supported).
     Allowed changes are dependent on the input.category.
 
-    :param patches: list[render.CellPatch]
+    Parameters
+    ----------
+    patches : list[render.CellPatch]
+        Cell patches to apply to the table.
 
-    :return: list[render.CellPatch]
+    Returns
+    -------
+    list[render.CellPatch]
+        The updated cell patches.
     """
     # Reset the "OMERO data checked" checkbox
     ui.update_checkbox("omero_table_checked", value=False)
@@ -475,12 +485,13 @@ def update_patches_omero(
 
 @reactive.calc
 def create_omero_table_style() -> Optional[list[dict]]:
-    """
-    Create styles for highlighting cells in a DataGrid.
+    """Create styles for highlighting cells in a DataGrid.
 
     This is depending on the category.
 
-    :return: Optional, list[dict]
+    Returns
+    -------
+    Optional, list[dict]
     """
     # Get omero dataframe (not the shown data since it may not be there yet)
     df = create_omero_table()
@@ -521,16 +532,19 @@ def create_omero_table_style() -> Optional[list[dict]]:
 
 @reactive.calc
 def load_csv_data() -> tuple[str, pd.DataFrame]:
-    """
-    Load and try parse a csv file.
+    """Load and try parse a csv file.
 
     Parsing is category dependent
-    :return: tuple[str, pd.DataFrame]
-        - str, file type output identifier
+
+    Returns
+    -------
+    tuple[str, pd.DataFrame]
+        str, file type output identifier
             - "nis_job" for Tom's file
             - "thorlabs" for Simone's file
             - TODO others to be implemented
-        - DataFrame for Power measurements: columns = ? Line [nm] ?|Power [%]|'Date'
+
+        DataFrame for Power measurements: columns = ? Line [nm] ?|Power [%]|'Date'
             - For Tom's file there is an additional column "Objective" at the beginning
     """
     # Reset the "CSV data checked" checkbox
@@ -566,8 +580,7 @@ def load_csv_data() -> tuple[str, pd.DataFrame]:
 
 @reactive.calc
 def cpt_select_objective() -> pd.DataFrame:
-    """
-    First part to create the power measurement data part of the table.
+    """First part to create the power measurement data part of the table.
 
     cpt = create_power_table
     Check if the dataframe contains measurements for multiple objectes &
@@ -593,8 +606,7 @@ def cpt_select_objective() -> pd.DataFrame:
 
 @reactive.calc
 def cpt_check_date() -> pd.DataFrame:
-    """
-    Check if there is a measurement date available.
+    """Check if there is a measurement date available.
 
     cpt = create_power_table
     If not get today and set it for the override date.
@@ -618,8 +630,7 @@ def cpt_check_date() -> pd.DataFrame:
 
 @reactive.calc
 def create_power_table() -> pd.DataFrame:
-    """
-    Set the table headers for the light source.
+    """Set the table headers for the light source.
 
     cpt = create_power_table
     Also renames the last column to "Value" instead of the date.
@@ -690,8 +701,7 @@ def create_csv_table() -> pd.DataFrame:
 
 @reactive.effect
 def update_csv_objective_choices():
-    """
-    Update the objecive choices from the csv file.
+    """Update the objecive choices from the csv file.
 
     The effect seems/will execute on load_csv_data.
 
@@ -738,8 +748,7 @@ def get_csv_file_name() -> str:
 @reactive.effect
 @reactive.event(input.csv_upload_btn)
 def upload_csv_data():
-    """
-    Check, then upload the CSV data.
+    """Check, then upload the CSV data.
 
     Performs the check and upload based on input.category.
     """
@@ -830,8 +839,7 @@ def upload_csv_data():
 @reactive.effect
 @reactive.event(input.omero_upload_btn)
 def upload_omero_data():
-    """
-    Check, then upload the OMERO data.
+    """Check, then upload the OMERO data.
 
     Performs the check and upload based on input.category.
     """
@@ -973,12 +981,14 @@ def create_pfs_dataframe() -> pd.DataFrame:
 
 @reactive.calc
 def get_common_column_values() -> tuple[str, str, str, str]:
-    """
-    Get the values for the common columns.
+    """Get the values for the common columns.
 
     Shows warnings if something is wrong.
 
-    :return: tuple[4xstr]:
+    Returns
+    -------
+    tuple[4xstr]:
+        With:
         - site name
         - microscope name
         - objective name
@@ -1028,8 +1038,7 @@ def get_common_column_values() -> tuple[str, str, str, str]:
 
 @reactive.calc
 def create_omero_table() -> pd.DataFrame:
-    """
-    Return the dataframe of the selected Image ID.
+    """Return the dataframe of the selected Image ID.
 
     Adjusts the dataframe according to the upload category.
     """
@@ -1092,14 +1101,18 @@ def give_image_selection_info() -> str:
 
 @reactive.calc
 def check_dataset_id() -> Optional[tuple[dict, dict]]:
-    """
-    Check entered dataset ID.
+    """Check entered dataset ID.
 
     Updates the "Available images" selection.
     Returns None if there wrong input or no images with metrics.
 
-    :return: dict, "image ID":image name
-    :return: dict, "image ID":metrics-dataframe
+    Returns
+    -------
+    None
+        or
+    tuple[dict, dict]
+        1. dict, "image ID":image name
+        2. dict, "image ID":metrics-dataframe
     """
     # Reset the "OMERO data checked" checkbox
     ui.update_checkbox("omero_table_checked", value=False)
@@ -1161,10 +1174,12 @@ def check_dataset_id() -> Optional[tuple[dict, dict]]:
 
 @reactive.calc
 def warn_csv() -> str:
-    """
-    Warn if csv upload for selected category is not implemented.
+    """Warn if csv upload for selected category is not implemented.
 
-    :return: str, message if warning; empty str if no warning
+    Returns
+    -------
+    str
+        Message if warning; empty str if no warning
     """
     cat = input.category()
     if cat not in ["Power"]:
@@ -1176,10 +1191,12 @@ def warn_csv() -> str:
 
 @reactive.calc
 def warn_omero() -> str:
-    """
-    Warn if OMERO upload for selected category is not implemented.
+    """Warn if OMERO upload for selected category is not implemented.
 
-    :return: str, message if warning; empty str if no warning
+    Returns
+    -------
+    str
+        Message if warning; empty str if no warning
     """
     cat = input.category()
     if cat not in ["PSF", "Uniformity/Distortion"]:
@@ -1274,13 +1291,19 @@ def update_info_selection():
 
 
 def check_power_prct_entries(df: pd.DataFrame) -> bool:
-    """
-    Check power percentage values.
+    """Check power percentage values.
 
     If entries are between 0-100, and if there are duplicate entries.
 
-    :returns: bool, True if all fine
-        otherwise (False) and shows notifications.
+    Parameters
+    ----------
+    df : pd.DataFrame
+        DataFrame with column "Power [%]"
+
+    Returns
+    -------
+    bool
+        True if all fine, otherwise (False) and shows notifications.
     """
     # Sanity test
     if "Power [%]" not in df.columns:
@@ -1313,13 +1336,17 @@ def check_power_prct_entries(df: pd.DataFrame) -> bool:
 
 
 def check_channel_names_provided(df: pd.DataFrame) -> bool:
-    """
-    Check if provided channel names match existing sheet entries.
+    """Check if provided channel names match existing sheet entries.
 
-    :param df: DataFrame of the shown OMERO data, i.e.:
-        *.data_patched()
+    Parameters
+    ----------
+    df : DataFrame
+        of the shown OMERO data, i.e.: *.data_patched()
 
-    :return: bool, True if all fine
+    Returns
+    -------
+    bool
+        True if all fine
     """
     # Get the original dataframe (from the sheet)
     ori_df = dataframe.get().copy()
@@ -1387,16 +1414,22 @@ def check_channel_names_provided(df: pd.DataFrame) -> bool:
 
 
 def check_similar_entries(existing: list[str], cur: str) -> bool:
-    """
-    Check if a string i similar to ones in a list.
+    """Check if a string i similar to ones in a list.
 
     Removes special characters from the strings (incl. " "),
     and makes lower case.
 
-    :param existing: list[str], to be checked
-    :param cur: str, to check against the list
+    Parameters
+    ----------
+    existing : list[str]
+        To be checked
+    cur : str
+        To check against the list
 
-    :return: bool, True if similar entry found
+    Returns
+    -------
+    bool
+        True if similar entry found
     """
     for e in existing:
         # Remove special characters & make lower case
@@ -1413,15 +1446,23 @@ def check_new_text_entry(
     existing: Union[list[str], dict[str, str]],
     id: str,
 ) -> str:
-    """
-    Check new text entries.
+    """Check new text entries.
 
-    :param cur_sel: str, of the drop-down selection
-    :param cur_entry: str, of the text field
-    :param existing: list[str] or dict, list of drop-down choices (FYI dict for objectives)
-    :param id: str, drop-down category (e.g. site, microscope, ...) for notifications
+    Parameters
+    ----------
+    cur_sel : str
+        Of the drop-down selection
+    cur_entry : str
+        Of the text field
+    existing : list[str] or dict
+        List of drop-down choices (FYI dict for objectives)
+    id : str
+        Drop-down category (e.g. site, microscope, ...) for notifications
 
-    :return: str, "final choice" or what needs to be entered into the table.
+    Returns
+    -------
+    str
+        "final choice" or what needs to be entered into the table.
     """
     # Convert existing to list if dict
     if isinstance(existing, dict):

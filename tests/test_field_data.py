@@ -1,5 +1,4 @@
-"""
-Test for the FieldData class.
+"""Test for the FieldData class.
 
 FIXME: currently not tested on dates with a missing channel (e.g. "20260107")
     Would need to have an OMERO table accordingly.
@@ -64,8 +63,7 @@ def _create_mock_omero_df_() -> pd.DataFrame:
 
 
 def test_fielddata_pytest():
-    """
-    Test basic functionality of the FieldData object.
+    """Test basic functionality of the FieldData object.
 
     Does not rely on OMERO and runs in pytest.
     """
@@ -102,8 +100,7 @@ def test_fielddata_pytest():
 
 @pytest.mark.manual
 def test_fielddata():
-    """
-    Test the FieldData object with OMERO connection.
+    """Test the FieldData object with OMERO connection.
 
     Runs only in "pytest -m manual", since OMERO connection required.
     Repeats test also from test_fielddata_pytest function.
@@ -255,8 +252,7 @@ def test_heat_mapping():
 
 @pytest.mark.manual
 def test_get_distortion_dataframe_from_rois():
-    """
-    Test the arrow heat map test function.
+    """Test the arrow heat map test function.
 
     Runs only in "pytest -m manual", since OMERO connection required.
     """
@@ -317,8 +313,7 @@ def test_get_distortion_dataframe_from_rois():
 
 @pytest.mark.manual
 def test_get_distortion_dataframe():
-    """
-    Test the get_distortion_dataframe function.
+    """Test the get_distortion_dataframe function.
 
     Which implements distortion for multiple channels.
     Runs only in "pytest -m manual", since OMERO connection required.
@@ -381,8 +376,7 @@ def test_get_distortion_dataframe():
 
 @pytest.mark.manual
 def test_rolloff():
-    """
-    Test functions related to RollOff dataframes.
+    """Test functions related to RollOff dataframes.
 
     Runs only in "pytest -m manual", since OMERO connection required.
     """

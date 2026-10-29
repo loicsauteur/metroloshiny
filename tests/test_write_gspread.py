@@ -1,5 +1,4 @@
-"""
-Write_gspread tests.
+"""Write_gspread tests.
 
 Some test will not run in pytest, as they would write to gspread.
 """
@@ -14,8 +13,7 @@ from metroloshiny.utils.read_file import get_sheet, load_doc
 
 
 def test_make_entries():
-    """
-    Test the make_entries function.
+    """Test the make_entries function.
 
     Will never run in pytest, since it would write to gspread.
     """
@@ -50,8 +48,7 @@ def test_make_entries():
 
 
 def test_prepare_data_for_entry():
-    """
-    Test prepare_data_for_entry function.
+    """Test prepare_data_for_entry function.
 
     Does not write to gspread.
     """

@@ -245,14 +245,18 @@ def create_xy_shift_plot(
     df_in: pd.DataFrame,
     date: str,
 ):
-    """
-    Create a scatter plot for the XY shifts (single date measurement).
+    """Create a scatter plot for the XY shifts (single date measurement).
 
-    :param df: pd.DataFrame with columns,
-        Channel, FWHM and dates
-    :param date: str, date column header to keep/visualise
+    Parameters
+    ----------
+    df_in : pd.DataFrame
+        With columns: Channel, FWHM and dates
+    date : str
+        Date column header to keep/visualise
 
-    :return: sns.lineplot
+    Returns
+    -------
+    sns.lineplot
     """
     # Duplicate the dataframe
     df = df_in.copy()
@@ -311,20 +315,26 @@ def create_plot(
     y_label: Optional[str] = None,
     y_range: Optional[list[Union[int, float]]] = None,
 ):
-    """
-    Create a plotly plot from a dataframe.
+    """Create a plotly plot from a dataframe.
 
     Expected are 5 columns, e.g.:
-    "Channel FWHM", Channel, "FWHM", Date, "value"
+    - "Channel FWHM", Channel, "FWHM", Date, "value"
+
     (From the original dataframe the first two columns combined make the first
     column, then the dataframe is pivoted with the melt function.)
 
-    :param df: pd.DataFrame
-    :param ylabel: str, if None (default), takes the last header of the df
-    :param y_max: list[int], min/max values for the plot y-axis,
-        if None, takes the absolute min/max of the dataframe values to plot.
+    Parameters
+    ----------
+    df : pd.DataFrame
+        The dataframe
+    y_label : str
+        If None (default), takes the last header of the df
+    y_range : list[int]
+        min/max values for the plot y-axis, if None, takes the absolute min/max of the dataframe values to plot.
 
-    :return: plotly line plot
+    Returns
+    -------
+    plotly line plot
     """
     # Show no data figure if no data
     if df is None or df.empty:
@@ -432,15 +442,23 @@ def create_plot(
 def calculate_theoretical_values(
     kind: str, ex: Optional[float], na: Optional[float], ri: Optional[float]
 ) -> tuple[float, float]:
-    """
-    Calculate theoretical FWHM values.
+    """Calculate theoretical FWHM values.
 
-    :param kind: str, one of: Widefield, Point Scanner, Spinning disk, 2-Photon
-    :param ex: float, excitation wavelength
-    :param na: float, NA
-    :param ri: float, refractive index
+    Parameters
+    ----------
+    kind: str
+        One of: Widefield, Point Scanner, Spinning disk, 2-Photon
+    ex: float
+        Excitation wavelength
+    na : float
+        The NA
+    ri: float
+        Refractive index
 
-    :return: tuple[float], (FWHM-lateral, FWHM-axial)
+    Returns
+    -------
+    tuple[float]
+        (FWHM-lateral, FWHM-axial)
     """
     # Return (0, 0) if values are None or 0
     if ex is None or ex == 0:
@@ -483,12 +501,16 @@ def calculate_theoretical_values(
 
 
 def no_data_fig_simple(message: str = "No data to visualise!"):
-    """
-    Show a no data plot with matplotlib.
+    """Show a no data plot with matplotlib.
 
-    :param message: str, to display in the plot.
+    Parameters
+    ----------
+    message : str
+        To display in the plot.
 
-    :return: matplot fig
+    Returns
+    -------
+    matplot fig
     """
     fig, ax = plt.subplots()
     ax.text(0.5, 0.5, message, ha="center", va="center")
@@ -497,12 +519,16 @@ def no_data_fig_simple(message: str = "No data to visualise!"):
 
 
 def no_data_fig(message: str = "No data to visualise!"):
-    """
-    Show a no data plot with plotly.
+    """Show a no data plot with plotly.
 
-    :param message: str, to display in the plot.
+    Parameters
+    ----------
+    message : str
+        To display in the plot.
 
-    :return: plotly.plot
+    Returns
+    -------
+    plotly.plot
     """
     fig = px.line(pd.DataFrame({"x": [], "y": []}), x="x", y="y")
     fig.add_annotation(
@@ -527,15 +553,16 @@ def no_data_fig(message: str = "No data to visualise!"):
 @reactive.calc
 @reactive.event(df_data, objective_choices)
 def get_objective_table() -> tuple[pd.DataFrame, list[dict]]:
-    """
-    Get the table about the objectives for the selected microscope.
+    """Get the table about the objectives for the selected microscope.
 
     Only lists objectives that have been used (i.e. in the PSF dataframe)
     Highlight the selected objective.
 
-    :return: pd.DataFrame
-        DataFrame of available objectives
-    :return: list[dict]
+    Returns
+    -------
+    pd.DataFrame
+        Of available objectives
+    list[dict]
         List of dict to be used to highlight row in DataGrid
     """
     # Make sure DF ready and selections valid
@@ -568,18 +595,19 @@ def get_objective_table() -> tuple[pd.DataFrame, list[dict]]:
 @reactive.calc
 @reactive.event(df_ref)
 def check_shift_ref_ch():
-    """
-    Identify the reference channel.
+    """Identify the reference channel.
 
     Work on "unfiltered" dataframe to keep all channels in it.
 
     Reference-X/Y/Z information is lost already during loading of sheet.
     Hence, try to identify via NaN values...
 
-    :return: tuple(bool, str):
-        - bool, True if channel was identified
-        - str, message to display in UI, can be channel name
-
+    Returns
+    -------
+    bool
+        True if channel was identified
+    str
+        Message to display in UI, can be channel name
     """
     df = df_ref.get()
     if df is None or df.empty:
@@ -626,16 +654,18 @@ def check_shift_ref_ch():
     input.fwhm_selection,
 )
 def add_theoretical_fwhm() -> tuple[pd.DataFrame, pd.DataFrame]:
-    """
-    Add the theoretical FWHM to the dataframe.
+    """Add the theoretical FWHM to the dataframe.
 
     Triggers on card selections inputs AND df_data.
 
     Creates the final data to be plotted.
 
-    :return: tuple(pd.DataFrame)
-        - dataframe for table
-        - dataframe for plotting (pivoted)
+    Returns
+    -------
+    pd.DataFrame
+        dataframe for table
+    pd.DataFrame
+        dataframe for plotting (pivoted)
     """
     df = get_raw_fwhm_data()
     if df.empty:
@@ -690,12 +720,14 @@ def add_theoretical_fwhm() -> tuple[pd.DataFrame, pd.DataFrame]:
 @reactive.calc
 @reactive.event(df_data, input.ch_selection)
 def get_shift_data() -> tuple[pd.DataFrame, pd.DataFrame]:
-    """
-    Filter the dataframe for shift values.
+    """Filter the dataframe for shift values.
 
-    :return: tuple[pd.DataFrame]:
-        - dataframe for table
-        - dataframe for plotting (pivoted)
+    Returns
+    -------
+    pd.DataFrame
+        dataframe for table
+    pd.DataFrame
+        dataframe for plotting (pivoted)
     """
     df = df_data.get()
     if df is None or df.empty:
@@ -747,12 +779,13 @@ def get_shift_data() -> tuple[pd.DataFrame, pd.DataFrame]:
 @reactive.calc
 @reactive.event(df_data)
 def get_raw_fwhm_data() -> pd.DataFrame:
-    """
-    Filter the dataframe for FWHM values.
+    """Filter the dataframe for FWHM values.
 
     Sets also the plotting UI selection choices.
 
-    :return: pd.DataFrame
+    Returns
+    -------
+    pd.DataFrame
     """
     df = df_data.get()
     if df is None or df.empty:
@@ -786,8 +819,7 @@ def get_raw_fwhm_data() -> pd.DataFrame:
 @reactive.effect()
 @reactive.event(df_data, input.ch_calc_selection)
 def update_theoretical_calculation():
-    """
-    Update UI values for theoretical calculations.
+    """Update UI values for theoretical calculations.
 
     Based on the channel selection for the calculation.
     Also updates the NA and RI selections.
@@ -846,8 +878,7 @@ def update_theoretical_calculation():
 @reactive.effect
 @reactive.event(input.site, input.microscope, input.objective, input.info)
 def filter_by_sidebar_selections():
-    """
-    Filter the data by the common columns.
+    """Filter the data by the common columns.
 
     Sets also the date range selection min/max.
     """

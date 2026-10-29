@@ -25,7 +25,6 @@ from metroloshiny.utils.setting_utils import (
 data_dir = Path(__file__).parents[4]
 data_dir = data_dir / "data"
 data_file = data_dir / "private_data.csv"
-# TODO update my private files (local and server) to match the new expected entries
 
 # Create a file if it does not yet exist
 if not os.path.exists(data_file):
@@ -67,8 +66,7 @@ with ui.card():
 
     @render.text
     def load_file():
-        """
-        Show information and trigger authentication.
+        """Show information and trigger authentication.
 
         Sets the reactive values and populates the input fields.
         """
@@ -168,14 +166,14 @@ with ui.card():
 
 @reactive.file_reader(data_file)
 def load_data_from_file() -> dict:
-    """
-    Load the saved data.
+    """Load the saved data.
 
     This is where we trigger the authentication.
     This reactive function is triggered every time the file changes.
     It will cause an exception if the file does not exist.
 
-    :return:
+    Returns
+    -------
     dict
         Key value pairs of the red private data
     """
@@ -201,10 +199,11 @@ def load_data_from_file() -> dict:
 
 @reactive.calc
 def update_fields_from_dict():
-    """
-    Update UI entries using a dictionary.
+    """Update UI entries using a dictionary.
 
-    :param data: dict
+    Parameters
+    ----------
+    data : dict
         Data dict, as loaded from the private data file.
     """
     data = data_dict.get()
@@ -250,8 +249,7 @@ def update_fields_from_dict():
 @reactive.effect
 @reactive.event(input.btn_save_settings)
 def check_all_settings_and_save():
-    """
-    Check and save the settings.
+    """Check and save the settings.
 
     Re-runs connection checks.
     Checks if inputs have changed (compared reactive values).
@@ -325,8 +323,7 @@ def check_all_settings_and_save():
 @reactive.effect
 @reactive.event(input.btn_check_settings_pwd)
 def check_settings_password():
-    """
-    Check the settings passwords.
+    """Check the settings passwords.
 
     Comares/checks also with loaded password.
     If all is good, the new_settings_pwd variable is set.
@@ -394,10 +391,9 @@ def check_settings_password():
 @reactive.effect
 @reactive.event(input.input_settings_pwd_1, input.input_settings_pwd_2)
 def update_check_settings_pwd_btn():
-    """
-    Remove OK icon from check upload password button.
+    """Remove OK icon from check upload password button.
 
-    Resets reactive variables FIXME ?? should it?
+    Resets reactive variables.
     """
     ui.update_action_button("btn_check_settings_pwd", label="Check", icon=[])
     # Reset the new password variable
@@ -408,8 +404,7 @@ def update_check_settings_pwd_btn():
 @reactive.effect
 @reactive.event(input.btn_check_upload_pwd)
 def check_upload_pwd():
-    """
-    Check if the upload password is OK.
+    """Check if the upload password is OK.
 
     Compares also the loaded upload password.
     If all is good the new_upload_pwd variable is set.
@@ -445,10 +440,9 @@ def check_upload_pwd():
 @reactive.effect
 @reactive.event(input.input_upload_pwd_1, input.input_upload_pwd_2)
 def update_check_upload_pwd_btn():
-    """
-    Remove OK icon from check upload password button.
+    """Remove OK icon from check upload password button.
 
-    Resets reactive variables FIXME ?? should it?
+    Resets reactive variables.
     """
     ui.update_action_button("btn_check_upload_pwd", label="Check", icon=[])
     upload_pwd.set(None)
@@ -499,8 +493,7 @@ def check_google_connection():
 @reactive.effect
 @reactive.event(input.input_gmail, input.input_g_json, input.input_sheet_url)
 def update_check_google_btn():
-    """
-    Remove OK icon from check google button.
+    """Remove OK icon from check google button.
 
     Resets reactive variables.
     """
@@ -580,8 +573,7 @@ def check_omero_connection():
     input.input_omero_host, input.input_omero_user, input.input_omero_password
 )
 def update_check_omero_btn():
-    """
-    Remove OK icon from check OMERO button.
+    """Remove OK icon from check OMERO button.
 
     Resets reactive variables.
     """
@@ -619,7 +611,13 @@ def check_auth_pwd():
 
 
 def authenticate(failed: bool = False):
-    """Create a pop-up to ask for a password."""
+    """Create a pop-up to ask for a password.
+
+    Parameters
+    ----------
+    failed : bool
+        Shows "Wrong password" warning if True. Default False
+    """
     m = ui.modal(
         "Please provide the settings password to make changes.",
         ui.input_password("auth_pwd", "Authentication Password", value=""),
@@ -632,14 +630,16 @@ def authenticate(failed: bool = False):
 
 
 def create_red_html_text(text: str):
-    """
-    Create a ui.HTML object in red color.
+    """Create a ui.HTML object in red color.
 
-    :param text: str
+    Parameters
+    ----------
+    text : str
         Text with optional HTML tags. E.g.:
         "Setting the password to access those settings is<strong> mandatory</strong>."
 
-    :return:
+    Returns
+    -------
     ui.HTML
         UI element.
     """

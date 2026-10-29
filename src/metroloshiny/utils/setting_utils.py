@@ -26,12 +26,17 @@ def create_new_data_dict() -> dict:
 
 
 def read_data_dict(path: str) -> dict:
-    """
-    Read the private data from file.
+    """Read the private data from file.
 
-    :param path: path to csv file to read.
+    Parameters
+    ----------
+    path : str
+        Path to csv file to read.
 
-    :return: dict of data (non-empty version of create_new_data_dict)
+    Returns
+    -------
+    dict
+        Of data (non-empty version of create_new_data_dict)
     """
     # Sanity check
     if not os.path.exists(path):
@@ -64,17 +69,25 @@ def read_data_dict(path: str) -> dict:
 def try_connect_omero(
     host: str, port: int, usr: str, pwd: str
 ) -> tuple[bool, str]:
-    """
-    Check OMERO connection.
+    """Check OMERO connection.
 
-    :param host: str, OMERO host address
-    :param port: int, OMERO port
-    :param usr: str, OMERO user name
-    :param pwd: str, OMERO user password
+    Parameters
+    ----------
+    host : str
+        OMERO host address
+    port    : int
+        OMERO port
+    usr : str
+        OMERO user name
+    pwd : str
+        OMERO user password
 
-    :return:
-        - bool, for successful connection
-        - str, message for error
+    Returns
+    -------
+    bool
+        For successful connection
+    str
+        Message for error
     """
     msg = ""
     success = False
@@ -92,18 +105,24 @@ def try_connect_omero(
 
 
 def try_connect_google(path: str, url: str) -> tuple[bool, str]:
-    """
-    Check the google service account settings.
+    """Check the google service account settings.
 
     FYI: the email address is actually not so important,
         since it is gotten from the JSON.
 
-    :param path: str, path to the Service Account JSON file
-    :param url: str, of the spread sheet document
+    Parameters
+    ----------
+    path : str
+        Path to the Service Account JSON file
+    url : str
+        Of the spread sheet document
 
-    :return:
-        - bool, for successful connection
-        - str, message for error
+    Returns
+    -------
+    bool
+        For successful connection
+    str
+        Message for error
     """
     success = False
     # Try getting the google client
@@ -134,15 +153,21 @@ def try_connect_google(path: str, url: str) -> tuple[bool, str]:
 
 
 def compare_passwords(pwd_1: str, pwd_2: str) -> tuple[bool, str]:
-    """
-    Check if 2 strings are the same.
+    """Check if 2 strings are the same.
 
-    :param pwd_1: str, first string
-    :param pwd_2: str, second string
+    Parameters
+    ----------
+    pwd_1 : str
+        First string
+    pwd_2 : str
+        Second string
 
-    :return:
-        - bool, if they match (returns false if it is an empty string)
-        - str, message
+    Returns
+    -------
+    bool
+        If they match (returns false if it is an empty string)
+    str
+        Message
     """
     if pwd_1 is None or pwd_2 is None:
         return False, "Passwords cannot be of None-type!"
@@ -161,21 +186,25 @@ def final_check_pwd(
     input_pwd_1: str,
     input_pwd_2: str,
 ) -> tuple[bool, str]:
-    """
-    Check if setting a password is valid.
+    """Check if setting a password is valid.
 
     Info: Ignores the from file loaded password...
 
-    :new_pwd: str
+    Parameters
+    ----------
+    new_pwd : str
         Currently remembered pwd (reactive value)
-    :input_pwd_1: str
+    input_pwd_1 : str
         User input for the new pwd
-    :input_pwd_2: str
+    input_pwd_2 : str
         User input for the new pwd (repeated entry)
 
-    :return:
-        - bool, if everything is correct
-        - str, message what is wrong
+    Returns
+    -------
+    bool
+        If everything is correct
+    str
+        Message what is wrong
     """
     if new_pwd is None:
         # Fail if reactive variable is not set.
@@ -194,19 +223,26 @@ def final_check_google(
     final_json: Optional[str],
     final_url: Optional[str],
 ) -> tuple[bool, str]:
-    """
-    Check if google settings are valid.
+    """Check if google settings are valid.
 
     Tries also to connect.
     Info: mail is actually not necessary...
 
-    :final_mail: str, remembered mail (reactive value)
-    :final_json: str, remembered JSON file path (reactive value)
-    :final_url: str, remembred google sheet URL (reactive value)
+    Parameters
+    ----------
+    final_mail : str
+        Remembered mail (reactive value)
+    final_json : str
+        Remembered JSON file path (reactive value)
+    final_url : str
+        Remembred google sheet URL (reactive value)
 
-    :return:
-        - bool, if everything is correct
-        - str, message what is wrong
+    Returns
+    -------
+    bool
+        If everything is correct
+    str
+        Message what is wrong
     """
     # Fail message: always the same (except connection error)
     msg = "Google are not set/checked!!"
@@ -231,19 +267,27 @@ def final_check_omero(
     final_usr: Optional[str],
     final_pwd: Optional[str],
 ) -> tuple[bool, str]:
-    """
-    Check if OMERO settings are valid.
+    """Check if OMERO settings are valid.
 
     Tries also to connect, but allow OMERO connection to be unset.
 
-    :final_host: str, remembered OMERO host (reactive value)
-    :final_port: int, remembered OMERO port (reactive value)
-    :final_usr: str, remembered OMERO user (reactive value)
-    :final_pwd: str, remembered OMERO pwd (reactive value)
+    Parameters
+    ----------
+    final_host : str
+        Remembered OMERO host (reactive value)
+    final_port : int
+        Remembered OMERO port (reactive value)
+    final_usr : str
+        Remembered OMERO user (reactive value)
+    final_pwd : str
+        Remembered OMERO pwd (reactive value)
 
-    :return:
-        - bool, if everything is correct
-        - str, message what is wrong
+    Returns
+    -------
+    bool
+        If everything is correct
+    str
+        Message what is wrong
     """
     # Allow OMERO not to be set
     optional_vars = (final_host, final_usr, final_pwd)
@@ -264,53 +308,12 @@ def final_check_omero(
     )
 
 
-def final_check_upload_pwd(
-    pwd_from_file: Optional[str],
-    final_pwd: Optional[str],
-    input_pwd_1: str,
-    input_pwd_2: str,
-) -> tuple[bool, str]:
-    """
-    Check if setting the settings password is valid.
-
-    FIXME deprecated!
-
-    :pwd_from_file: str
-        password that was loaded from the file
-    :final_pwd: str
-        currently remembered pwd (reactive value)
-    :input_new_pwd_1: str
-        user input for the new pwd
-    :input_new_pwd_2: str
-        user input for the new pwd (repeated entry)
-
-    :return:
-    bool
-        if everything is correct
-    str
-        message what is wrong
-    """
-    # Require the password to be set
-    if final_pwd is None:
-        return False, "Please set/check an upload password!"
-    elif (
-        input_pwd_1 == "" or input_pwd_2 == ""
-    ) and pwd_from_file is not None:
-        # Allow to not set a new password
-        return True, "No upload password change."
-    elif input_pwd_1 != input_pwd_2:
-        return False, "The two upload passwords are not the same."
-    else:
-        return True, "New upload password set!"
-
-
 def save_private_data(data: dict, path: str):
-    """
-    Save the data to a csv file.
+    """Save the data to a csv file.
 
-    :param data: dict
+    data : dict
         Data dict with the same keys as return from create_new_data_dict()
-    :param path: str
+    path : str
         Path to saving location
     """
     # Sanity check (all keys present?)

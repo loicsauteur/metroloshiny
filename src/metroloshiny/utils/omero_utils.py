@@ -29,25 +29,34 @@ def get_omero_dates(
     port: Optional[int] = None,
     path_private_data: Optional[str] = None,
 ):
-    """
-    Get the acquisition and import date from OMERO.
+    """Get the acquisition and import date from OMERO.
 
-    :param image_id: int OMERO dataset ID
-    :param username: str OMERO user name.
-                If None, will get it from private_data.csv
-    :param passwd: str OMERO user password.
-                If None, will get it from private_data.csv
-    :param host: str OMERO host.
-                If None, will get it from private_data.csv
-    :param port: str OMERO port.
-                If None, will get it from private_data.csv
-    :param path_private_data: str path to private_data.csv.
-                If None takes default path "./data/private_data.csv"
+    Parameters
+    ----------
+    image_id : int
+        OMERO dataset ID
+    username : str
+        OMERO user name.
+        If None, will get it from private_data.csv
+    passwd : str
+        OMERO user password.
+        If None, will get it from private_data.csv
+    host : str
+        OMERO host.
+        If None, will get it from private_data.csv
+    port : int
+        OMERO port.
+        If None, will get it from private_data.csv
+    path_private_data : str
+        Path to private_data.csv.
+        If None takes default path "./data/private_data.csv"
 
-    :return: tuple[
-        Optional[str],    acquisition date (may be None if not set)
-        str,              import date
-    ]
+    Returns
+    -------
+    Optional[str]
+        Acquisition date (may be None if not set)
+    Optional[str]
+        Import date
     """
     # Get the connection details from file
     username, passwd, host, port = get_cred(
@@ -77,25 +86,34 @@ def get_image_voxelsize_channel_names(
     port: Optional[int] = None,
     path_private_data: Optional[str] = None,
 ):
-    """
-    Get voxel size and channel names for an Image ID.
+    """Get voxel size and channel names for an Image ID.
 
-    :param image_id: int OMERO dataset ID
-    :param username: str OMERO user name.
-                If None, will get it from private_data.csv
-    :param passwd: str OMERO user password.
-                If None, will get it from private_data.csv
-    :param host: str OMERO host.
-                If None, will get it from private_data.csv
-    :param port: str OMERO port.
-                If None, will get it from private_data.csv
-    :param path_private_data: str path to private_data.csv.
-                If None takes default path "./data/private_data.csv"
+    Parameters
+    ----------
+    image_id : int
+        OMERO dataset ID
+    username : str
+        OMERO user name.
+        If None, will get it from private_data.csv
+    passwd : str
+        OMERO user password.
+        If None, will get it from private_data.csv
+    host : str
+        OMERO host.
+        If None, will get it from private_data.csv
+    port : str
+        OMERO port.
+        If None, will get it from private_data.csv
+    path_private_data : str
+        Path to private_data.csv.
+        If None takes default path "./data/private_data.csv"
 
-    :return: tuple[
-        Optional[list[float]],  XYZ voxel size
-        Optional[list[str]],    channel names on OMERO
-    ]
+    Returns
+    -------
+    Optional[list[float]]
+        XYZ voxel size
+    Optional[list[str]]
+        Channel names on OMERO
     """
     # Get the connection details from file
     username, passwd, host, port = get_cred(
@@ -135,30 +153,41 @@ def get_images_for_metric(
     port: Optional[int] = None,
     path_private_data: Optional[str] = None,
 ):
-    """
-    Get images from a dataset which have the metric of interest.
+    """Get images from a dataset which have the metric of interest.
 
-    :param dataset_id: int OMERO dataset ID
-    :param metric_id: metric to look for in OMERO.
-    :param username: str OMERO user name.
-                If None, will get it from private_data.csv
-    :param passwd: str OMERO user password.
-                If None, will get it from private_data.csv
-    :param host: str OMERO host.
-                If None, will get it from private_data.csv
-    :param port: str OMERO port.
-                If None, will get it from private_data.csv
-    :param path_private_data: str path to private_data.csv.
-                If None takes default path "./data/private_data.csv"
+    Parameters
+    ----------
+    dataset_id : int
+        OMERO dataset ID
+    metric_id : str
+        Metric to look for in OMERO.
+    username : str
+        OMERO user name.
+        If None, will get it from private_data.csv
+    passwd  : str
+        OMERO user password.
+        If None, will get it from private_data.csv
+    host : str
+        OMERO host.
+        If None, will get it from private_data.csv
+    port : int
+        OMERO port.
+        If None, will get it from private_data.csv
+    path_private_data : str
+        Path to private_data.csv.
+        If None takes default path "./data/private_data.csv"
 
-    :return: tuple[dict, dict]
-        - dict[int, str] with
-            key = image ID
-            value = f"image ID: image name"
-        - dict[int, pd.DataFrame] with
-            key = image ID
-            value = key-value table with columns ["Key", "Value"] for OMERO key-value pairs
-            # FIXME check/improve for tables...
+    Returns
+    -------
+    dict[int, str]
+        With
+        - key = image ID
+        - value = f"image ID: image name"
+    dict[int, pd.DataFrame]
+        With
+        - key = image ID
+        - value = key-value table with columns ["Key", "Value"] for OMERO key-value pairs
+        - # FIXME check/improve for tables...
 
     """
     # Get the connection details from file
@@ -237,14 +266,21 @@ def get_images_for_metric(
 def get_images_in_dataset_by_tag(
     conn: BlitzGateway, dataset_id: int, tag_names: list[str]
 ) -> dict:
-    """
-    Get a of all image form a dataset ID by tag annotation matching.
+    """Get a of all image form a dataset ID by tag annotation matching.
 
-    :param conn: BlitzGateway
-    :param dataset_id: int
-    :param tag_names: list[str], list of 1 or several tags to select images.
+    Parameters
+    ----------
+    conn : BlitzGateway
+        The gateway
+    dataset_id : int
+        OMERO Dataset ID
+    tag_names : list[str]
+        List of 1 or several tags to select images.
 
-    :return: dict {image_id: image_name}
+    Returns
+    -------
+    dict
+        {image_id: image_name}
     """
     # Sanity check
     if not isinstance(tag_names, list):
@@ -271,13 +307,19 @@ def get_images_in_dataset_by_tag(
 
 
 def check_image_tags(anns: list, tags: list[str]) -> bool:
-    """
-    Check if annotation list contains all tags.
+    """Check if annotation list contains all tags.
 
-    :param anns: list, OMERO Annotations
-    :param tags: list[str], tag names to check
+    Parameters
+    ----------
+    anns : list
+        OMERO Annotations
+    tags : list[str]
+        Tag names to check
 
-    :return: bool, True if all tags in annotation list
+    Returns
+    -------
+    bool
+        True if all tags in annotation list
     """
     found_tags = []
     # Check each searched tag in the annotations
@@ -293,13 +335,19 @@ def check_image_tags(anns: list, tags: list[str]) -> bool:
 
 
 def get_images_in_dataset(conn: BlitzGateway, dataset_id: int) -> dict:
-    """
-    Get a of all image IDs (with their names) for a dataset ID.
+    """Get a of all image IDs (with their names) for a dataset ID.
 
-    :param conn: BlitzGateway
-    :param dataset_id: int
+    Parameters
+    ----------
+    conn : BlitzGateway
+        The gateway.
+    dataset_id : int
+        OMERO Dataset ID
 
-    :return: dict {image_id: image_name}
+    Returns
+    -------
+    dict
+        {image_id: image_name}
     """
     dataset = conn.getObject("dataset", dataset_id)
     # Images is None if it is not a dataset ID
@@ -321,17 +369,32 @@ def get_cred(
     host: Optional[str] = None,
     port: Optional[int] = None,
 ) -> tuple:
-    """
-    Get credentials for OMERO connection from private data.
+    """Get credentials for OMERO connection from private data.
 
-    :param path_private_data: Optional path to private_data.csv. If None,
-                              will search for default location of the file.
-    :param username: If None, returns str OMERO USER from private_data.csv.
-    :param passwd: If None, returns str OMERO PASSWORD from private_data.csv.
-    :param host: If None, returns str OMERO HOST from private_data.csv.
-    :param port: If None, returns str OMERO PORT from private_data.csv.
+    Parameters
+    ----------
+    path_private_data : Optional[str]
+        Path to private_data.csv. If None,
+        will search for default location of the file.
+    username : Optional[str]
+        If None, returns str OMERO USER from private_data.csv.
+    passwd : Optional[str]
+        If None, returns str OMERO PASSWORD from private_data.csv.
+    host : Optional[str]
+        If None, returns str OMERO HOST from private_data.csv.
+    port : Optional[int]
+        If None, returns str OMERO PORT from private_data.csv.
 
-    :return: (username, passwd, host, port)
+    Returns
+    -------
+    str
+        username
+    str
+        passwd
+    str
+        host
+    int
+        port
     """
     if username is None:
         username = get_private_data("OMERO USER", path_private_data)
@@ -352,18 +415,26 @@ def get_cred(
 def get_fwhm_metric_data(
     conn: BlitzGateway, image_id: int, metric: str
 ) -> Optional[pd.DataFrame]:
-    """
-    Get the FWHM metric data from the OMERO image key-value pairs.
+    """Get the FWHM metric data from the OMERO image key-value pairs.
 
     Checks kv pair keys for metric (excludes "Profile_length_for_FWHM").
     Picks the first instance of key-value pairs that if finds.
 
-    :param conn: BlitzGateway
-    :param image_id: int, OMERO image ID
-    :param metric: str, metric to find, e.g. FWHM
+    Parameters
+    ----------
+    conn : BlitzGateway
+        The gateway.
+    image_id : int
+        OMERO image ID
+    metric : str
+        Metric to find, e.g. FWHM
 
-    :return: None, if the metric was not found in the image
-        pd.DataFrame
+    Returns
+    -------
+    Optional[pd.DataFrame]
+        None, if the metric was not found in the image
+
+        Otherwise, a dataframe with key-value pairs
     """
     # Get Omero image
     image = conn.getObject("image", image_id)
@@ -397,15 +468,21 @@ def get_fwhm_metric_data(
 
 
 def get_dates(conn: BlitzGateway, image_id: int) -> tuple[Optional[str], str]:
-    """
-    Get the acquisition and import date from OMERO.
+    """Get the acquisition and import date from OMERO.
 
-    :param conn: BlitzGateway
-    :param id: int, Image ID
+    Parameters
+    ----------
+    conn : BlitzGateway
+        The gateway.
+    image_id : int
+        Image ID
 
-    :return: tuple[acquisition, import], str dates in YYYYmmdd format
-        - acquisition date may be None (if not set)
-        - import date should never be None
+    Returns
+    -------
+    Optional[str]
+        Acquisition date in YYYYmmdd format. May be None (if not set)
+    str
+        Import date should never be None
     """
     image = conn.getObject("image", image_id)
     if image is None:
@@ -426,14 +503,21 @@ def get_dates(conn: BlitzGateway, image_id: int) -> tuple[Optional[str], str]:
 
 
 def get_channel_names(conn: BlitzGateway, datatype: str, image_id: int):
-    """
-    Get the channel names stored for an image on OMERO.
+    """Get the channel names stored for an image on OMERO.
 
-    :param conn: BlitzGateway
-    :param datatype: str, if not "Image" returns empty list
-    :param image_id: int, Image ID
+    Parameters
+    ----------
+    conn : BlitzGateway
+        The gateway.
+    datatype : str
+        If not "Image" returns empty list
+    image_id : int
+        Image ID
 
-    :return: list of channel names (empty if datatype != Image)
+    Returns
+    -------
+    list[str]
+        Of channel names (empty if datatype != Image)
     """
     if datatype != "Image":
         return []
@@ -446,14 +530,21 @@ def get_channel_names(conn: BlitzGateway, datatype: str, image_id: int):
 def get_voxel_size(
     conn: BlitzGateway, datatype: str, image_id: int
 ) -> list[float]:
-    """
-    Get the voxel sizes stored for an image on OMERO.
+    """Get the voxel sizes stored for an image on OMERO.
 
-    :param conn: BlitzGateway
-    :param datatype: str, if not "Image" returns empty list
-    :param image_id: int, Image ID
+    Parameters
+    ----------
+    conn : BlitzGateway
+        The gateway.
+    datatype : str
+        If not "Image" returns empty list
+    image_id : int
+        Image ID
 
-    :return: list of XYZ voxel size (empty if datatype != Image)
+    Returns
+    -------
+    list[float]
+        Of XYZ voxel size (empty if datatype != Image)
     """
     if datatype != "Image":
         return []
@@ -482,19 +573,28 @@ def get_omero_ring_rois(
     image_id: int,
     roi_categories: Optional[list[str]] = None,
 ) -> tuple[dict, dict]:
-    """
-    Get the OMERO field distortion ROIs for a specified image id.
+    """Get the OMERO field distortion ROIs for a specified image id.
 
     see also: https://omero.readthedocs.io/en/v5.6.10/developers/Python.html#rois
 
-    :param conn: BlitzGateway
-    :param id: int, Image ID
-    :param tags: list[str], of roi categroies/names, must be a length of 2
+    Parameters
+    ----------
+    conn : BlitzGateway
+        The gateway.
+    image_id : int
+        Image ID
+    roi_categories : list[str]
+        Of roi categroies/names, must be a length of 2.
         Default (if None)= ["detected rings", "ideal locations"]
 
-    :return: (dict, dict) for detected_rois and ideal_locations
-        each dict has keys "001" (roi number)
-        and value centroid (X, Y) in pixel units
+    Returns
+    -------
+    dict
+        For detected_rois
+        - each dict has keys "001" (roi number)
+        - and value centroid (X, Y) in pixel units
+    dict
+        For ideal_locations
     """
     image = conn.getObject("image", image_id)
     # print("image:", image, image.getId(), type(image))
@@ -552,21 +652,29 @@ def get_omero_ring_rois(
 def get_omero_table(
     conn: BlitzGateway, image_id: int, name_part: str
 ) -> pd.DataFrame:
-    """
-    Get an OMERO table as dataframe.
+    """Get an OMERO table as dataframe.
 
     INFO: image has 2 tables (files)
     - "Field_distortion" with what looks like calibrated distances per channel (but how is the final ring position calculated?)
     - "Field_uniformity" with intensities per channel e.g. "ch0"
 
-    :param conn: BlitzGateway
-    :param image_id: int, Image ID
-    :param name_part: str, substring of the table name, e.g.:
+    Parameters
+    ----------
+    conn : BlitzGateway
+        The gateway.
+    image_id : int
+        Image ID
+    name_part : str
+        Substring of the table name, e.g.:
         - "Field_distortion" for distortion table
         - "Field_uniformity" for uniformity (intensity) table
-        -> Attention: if multiple tables contain the substring, only the first one will be returned.
 
-    :return: pd.DataFrame (Image, and Image_ID columns removed)
+        Attention: if multiple tables contain the substring, only the first one will be returned.
+
+    Returns
+    -------
+    pd.DataFrame
+        (Image, and Image_ID columns removed)
     """
     image = conn.getObject("image", image_id)
     if image is None:
@@ -588,8 +696,7 @@ def get_omero_table(
 def omero_table_to_dataframe(
     conn: BlitzGateway, ann: Union[FileAnnotationWrapper, Any]
 ) -> pd.DataFrame:
-    """
-    Convert the OMERO table object to a dataframe.
+    """Convert the OMERO table object to a dataframe.
 
     This function is specific for field uniformity/distortion tables.
 
@@ -599,10 +706,16 @@ def omero_table_to_dataframe(
 
     See also: https://omero.readthedocs.io/en/stable/developers/Tables.html
 
-    :param: conn, BlitzGateway
-    :param ann: FileAnnotationWrapper or already opened OMERO table object
+    Parameters
+    ----------
+    conn : BlitzGateway
+        The gateway
+    ann : FileAnnotationWrapper or Any
+        Wrpper or already opened OMERO table object.
 
-    :return: pd.DataFrame
+    Returns
+    -------
+    pd.DataFrame
     """
     if isinstance(ann, FileAnnotationWrapper):
         res = conn.c.sf.sharedResources()

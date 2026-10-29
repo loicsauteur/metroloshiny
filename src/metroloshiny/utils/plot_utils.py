@@ -10,14 +10,21 @@ from plotly.graph_objects import Figure
 
 
 def normalize_percentile(values, low: int = 1, high: int = 99) -> list:
-    """
-    Normalise percitenile.
+    """Normalise percitenile.
 
-    :param values: list, np.array, df, of values
-    :param low: int, bottom percentile
-    :param high: int, top percentile
+    Parameters
+    ----------
+    values : list, np.array, or df
+        Of values
+    low : int
+        Bottom percentile
+    high : int
+        Top percentile
 
-    :return: list, normalised values
+    Returns
+    -------
+    list
+        Normalised values
     """
     vmin, vmax = np.nanpercentile(values, q=[low, high])
     return np.clip((values - vmin) / (vmax - vmin), a_min=0, a_max=1)
@@ -30,8 +37,7 @@ def normalize_df(
     low: Optional[float] = None,
     high: Optional[float] = None,
 ) -> pd.DataFrame:
-    """
-    Normalize a dataframe by min/max values.
+    """Normalize a dataframe by min/max values.
 
     For vector normalization low should be 0, while high the absolute max.
 
@@ -40,13 +46,22 @@ def normalize_df(
         attention in cases where values are all positive,
         normalization low will not be 0.
 
-    :param df: pd.DataFrame
-    :param start_col: int, first column for normalization. Default = 0
-    :param end_col: int, last column for normalization. Default = -1
-    :param low: float, min. value for normalization
-    :param high: float, max. value for normalization
+    Parameters
+    ----------
+    df : pd.DataFrame
+        Input dataframe.
+    start_col : int
+        First column for normalization. Default = 0
+    end_col : int
+        Last column for normalization. Default = -1
+    low : float
+        min. value for normalization
+    high : float
+        max. value for normalization
 
-    :return: pd.Dataframe
+    Returns
+    -------
+    pd.Dataframe
     """
     if end_col != -1 and start_col > end_col:
         raise ValueError("start_col cannot be bigger than end_col.")
@@ -88,14 +103,18 @@ def normalize_df(
 
 
 def no_data_seaborn(message: str = "No data to visualise!"):
-    """
-    Show a no data plot with matplotlib.
+    """Show a no data plot with matplotlib.
 
     For @render.plot
 
-    :param message: str, to display in the plot.
+    Parameters
+    ----------
+    message : str
+        To display in the plot.
 
-    :return: matplot fig
+    Returns
+    -------
+    matplot fig
     """
     fig, ax = plt.subplots()
     ax.text(0.5, 0.5, message, ha="center", va="center")
@@ -104,14 +123,18 @@ def no_data_seaborn(message: str = "No data to visualise!"):
 
 
 def no_data_plotly(message: str = "No data to visualise!"):
-    """
-    Show a no data plot with plotly.
+    """Show a no data plot with plotly.
 
     For @render_widget
 
-    :param message: str, to display in the plot.
+    Parameters
+    ----------
+    message : str
+        To display in the plot.
 
-    :return: plotly.plot
+    Returns
+    -------
+    plotly.plot
     """
     fig = px.line(pd.DataFrame({"x": [], "y": []}), x="x", y="y")
     fig.add_annotation(
@@ -140,18 +163,28 @@ def add_center_cross_plotly(
     length: float = 1,
     as_x: bool = True,
 ):
-    """
-    Add a centered cross onto a plotly subplot.
+    """Add a centered cross onto a plotly subplot.
 
-    :param fig: plotly Figure (subplot)
-    :param x_shape: data shape in x
-    :param y_shape: data shape in y
-    :param row: subplot row
-    :param col: subplot col
-    :param color: cross color. Default = magenta
-    :param width: cross line width. Default = 1
-    :param length: cross arm length (in "XY plot units"). Default = 1
-    :param as_x: bool, if True (=default) the cross is an X, if False a +
+    Parameters
+    ----------
+    fig : plotly Figure
+        Subplot
+    x_shape : int
+        Data shape in x
+    y_shape : int
+        Data shape in y
+    row : int
+        Subplot row
+    col : int
+        Subplot col
+    color : str
+        Cross color. Default = magenta
+    width: float
+        Cross line width. Default = 1
+    length : float
+        Cross arm length (in "XY plot units"). Default = 1
+    as_x : bool
+        If True (=default) the cross is an X, if False a +
     """
     # Calculate the center locations (off'ed by 0.5 for absolute center)
     cx = (x_shape) / 2 + 0.5

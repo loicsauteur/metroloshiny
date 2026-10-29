@@ -45,15 +45,18 @@ def make_entries(
     sheet: gs.Worksheet,
     data: pd.DataFrame,
 ):
-    """
-    Upload data to a google spread sheet.
+    """Upload data to a google spread sheet.
 
     Note: I ran into an error (Range ('psf_measurements!U1) exceeds grid limits.'),
         when I deleted the last column and retried upload (it did not add, a new
         column as expected). Restarting the app, made it work...
 
-    :param sheet: gs.Worksheet reference
-    :param data: pd.DataFrame, should have the same columns as in the sheet.
+    Parameters
+    ----------
+    sheet : gs.Worksheet
+        reference Google Worksheet
+    data : pd.DataFrame
+        Should have the same columns as in the sheet.
     """
     # Get the sheet dataframe (explicitly specify columns for empty tables)
     df = pd.DataFrame(sheet.get_all_records(), columns=sheet.row_values(1))
@@ -221,16 +224,33 @@ def prepare_data_for_entry(
     info: str,
     date: str,
 ) -> pd.DataFrame:
-    """
-    Create a dataframe similar to spreadsheet table.
+    """Create a dataframe similar to spreadsheet table.
 
-    :param data: dict, (nested) e.g. {
+    Parameters
+    ----------
+    data : dict or pd.DataFrame
+        Nested dict e.g. {
             "C1" : {'FWHM-X': 911.0, 'FWHM-Y': 852.0, 'FWHM-Z': 1260.0},
             ...
         }
-        if it is a DF...
-    :param data_headers: list[str], nested dict headers, excluding value column.
+        if it is a DF... FIXME describe this
+    data_headers : list[str]
+        nested dict headers, excluding value column.
         e.g. ["Channel", "FWHM"]
+    site : str
+        Site name
+    microscope : str,
+        Microscope name
+    objective : str
+        Objective name
+    info : str
+        Information string
+    date : str
+        Date in YYYYmmdd
+
+    Returns
+    -------
+    pd.DataFrame
     """
     # Sainity check
     if not isinstance(data_headers, list):
