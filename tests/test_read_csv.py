@@ -1,5 +1,6 @@
 """Test functions for reading csv and similar files."""
 
+from datetime import datetime
 from pathlib import Path
 
 import numpy as np
@@ -118,6 +119,56 @@ def test_read_simple_xlsx():
         NotImplementedError, match=r"Data contains missing val*"
     ):
         rc.read_simple_xlsx(path=str(path))
+
+
+def test_read_thorlabs_metadata():
+    """Test read_thorlabs_metadata() function."""
+    dir = (
+        Path(__file__).parents[1]
+        / "example_files/power_long_short_term_thorlabs_examples/"
+    )
+    path = dir / "example_Short_Stability_355nm_d20261007.csv"
+
+    # Check non-str input
+    with pytest.raises(IOError, match=r"Only string paths are supported."):
+        rc.read_thorlabs_metadata(path)
+    # Check non-csv file
+    with pytest.raises(
+        NotImplementedError,
+        match=r"Reading Thorlabs only implemented for CSV files.",
+    ):
+        rc.read_thorlabs_metadata(
+            str(dir.parent / "metroloshiny_data_example.xlsx")
+        )
+    # Check non-existing file
+    with pytest.raises(FileNotFoundError, match=r"File does not exist*"):
+        rc.read_thorlabs_metadata(str(dir / "someFile.txt"))
+
+    delimiter, line, wavelength, start, interval = rc.read_thorlabs_metadata(
+        str(path)
+    )
+    assert delimiter == ";"
+    assert line == 12, f"Startline was {line} instead of 12."
+    assert wavelength == 355
+    assert start == datetime(2026, 10, 7, 6, 40, 48)
+    assert interval == 2.0, f"Interval was {interval} instead of '2.0'"
+
+    # Different valid file
+    path = dir / "example_Long_Stability_560nm_d20261022.csv"
+    delimiter, line, wavelength, start, interval = rc.read_thorlabs_metadata(
+        str(path)
+    )
+    assert delimiter == ";"
+    assert line == 12, f"Startline was {line} instead of 12."
+    assert wavelength == 560
+    assert start == datetime(2026, 10, 22, 6, 18, 34)
+    assert interval == 30.0, f"Interval was {interval} instead of '2.0'"
+
+    # TODO add more test to check parsing errors (-> requires faked csv files)
+    #       - parsing wavelength
+    #       - parsing interval
+    #       - missing delimiter, wavelength and/or missing data (/header -rows)
+    # TODO try reading from wrong csv file (as on line 45 here in other test)
 
 
 if __name__ == "__main__":

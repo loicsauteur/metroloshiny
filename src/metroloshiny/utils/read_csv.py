@@ -1,9 +1,14 @@
 """Reading/handling of csv and xlsx files."""
 
+import os
 from datetime import datetime
 
 import pandas as pd
 
+from metroloshiny.utils.common_utils import (
+    identify_date_format,
+    identify_time_format,
+)
 from metroloshiny.utils.dataframe_utils import (
     convert_date_column,
     convert_power_column,
@@ -83,6 +88,125 @@ def get_power_measurement(path: str) -> tuple[str, pd.DataFrame]:
         raise NotImplementedError(f"Your file type is not implemented: {path}")
 
 
+def read_thorlabs_metadata(path: str, skip_interval: bool = False) -> tuple:
+    """Read measurement metadata from a Thorlabs csv file.
+
+    Parameters
+    ----------
+    path : str
+        Path to file
+    skip_interval : bool
+        Skips interval parsing and sets it to None. Default = False
+
+    Returns
+    -------
+    str
+        CSV file delimiter
+    int
+        Starting line of the data
+    int
+        Measurement wavelength in nm
+    datetime
+        Measurement start date and time
+    Optional[float]
+        Measurement interval in seconds
+
+    Raises
+    ------
+    IOError
+        If path not a string
+    FileNotFoundError
+    NotImplementedError
+        - For non-csv files
+        - Or if it does not seem to be a Thorlabs file
+    RunTimeError
+        - If the wavelength could not be parsed
+        - Or if interval could not be parsed (if not skipped)
+    """
+    # Sanity test
+    if not isinstance(path, str):
+        raise IOError("Only string paths are supported.")
+    # Check file exists
+    if not os.path.exists(path):
+        raise FileNotFoundError(f"File does not exist: {path}")
+    # Only support csv files
+    if not path.endswith(".csv"):
+        raise NotImplementedError(
+            "Reading Thorlabs only implemented for CSV files."
+        )
+    # Try to identify specific elements in the expected csv file
+    delimiter = first_line = start_date = start_time = interval = (
+        wavelength
+    ) = header = None
+
+    with open(path, mode="r", encoding="utf-8") as file:
+        for i, l in enumerate(file):
+            # Remove trailing new line characters
+            line = l.rstrip("\n")
+            # Identify the file delimiter
+            if line.startswith("Delimiter Used"):
+                delimiter = line.split("'")[1]
+            # Identify the measurement start
+            if line.startswith("Start of Measurement"):
+                start_date = line.split(" ")[-2]
+                start_time = line.split(" ")[-1]
+            # Identify the interval
+            if line.startswith("Sample Interval"):
+                interval = line.split(";")[-1]
+            # Find the first data line & remember header for date/time formats
+            if line.startswith("Samples"):
+                first_line = i - 2
+                # Needs to be offsetted
+                # Remember header to extract date/time formats
+                header = line
+            # Find the wavelength used
+            if line.startswith("Wavelength"):
+                wavelength = line.split(" ")[-2]
+                try:
+                    wavelength = int(wavelength)
+                except ValueError as err:
+                    raise RuntimeError(
+                        "Could not identify the used Wavelength from: "
+                        f"{line}, using <{' '.join(line.split(' ')[-2:])}>"
+                    ) from err
+    file.close()
+    # Raise NotImplementedError if crucial elements could not be identified
+    if None in [delimiter, first_line, wavelength]:
+        raise NotImplementedError(
+            "File does not seem to be the expected Thorlabs file."
+        )
+
+    # Parse the start date and time
+    header = header.split(delimiter)
+    date_format = identify_date_format(header[1])
+    time_format = identify_time_format(header[2])
+    start = datetime.strptime(
+        str(start_date) + str(start_time), date_format + time_format
+    )
+
+    # Skip interval parsing
+    if skip_interval:
+        return delimiter, first_line, wavelength, start, None
+
+    # Parse the measurement interval
+    interval = interval.strip(" ")
+    interval_unit = interval.split(" ")[1]
+    try:
+        interval_dt = float(interval.split(" ")[0])
+    except ValueError as err:
+        raise RuntimeError(
+            f"Could not parse the interval from: {interval.split(' ')}"
+        ) from err
+    if interval_unit not in ["s", "m"]:
+        raise RuntimeError(
+            f"Unknown interval unit: <{interval}>. Only 's' & 'm' supported."
+        )
+    if interval_unit == "m":
+        interval_dt = interval_dt * 60
+
+    return delimiter, first_line, wavelength, start, interval_dt
+
+
 def read_thorlabs_csv(path: str) -> pd.DataFrame:
     """Try reading a thorlabs power measurement file.
 
@@ -103,43 +227,8 @@ def read_thorlabs_csv(path: str) -> pd.DataFrame:
     NotImplementedError
         If not csv or file not as expected.
     """
-    # Sanity test
-    if not isinstance(path, str):
-        raise IOError("Only string paths are supported.")
-    # Only support csv files
-    if not path.endswith(".csv"):
-        raise NotImplementedError(
-            "Reading Thorlabs only implemented for CSV files."
-        )
-
-    # Try to identify specific elements in the expected csv file
-    delimiter = None
-    first_line = None
-    wavelength = None
-    with open(path, mode="r", encoding="utf-8") as file:
-        for i, line in enumerate(file):
-            # Identify the file delimiter
-            if line.startswith("Delimiter Used"):
-                delimiter = line.split("'")[1]
-            # Find the first data line
-            if line.startswith("Samples"):
-                first_line = i - 2
-                # Needs to be offsetted
-            # Find the wavelength used
-            if line.startswith("Wavelength"):
-                wavelength = line.split(" ")[-2]
-                try:
-                    wavelength = int(wavelength)
-                except ValueError as err:
-                    raise RuntimeError(
-                        "Could not identify the used Wavelength from: "
-                        f"{line}, using <{' '.join(line.split(' ')[-2:])}>"
-                    ) from err
-
-    if delimiter is None or first_line is None or wavelength is None:
-        raise NotImplementedError(
-            "File does not seem to be the expected Thorlabs file."
-        )
+    # Get the relevant metadata from the csv file (may raise exceptions)
+    delimiter, first_line, wavelength, _, _ = read_thorlabs_metadata(path)
 
     # Convert csv to dataframe
     df = pd.read_csv(path, sep=delimiter, header=first_line)
