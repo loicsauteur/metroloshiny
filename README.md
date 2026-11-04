@@ -234,6 +234,9 @@ There are 2 different kind of tests:
 <!--
 Commit changes:
 To make use of pre-commit, **need to run git from the dev pixi env**.
+
+I experienced playwright assertion errors, when the test had already ran successfully.
+   -> freeing resources (RAM/CPU) helped.
 -->
 
 # Installation on Linux server
