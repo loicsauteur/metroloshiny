@@ -176,5 +176,36 @@ def test_read_thorlabs_metadata():
     # TODO try reading from wrong csv file (as on line 45 here in other test)
 
 
+def test_get_long_term_power_measurement_thorlabs():
+    """Test the get_long_term_power_measurement_thorlabs() function."""
+    dir = (
+        Path(__file__).parents[1]
+        / "example_files/power_long_short_term_thorlabs_examples/"
+    )
+    path = dir / "example_Short_Stability_355nm_d20261007.csv"
+
+    df, date, wave, inter = rc.get_long_term_power_measurement_thorlabs(
+        str(path)
+    )
+    assert "Time (s)" in df.columns
+    assert "Power (mW)" in df.columns
+    assert len(df) == 299
+    assert date == "20261007"
+    assert wave == 355
+    assert inter == 2.0
+
+    # Different valid file
+    path = dir / "example_Long_Stability_560nm_d20261022.csv"
+    df, date, wave, inter = rc.get_long_term_power_measurement_thorlabs(
+        str(path)
+    )
+    assert "Time (s)" in df.columns
+    assert "Power (mW)" in df.columns
+    assert len(df) == 241
+    assert date == "20261022"
+    assert wave == 560
+    assert inter == 30
+
+
 if __name__ == "__main__":
     pass

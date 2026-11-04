@@ -88,6 +88,48 @@ def get_power_measurement(path: str) -> tuple[str, pd.DataFrame]:
         raise NotImplementedError(f"Your file type is not implemented: {path}")
 
 
+def get_long_term_power_measurement_thorlabs(
+    path: str,
+) -> tuple[pd.DataFrame, str, int, float]:
+    """Get Thorlabs long term power measurements.
+
+    Parameters
+    ----------
+    path : str
+        Path to file
+
+    Returns
+    -------
+    pd.DataFrame
+        with columns:
+        - Time (s), type float, measurement intervals
+        - Power (mW), type float
+    str
+        Acquisition date (YYYYMMDD)
+    int
+        Wavlength in nm
+    float
+        Interval in s
+    """
+    delimiter, line, wave, start, interval, _, _ = read_thorlabs_metadata(path)
+    # Convert csv to dataframe
+    df = pd.read_csv(path, sep=delimiter, header=line)
+
+    # Convert power measurements to mW
+    df = convert_power_column(df)
+
+    # Create a column for the time
+    time_col = [0 + i * interval for i in range(len(df))]
+    df.insert(0, "Time (s)", time_col)
+    # Keep only the 2 relevant columns
+    df = df[["Time (s)", "Power (mW)"]]
+
+    # Parse the acquisition date
+    acqui_date = start.strftime("%Y%m%d")
+
+    return df, acqui_date, wave, interval
+
+
 def read_thorlabs_metadata(path: str, skip_interval: bool = False) -> tuple:
     """Read measurement metadata from a Thorlabs csv file.
 
