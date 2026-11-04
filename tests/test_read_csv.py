@@ -144,25 +144,29 @@ def test_read_thorlabs_metadata():
     with pytest.raises(FileNotFoundError, match=r"File does not exist*"):
         rc.read_thorlabs_metadata(str(dir / "someFile.txt"))
 
-    delimiter, line, wavelength, start, interval = rc.read_thorlabs_metadata(
-        str(path)
+    delimiter, line, wavelength, start, interval, d_format, t_format = (
+        rc.read_thorlabs_metadata(str(path))
     )
     assert delimiter == ";"
     assert line == 12, f"Startline was {line} instead of 12."
     assert wavelength == 355
     assert start == datetime(2026, 10, 7, 6, 40, 48)
     assert interval == 2.0, f"Interval was {interval} instead of '2.0'"
+    assert d_format == "%m/%d/%Y"
+    assert t_format == "%H:%M:%S"
 
     # Different valid file
     path = dir / "example_Long_Stability_560nm_d20261022.csv"
-    delimiter, line, wavelength, start, interval = rc.read_thorlabs_metadata(
-        str(path)
+    delimiter, line, wavelength, start, interval, d_format, t_format = (
+        rc.read_thorlabs_metadata(str(path))
     )
     assert delimiter == ";"
     assert line == 12, f"Startline was {line} instead of 12."
     assert wavelength == 560
     assert start == datetime(2026, 10, 22, 6, 18, 34)
     assert interval == 30.0, f"Interval was {interval} instead of '2.0'"
+    assert d_format == "%m/%d/%Y"
+    assert t_format == "%H:%M:%S"
 
     # TODO add more test to check parsing errors (-> requires faked csv files)
     #       - parsing wavelength

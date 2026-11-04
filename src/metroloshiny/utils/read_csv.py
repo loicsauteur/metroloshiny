@@ -110,6 +110,10 @@ def read_thorlabs_metadata(path: str, skip_interval: bool = False) -> tuple:
         Measurement start date and time
     Optional[float]
         Measurement interval in seconds
+    str
+        Date format. E.g. "%m/%d/%Y"
+    str
+        Time format. E.g. "%H:%M:%S"
 
     Raises
     ------
@@ -186,7 +190,15 @@ def read_thorlabs_metadata(path: str, skip_interval: bool = False) -> tuple:
 
     # Skip interval parsing
     if skip_interval:
-        return delimiter, first_line, wavelength, start, None
+        return (
+            delimiter,
+            first_line,
+            wavelength,
+            start,
+            None,
+            date_format,
+            time_format,
+        )
 
     # Parse the measurement interval
     interval = interval.strip(" ")
@@ -204,7 +216,15 @@ def read_thorlabs_metadata(path: str, skip_interval: bool = False) -> tuple:
     if interval_unit == "m":
         interval_dt = interval_dt * 60
 
-    return delimiter, first_line, wavelength, start, interval_dt
+    return (
+        delimiter,
+        first_line,
+        wavelength,
+        start,
+        interval_dt,
+        date_format,
+        time_format,
+    )
 
 
 def read_thorlabs_csv(path: str) -> pd.DataFrame:
@@ -228,7 +248,9 @@ def read_thorlabs_csv(path: str) -> pd.DataFrame:
         If not csv or file not as expected.
     """
     # Get the relevant metadata from the csv file (may raise exceptions)
-    delimiter, first_line, wavelength, _, _ = read_thorlabs_metadata(path)
+    delimiter, first_line, wavelength, _date, _, _, _ = read_thorlabs_metadata(
+        path
+    )
 
     # Convert csv to dataframe
     df = pd.read_csv(path, sep=delimiter, header=first_line)
