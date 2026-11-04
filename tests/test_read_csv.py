@@ -27,6 +27,7 @@ def test_read_thorlabs_csv():
     # Simple checks
     assert len(df.columns) == 3  # cols
     assert len(df) == 5  # rows
+    assert "20260506" in df.columns
 
     # Check wrong file-type input
     path = example_dir / "metroloshiny_data_example.xlsx"
