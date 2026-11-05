@@ -7,7 +7,8 @@ Writing long (/short) term power measurement yaml files:
 - YAML files contain key-value pairs for:
   - site
   - microscope
-  - interval
+  - objective
+  - interval (corresponds to Info column in google sheet)
   - wavelength
   - date
   - Time (s): list
@@ -25,6 +26,7 @@ def create_long_term_power_file_path(
     path: str,
     site: str,
     microscope: str,
+    objective: str,
     interval: float,
     wavelength: float,
     date: str,
@@ -39,6 +41,8 @@ def create_long_term_power_file_path(
         Site name
     microscope : str
         Microscope name
+    objective : str
+        Objective name
     interval : float
         Measurement interval in s
     wavelength : int
@@ -60,7 +64,7 @@ def create_long_term_power_file_path(
         raise IOError(f"Path is not a directory {path}")
     file = (
         Path(path)
-        / f"{site}__{microscope}__i{interval}__w{wavelength}__d{date}.yaml"
+        / f"{site}__{microscope}__o{objective}__i{interval}__w{wavelength}__d{date}.yaml"
     )
     return str(file.absolute())
 
@@ -69,6 +73,7 @@ def read_long_term_power_yaml(
     path: str,
     site: str,
     microscope: str,
+    objective: str,
     interval: float,
     wavelength: float,
     date: str,
@@ -83,6 +88,8 @@ def read_long_term_power_yaml(
         Site name
     microscope : str
         Microscope name
+    objective : str
+        Objective name
     interval : float
         Measurement interval in s
     wavelength : int
@@ -99,7 +106,7 @@ def read_long_term_power_yaml(
     """
     # Build the file path
     file = create_long_term_power_file_path(
-        path, site, microscope, interval, wavelength, date
+        path, site, microscope, objective, interval, wavelength, date
     )
     # FYI: open will raise FileNotFoundError
     with open(file) as f:
@@ -115,6 +122,7 @@ def power_dataframe_to_yaml(
     df: pd.DataFrame,
     site: str,
     microscope: str,
+    objective: str,
     interval: float,
     wavelength: int,
     date: str,
@@ -136,6 +144,8 @@ def power_dataframe_to_yaml(
         Site name
     microscope : str
         Microscope name
+    objective : str
+        Objective name
     interval : float
         Measurement interval in s
     wavelength : int
@@ -167,7 +177,7 @@ def power_dataframe_to_yaml(
             f"Only DataFrames with 2 columns supported. This one had {len(df.columns)}."
         )
     file_path = create_long_term_power_file_path(
-        path, site, microscope, interval, wavelength, date
+        path, site, microscope, objective, interval, wavelength, date
     )
     if Path(file_path).exists() and not overwrite:
         raise FileExistsError("The measurement file already exists.")
@@ -176,6 +186,7 @@ def power_dataframe_to_yaml(
     doc: dict[str, Any] = {
         "site": site,
         "microscope": microscope,
+        "objective": objective,
         "interval": float(interval),
         "wavelength": int(wavelength),
         "date": str(date),

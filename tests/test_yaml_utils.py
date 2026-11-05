@@ -33,6 +33,7 @@ def test_power_dataframe_to_yaml():
             df=df,
             site="Hebelstrasse",
             microscope="Ti2",
+            objective="10x0.75",
             interval=interval,
             wavelength=wave,
             date=date,
@@ -48,6 +49,7 @@ def test_power_dataframe_to_yaml():
                 df=df,
                 site="Hebelstrasse",
                 microscope="Ti2",
+                objective="10x0.75",
                 interval=interval,
                 wavelength=wave,
                 date=date,
@@ -57,6 +59,7 @@ def test_power_dataframe_to_yaml():
             df=df,
             site="Hebelstrasse",
             microscope="Ti2",
+            objective="10x0.75",
             interval=interval,
             wavelength=wave,
             date=date,
@@ -73,16 +76,24 @@ def test_power_dataframe_to_yaml():
 def test_create_long_term_power_file_path():
     """Test the create_long_term_power_file_path() function."""
     file = yu.create_long_term_power_file_path(
-        "./data", "Basel", "Ti2", 2, 355, "20261105"
+        "./data", "Basel", "Ti2", "10x0.75", 2, 355, "20261105"
     )
     expected = Path("./data").absolute()
-    expected = str(expected) + "/Basel__Ti2__i2__w355__d20261105.yaml"
+    expected = (
+        str(expected) + "/Basel__Ti2__o10x0.75__i2__w355__d20261105.yaml"
+    )
     assert file == expected, f"Path was {file}, not {expected}"
 
     # Check for error - if path is not a directory
     with pytest.raises(IOError, match=r"Path is not a directory*"):
         yu.create_long_term_power_file_path(
-            "./data/somefile.txt", "Basel", "Ti2", 2, 355, "20261105"
+            "./data/somefile.txt",
+            "Basel",
+            "Ti2",
+            "10x0.75",
+            2,
+            355,
+            "20261105",
         )
 
 
@@ -110,6 +121,7 @@ def test_read_long_term_power_yaml():
             df=df_ori,
             site="Hebelstrasse",
             microscope="Ti2",
+            objective="10x0.75",
             interval=interval,
             wavelength=wave,
             date=date,
@@ -118,6 +130,7 @@ def test_read_long_term_power_yaml():
             save_dir,
             site="Hebelstrasse",
             microscope="Ti2",
+            objective="10x0.75",
             interval=interval,
             wavelength=wave,
             date=date,
@@ -138,6 +151,7 @@ def test_read_long_term_power_yaml():
             save_dir,
             site="Hebelstrasse",
             microscope="Ti2",
+            objective="10x0.75",
             interval=interval,
             wavelength=wave,
             date=date,
