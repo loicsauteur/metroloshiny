@@ -16,6 +16,7 @@ __sheet_names__ = {
     "PSF": "psf_measurements",
     "Objectives": "objective_db",
     "Uniformity/Distortion": "field_dist_uni",
+    "Long term power": "long_term_power",
     "Test": "test_sheet",
 }
 
@@ -188,6 +189,8 @@ def get_sheet(
         df = ensure_numeric_data(df, first_column=6)
     elif kind in ["Objectives", "Uniformity/Distortion", "Test"]:
         # Do not ensure numeric data (just make the dataframe as is)
+        df = pd.DataFrame(df)
+    elif kind == "Long term power":
         df = pd.DataFrame(df)
     else:
         raise NotImplementedError(

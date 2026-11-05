@@ -17,6 +17,7 @@ __gspread_names__ = {
     "PSF": "psf_measurements",
     "Objectives": "objective_db",
     "Uniformity/Distortion": "field_dist_uni",
+    "Long term power": "long_term_power",
     "Test": "test_sheet",
 }
 
