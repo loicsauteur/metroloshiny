@@ -130,6 +130,55 @@ def get_long_term_power_measurement_thorlabs(
     return df, acqui_date, wave, interval
 
 
+def read_multi_long_term_thorlabs(
+    paths: list[str],
+) -> tuple[list, list, list, float]:
+    """Read multiple long term power measurements from Thorlabs.
+
+    Checks if all files have the same interval.
+
+    Parameters
+    ----------
+    paths : list[str]
+        List of file paths
+
+    Returns
+    -------
+    list[pd.DataFrame]
+        DataFrame per file, with columns
+        - Time (s)
+        - Power (wM)
+    list[str]
+        List of dates per file
+    list[int]
+        List of wavelengths per file in nm
+    float
+        Measurement interval in seconds
+
+    Raises
+    ------
+    ValueError
+        If files do not have all the same interval value.
+    """
+    dfs = []
+    dates = []
+    waves = []
+    interval = -1.0
+
+    for f in paths:
+        df, date, wave, i = get_long_term_power_measurement_thorlabs(f)
+        dfs.append(df)
+        dates.append(date)
+        waves.append(wave)
+        if interval == -1.0:
+            interval = i
+        elif interval != i:
+            raise ValueError(
+                f"Files do not have matching measuring intervals. Got {i} and {interval} seconds."
+            )
+    return dfs, dates, waves, interval
+
+
 def read_thorlabs_metadata(path: str, skip_interval: bool = False) -> tuple:
     """Read measurement metadata from a Thorlabs csv file.
 

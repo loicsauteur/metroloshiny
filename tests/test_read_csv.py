@@ -207,5 +207,34 @@ def test_get_long_term_power_measurement_thorlabs():
     assert inter == 30
 
 
+def test_read_multi_long_term_thorlabs():
+    """Test the read_multi_long_term_thorlabs() function."""
+    dir = (
+        Path(__file__).parents[1]
+        / "example_files/power_long_short_term_thorlabs_examples/"
+    )
+
+    paths = [
+        str(dir / "example_Short_Stability_355nm_d20261007.csv"),
+        str(dir / "example_Short_Stability_470nm_d20261007.csv"),
+    ]
+    dfs, dates, waves, interval = rc.read_multi_long_term_thorlabs(paths)
+    assert len(dfs) == 2
+    assert "20261007" in dates
+    assert len(dates) == 2
+    assert len(waves) == 2
+    assert 355 in waves
+    assert 470 in waves
+    assert interval == 2.0
+
+    # Test for error if intervals dont match
+    paths.append(str(dir / "example_Long_Stability_560nm_d20261022.csv"))
+    with pytest.raises(
+        ValueError,
+        match=r"Files do not have matching measuring intervals. Got *",
+    ):
+        rc.read_multi_long_term_thorlabs(paths)
+
+
 if __name__ == "__main__":
     pass
