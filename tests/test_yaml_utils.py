@@ -75,10 +75,17 @@ def test_power_dataframe_to_yaml():
 
 def test_create_long_term_power_file_path():
     """Test the create_long_term_power_file_path() function."""
+    # Temporary output directory
+    save_dir = "./tests/test_files/"
+    delete_dir = False
+    if not Path(save_dir).exists():
+        delete_dir = True
+        Path(save_dir).mkdir()
+
     file = yu.create_long_term_power_file_path(
-        "./data", "Basel", "Ti2", "10x0.75", 2, 355, "20261105"
+        save_dir, "Basel", "Ti2", "10x0.75", 2, 355, "20261105"
     )
-    expected = Path("./data").absolute()
+    expected = Path(save_dir).absolute()
     expected = (
         str(expected) + "/Basel__Ti2__o10x0.75__i2__w355__d20261105.yaml"
     )
@@ -87,7 +94,7 @@ def test_create_long_term_power_file_path():
     # Check for error - if path is not a directory
     with pytest.raises(IOError, match=r"Path is not a directory*"):
         yu.create_long_term_power_file_path(
-            "./data/somefile.txt",
+            save_dir + "somefile.txt",
             "Basel",
             "Ti2",
             "10x0.75",
@@ -95,11 +102,14 @@ def test_create_long_term_power_file_path():
             355,
             "20261105",
         )
+    # Delete the temporary directory
+    if delete_dir:
+        Path(save_dir).rmdir()
 
 
 def test_read_long_term_power_yaml():
     """Test the read_long_term_power_yaml() function."""
-    # Temporary output file
+    # Temporary output directory
     save_dir = "./tests/test_files/"
 
     # Get some data
@@ -159,4 +169,4 @@ def test_read_long_term_power_yaml():
 
 
 if __name__ == "__main__":
-    pass
+    test_create_long_term_power_file_path()
