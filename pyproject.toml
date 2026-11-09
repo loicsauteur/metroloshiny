@@ -28,7 +28,7 @@ default = { solve-group = "default" }
 dev = { features = ["dev"], solve-group = "default"}
 
 [tool.pixi.feature.dev.tasks]
-playwright = { cmd="playwright install" }
+playwright = { cmd="playwright install --with-deps" }
 fmt = { cmd="ruff format ." }
 lint = { cmd="ruff check . --fix" }
 types = { cmd="ty check ." }
@@ -47,11 +47,11 @@ ruff = ">=0.11"
 pre-commit = ">=4.2"
 black = ">=26.3.1,<27"
 typos = ">=1.47, <2"
-playwright = ">=1.50,<2.0"
-pytest-playwright = ">=0.8,<0.9" # for testing shiny apps, may need a task for "playwright install"
 
 [tool.pixi.feature.dev.pypi-dependencies]
 ty = "*"
+playwright = "==1.64.1" # for testing shiny apps, may need a task for "playwright install"
+pytest-playwright = "==0.10.0"
 
 #[dependency-groups]
 #test = ["pytest"]
@@ -61,7 +61,8 @@ ty = "*"
 deploy = "sudo rm -r /srv/shiny-server/*;sudo cp -R src/metroloshiny/metroloshiny_apps/. /srv/shiny-server/;sudo systemctl restart shiny-server"
 
 [tool.pixi.dependencies]
-shiny = ">=1.4.0,<2"
+# shiny = ">=1.4.0,<2" # Was 1.4.0
+shiny = ">=1.8.0,<2" # match version with playwright?
 seaborn = ">=0.13.2,<0.14"
 pandas = ">=3.0.1,<4"
 python = "3.11.*"
