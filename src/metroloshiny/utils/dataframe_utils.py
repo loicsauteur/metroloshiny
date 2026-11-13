@@ -216,8 +216,8 @@ def identify_target_rows(
 ) -> Union[dict, pd.DataFrame]:
     """Get indices of the dataframe for values in a nested_dict.
 
-    Used to idientify the rows where to put data into a table.
-    The nested_dict contains keys to idientify specific row values,
+    Used to identify the rows where to put data into a table.
+    The nested_dict contains keys to identify specific row values,
     e.g. "C1" and "FWHM-Y", and the last level of the nested dict
     contains the value for entering into the table.
 
