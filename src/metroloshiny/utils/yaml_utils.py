@@ -78,7 +78,7 @@ def read_long_term_power_yaml(
     wavelength: float,
     date: str,
 ) -> pd.DataFrame:
-    """Read a long term power meeasurement YAML file.
+    """Read a long term power measurement YAML file.
 
     Parameters
     ----------
@@ -165,7 +165,34 @@ def power_dataframe_to_yaml(
     KeyError
         If dataframe does not have expected columns
     ValueError
-        If dataframe has not expcected number of columns
+        If dataframe has not expected number of columns
+
+    Examples
+    --------
+    >>> power_dataframe_to_yaml(
+    ...     "/path/to/data/site__microscope__i{interval}__w{wavelength}__d{date}.yaml",
+    ...     df,
+    ...     "site",
+    ...     "microscope",
+    ...     "objective",
+    ...     2.0,
+    ...     488,
+    ...     "20261113",
+    ...     overwrite=False,
+    ... )
+    '/path/to/data/site__microscope__i2__w488__d20261113.yaml'
+
+    The resulting YAML file will look like:
+
+    .. code-block:: yaml
+        site: site
+        microscope: microscope
+        objective: objective
+        interval: 2.0
+        wavelength: 488
+        date: '20261113'
+        Time (s): [0.0, 2.0, ...]
+        Power (mW): [4.2, 4.3, ...]
     """
     # Checks
     if "Time (s)" not in df.columns:
