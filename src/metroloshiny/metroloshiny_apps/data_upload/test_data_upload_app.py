@@ -71,7 +71,7 @@ def test_better(page: Page, local_app: ShinyAppProc) -> None:
 
     category.set("PSF")
     category.set("Power")
-    # Get everything rendered by the function rrender_omero_upload()
+    # Get everything rendered by the function render_omero_upload()
     x = ctrl.OutputUi(page, "render_omero_upload")
     # Check the Power category shows not implemented for OMERO
     # If wrong text -> time out error

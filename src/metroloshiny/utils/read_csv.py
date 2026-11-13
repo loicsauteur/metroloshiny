@@ -79,7 +79,7 @@ def get_power_measurement(path: str) -> tuple[str, pd.DataFrame]:
             possible_exception = err
         # TODO implement try reading other csv files
 
-        # Eeading the file is not implemented
+        # Reading the file is not implemented
         raise NotImplementedError(
             f"The .csv file could not be read: {possible_exception}"
         )
@@ -107,7 +107,7 @@ def get_long_term_power_measurement_thorlabs(
     str
         Acquisition date (YYYYMMDD)
     int
-        Wavlength in nm
+        Wavelength in nm
     float
         Interval in s
     """
@@ -251,7 +251,7 @@ def read_thorlabs_metadata(path: str, skip_interval: bool = False) -> tuple:
             # Find the first data line & remember header for date/time formats
             if line.startswith("Samples"):
                 first_line = i - 2
-                # Needs to be offsetted
+                # Needs to be offset
                 # Remember header to extract date/time formats
                 header = line
             # Find the wavelength used
@@ -478,7 +478,7 @@ def read_nis_job_xlsx(path: str) -> pd.DataFrame:
     for sheet in sheets:
         df = pd.read_excel(file, sheet_name=sheet)
         # Find the power unit (if None -> no measurements for this sheet) ####
-        # Find the cell (first col) shtat startswith "All values" to identify unit
+        # Find the cell (first col) that startswith "All values" to identify unit
         first_col = df.iloc[:, 0]
         info = first_col[
             first_col.astype(str).str.startswith("All values", na=False)
@@ -511,7 +511,7 @@ def read_nis_job_xlsx(path: str) -> pd.DataFrame:
                 # Could not parse date (with expected format)
                 date = "date-missing"
 
-        # Idnetify the row that starts with "Power"
+        # Identify the row that starts with "Power"
         row_idx = df.iloc[:, 0].astype(str).str.startswith("Power", na=False)
         row_idx = df.index[row_idx][0] if row_idx.any() else None
         if row_idx is None:

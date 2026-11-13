@@ -291,7 +291,7 @@ def create_csv_table_style() -> Optional[list[dict]]:
 def update_csv_table(
     *, patches: list[render.CellPatch]
 ) -> list[render.CellPatch]:
-    """Specify how chells in the csv table change.
+    """Specify how cells in the csv table change.
 
     Depends on the category and kind of loaded csv file.
 
@@ -387,7 +387,7 @@ def update_csv_table(
             )
             return ori_patches
 
-    # TODO implement for other cases/categoreies
+    # TODO implement for other cases/categories
     else:
         # Do not allow any changes
         ui.notification_show(
@@ -701,7 +701,7 @@ def create_csv_table() -> pd.DataFrame:
 
 @reactive.effect
 def update_csv_objective_choices():
-    """Update the objecive choices from the csv file.
+    """Update the objective choices from the csv file.
 
     The effect seems/will execute on load_csv_data.
 
