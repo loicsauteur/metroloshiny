@@ -226,8 +226,6 @@ def identify_target_rows(
     If an entry form the nested dict cannot be matched into the table,
     the index will be negative (decreasing by unmatched counts).
 
-    INFO: replaced filter_by_nested_dict() ?? FIXME ??
-
     Parameters
     ----------
     df : pd.DataFrame
@@ -299,94 +297,6 @@ def identify_target_rows(
 
     # Return the sorted dictionary
     return dict(sorted(result.items()))
-
-
-@DeprecationWarning
-def filter_by_nested_dict(
-    df: pd.DataFrame, nested_dict: dict, headers: list[str]
-) -> dict:
-    """Get indices of the dataframe for values in a nested_dict.
-
-    ! FIXME Deprecated !
-
-    Used to idientify the rows where to put data into a table.
-    The nested_dict contains keys to idientify specific row values,
-    e.g. "C1" and "FWHM-Y", and the last level of the nested dict
-    contains the value for entering into the table.
-
-    The result is a dictionary with {index:value}.
-    Indices are 0-based and excluding the header row.
-    If an entry form the nested dict cannot be matched into the table,
-    the index will be negative (decreasing by unmatched counts).
-
-    Parameters
-    ----------
-    df : pd.DataFrame
-        Input dataframe
-    nested_dict : dict
-         e.g. {
-            "C1" : {'FWHM-X': 911.0, 'FWHM-Y': 852.0, 'FWHM-Z': 1260.0}
-        }
-    headers : list[str]
-        For matching the df columns with
-        the nested_dict keys.
-
-    Returns
-    -------
-    dict
-        {pd.DataFrame index : value of nested_dict}
-
-        Sorted by index value
-    """
-    # Ensure there is no duplicate entries
-    try:
-        _df = df.duplicated(subset=headers, keep=False)
-        if _df.any():
-            duplicates = df.loc[_df, headers]
-            raise ValueError(
-                f"Duplicate entries in the dataframe:\n{duplicates}"
-            )
-    except KeyError as err:
-        raise KeyError(
-            f"Selected headers do not match the table headers: {err}"
-        ) from err
-
-    # Create invered nested dict = {value: path of keys}
-    # inverted_dict = invert_nested_dict(nested_dict)
-    raise DeprecationWarning("This function is deprecated!")
-
-    # # Create the result dict = {index: value}
-    # result = {}
-    # neg_idx = 0
-
-    # for value, key_list in inverted_dict.items():
-    #     if len(headers) != len(key_list):
-    #         raise RuntimeError(
-    #             f"Number of specified headers ({len(headers)}) "
-    #             f"does not match the number of row items {len(key_list)} "
-    #             f"for the value."
-    #         )
-    #     _df = df.copy()
-    #     for i in range(len(headers)):
-    #         with warnings.catch_warnings():
-    #             warnings.filterwarnings(
-    #                 "ignore",
-    #                 message="Boolean Series key will be reindexed to match DataFrame index",
-    #             )
-    #             _df = _df[df[headers[i]] == key_list[i]]
-    #     index_list = _df.index.to_list()
-    #     # print("index_list =", index_list)
-    #     if len(index_list) == 0:
-    #         neg_idx = neg_idx - 1
-    #         result[neg_idx] = value
-    #     elif len(index_list) > 1:
-    #         raise RuntimeError(
-    #             f"Expected here a dataframe with only one entry but got:\n{_df}"
-    #         )
-    #     else:
-    #         result[index_list[0]] = value
-    # # Return the sorted dictionary
-    # return dict(sorted(result.items()))
 
 
 def filter_by_date_range(
