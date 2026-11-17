@@ -65,7 +65,7 @@ def make_entries(
     # Check that all data columns (except last) are also in the sheet cols
     for c in data.columns[:-2]:
         if c not in df.columns:
-            raise RuntimeError(
+            raise KeyError(
                 f"Columns mismatch: <{c}> not found in gspread sheet."
             )
 
