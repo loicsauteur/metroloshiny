@@ -45,6 +45,7 @@ _white_cell_format_["backgroundColor"] = {
 def make_entries(
     sheet: gs.Worksheet,
     data: pd.DataFrame,
+    check_only: bool = False,
 ):
     """Upload data to a google spread sheet.
 
@@ -57,12 +58,24 @@ def make_entries(
     sheet : gs.Worksheet
         reference Google Worksheet
     data : pd.DataFrame
-        Should have the same columns as in the sheet, plus one column with the new entries.
+        Should have the same columns as in the sheet, plus one column with the new entries
+    check_only : bool
+        Does not modify Google Worksheet (or raise exceptions),
+        only returns whether an entry can be made. Default is False
+
+    Returns
+    -------
+    None
+        If check_only = False
+    tuple[bool, str]
+        If check_only = True
+        - [True, ""] if an entry can be made
+        - [False, 'error description']
 
     Raises
     ------
     KeyError
-        - - If columns are not the same as in google spreadsheet
+        - If columns are not the same as in google spreadsheet
     RuntimeError
         - If there is a mix of 'new rows' to be added and adding to 'existing rows'
         - If target google spreadsheet cells already contain values
@@ -76,9 +89,10 @@ def make_entries(
     # Check that all data columns (except last) are also in the sheet cols
     for c in data.columns[:-2]:
         if c not in df.columns:
-            raise KeyError(
-                f"Columns mismatch: <{c}> not found in gspread sheet."
-            )
+            msg = f"Columns mismatch: <{c}> not found in gspread sheet."
+            if check_only:
+                return False, msg
+            raise KeyError(msg)
 
     # Get a list of the headers that are common
     merge_headers = list(data.columns[:-1])
@@ -109,9 +123,10 @@ def make_entries(
         col = len(df.columns) + 1
     else:
         col = headers.index(date) + 1
+
     # Add new column if necessary
     new_col_added = False
-    if sheet.column_count < col:
+    if sheet.column_count < col and not check_only:
         # Note (FIXME?): I get a google error if I delete last col I just added...
         sheet.add_cols(cols=1)
         # Adjusting the format (e.g. highlight) is done once the col letter is known
@@ -119,7 +134,7 @@ def make_entries(
 
     date_cell = sheet.cell(row=1, col=col)
     col = date_cell.address.replace(str(1), "")  # get col letter(s)
-    if new_col_added:
+    if new_col_added and not check_only:
         # Make sure that cells are not highlighted initially
         sheet.format(ranges=f"{col}:{col}", format=_white_cell_format_)
 
@@ -155,11 +170,14 @@ def make_entries(
     else:
         missing_entries = dest_df[dest_df["match_index"] < 0]
         missing_entries = missing_entries.drop("match_index", axis=1)
-        raise RuntimeError(
+        msg = (
             "Error: Not all the data could be matched to existing entries.\n"
             "Manual curation in the google sheet is needed to add following "
             f"missing rows. I.e.:\n\n{missing_entries}"
         )
+        if check_only:
+            return False, msg
+        raise RuntimeError(msg)
 
     # Adding entries                ------------------------------------------
     # Add entries to existing rows
@@ -168,13 +186,15 @@ def make_entries(
         indices = [i + 2 for i in indices]
         # Check if the indices are continuous (to write as a block)
         if any(a + 1 != b for a, b in pairwise(indices)):
-            # if not check_if_sequence(indices): # old version using cell-addresses list
-            raise NotImplementedError(
+            msg = (
                 "Values cannot be uploaded: Value upload is supported only "
                 "if they can be added as a 'block'.\n"
                 f"Your values would end up in spreadsheet rows: {indices}, "
                 "which has gaps/missing rows, or is unordered."
             )
+            if check_only:
+                return (False, msg)
+            raise NotImplementedError(msg)
         # Create a list of value addresses
         value_addresses = [f"{col}{i}" for i in indices]
         start_cell = value_addresses[0]
@@ -186,10 +206,14 @@ def make_entries(
             for i in range(len(cells)):
                 if len(cells[i]) != 0:
                     filled_cells.append(value_addresses[i])
-            raise RuntimeError(
-                f"Following cells already contain values: {filled_cells}"
-            )
+            msg = f"Following cells already contain values: {filled_cells}"
+            if check_only:
+                return False, msg
+            raise RuntimeError(msg)
         # Enter the values
+        if check_only:
+            # Entry can be made
+            return True, ""
         value_block = [[i] for i in dest_df[date]]  # 2D array
         sheet.update(range_name=f"{start_cell}:{end_cell}", values=value_block)
         sheet.format(
@@ -198,6 +222,9 @@ def make_entries(
 
     # Create new entries at the bottom of the sheet
     else:
+        if check_only:
+            # Entries can be made
+            return True, ""
         # Create 3D arrays for the "common block" and value block
         common_block = dest_df[dest_df.columns[:-2]].to_numpy().tolist()
         value_block = [[i] for i in dest_df[date]]
