@@ -264,7 +264,7 @@ def prepare_data_for_entry(
     -------
     pd.DataFrame
     """
-    # Sainity check
+    # Sanity check
     if not isinstance(data_headers, list):
         raise RuntimeError("Data headers are not a list!")
     if isinstance(data, dict):
@@ -295,7 +295,7 @@ def prepare_data_for_entry(
                 df.columns = new_headers
             else:
                 raise RuntimeError(
-                    "Provided data value column header is not recognised: "
+                    "Provided data value column header is not recognized: "
                     f"{cur_headers[-1]}"
                 )
     # Reset the df index

@@ -106,7 +106,7 @@ def test_prepare_data_for_entry():
     data_df_3.columns = ["Channel", "FWHM", "19991212"]
     with pytest.raises(
         RuntimeError,
-        match=r"Provided data value column header is not recognised: *",
+        match=r"Provided data value column header is not recognized: *",
     ):
         wg.prepare_data_for_entry(
             data=data_df_3,
