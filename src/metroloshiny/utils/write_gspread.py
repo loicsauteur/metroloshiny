@@ -57,7 +57,18 @@ def make_entries(
     sheet : gs.Worksheet
         reference Google Worksheet
     data : pd.DataFrame
-        Should have the same columns as in the sheet.
+        Should have the same columns as in the sheet, plus one column with the new entries.
+
+    Raises
+    ------
+    KeyError
+        - - If columns are not the same as in google spreadsheet
+    RuntimeError
+        - If there is a mix of 'new rows' to be added and adding to 'existing rows'
+        - If target google spreadsheet cells already contain values
+    NotImplementedError
+        - If rows to be entered can not be entered in block into the google spreadsheet
+          (i.e. needs manual sorting of the spreadsheet)
     """
     # Get the sheet dataframe (explicitly specify columns for empty tables)
     df = pd.DataFrame(sheet.get_all_records(), columns=sheet.row_values(1))
