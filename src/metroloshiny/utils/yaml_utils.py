@@ -27,6 +27,7 @@ def create_long_term_power_file_path(
     site: str,
     microscope: str,
     objective: str,
+    info: str,
     interval: float,
     wavelength: float,
     date: str,
@@ -43,6 +44,8 @@ def create_long_term_power_file_path(
         Microscope name
     objective : str
         Objective name
+    info : str
+        Additional info (according to google sheet column)
     interval : float
         Measurement interval in s
     wavelength : int
@@ -53,7 +56,8 @@ def create_long_term_power_file_path(
     Returns
     -------
     str
-        Absolute path to file
+        Absolute path to file. E.g.:
+        path/{site}__{microscope}__o{objective}__{info}__i{interval}s__w{wavelength}__d{date}.yaml
 
     Raises
     ------
@@ -62,9 +66,15 @@ def create_long_term_power_file_path(
     """
     if not Path(path).is_dir():
         raise IOError(f"Path is not a directory {path}")
+
+    # Convert spaces to dashes
+    site = site.replace(" ", "-")
+    microscope = microscope.replace(" ", "-")
+    objective = objective.replace(" ", "-")
+    info = info.replace(" ", "-")
     file = (
         Path(path)
-        / f"{site}__{microscope}__o{objective}__i{interval}__w{wavelength}__d{date}.yaml"
+        / f"{site}__{microscope}__o{objective}__{info}__i{interval}s__w{wavelength}__d{date}.yaml"
     )
     return str(file.absolute())
 
@@ -74,6 +84,7 @@ def read_long_term_power_yaml(
     site: str,
     microscope: str,
     objective: str,
+    info: str,
     interval: float,
     wavelength: float,
     date: str,
@@ -90,6 +101,8 @@ def read_long_term_power_yaml(
         Microscope name
     objective : str
         Objective name
+    info : str
+        Additional info (according to google sheet column)
     interval : float
         Measurement interval in s
     wavelength : int
@@ -106,7 +119,7 @@ def read_long_term_power_yaml(
     """
     # Build the file path
     file = create_long_term_power_file_path(
-        path, site, microscope, objective, interval, wavelength, date
+        path, site, microscope, objective, info, interval, wavelength, date
     )
     # FYI: open will raise FileNotFoundError
     with open(file) as f:
@@ -123,6 +136,7 @@ def power_dataframe_to_yaml(
     site: str,
     microscope: str,
     objective: str,
+    info: str,
     interval: float,
     wavelength: int,
     date: str,
@@ -134,7 +148,7 @@ def power_dataframe_to_yaml(
     ----------
     path : str
         Path to folder containing the YAML file.
-        E.g. ./data for the file in
+        E.g. ./data for the file
         ./data/site__microscope__i{interval}__w{wavelength}__d{date}.yaml
     df : pd.DataFrame
         with columns:
@@ -146,6 +160,8 @@ def power_dataframe_to_yaml(
         Microscope name
     objective : str
         Objective name
+    info : str
+        Additional info (according to google sheet column)
     interval : float
         Measurement interval in s
     wavelength : int
@@ -170,17 +186,18 @@ def power_dataframe_to_yaml(
     Examples
     --------
     >>> power_dataframe_to_yaml(
-    ...     "/path/to/data/site__microscope__i{interval}__w{wavelength}__d{date}.yaml",
+    ...     "/data/to/data/",
     ...     df,
     ...     "site",
     ...     "microscope",
     ...     "objective",
+    ...     "some info",
     ...     2.0,
     ...     488,
     ...     "20261113",
     ...     overwrite=False,
     ... )
-    '/path/to/data/site__microscope__i2__w488__d20261113.yaml'
+    '/path/to/data/site__microscope_oobjective_some-info__i2s__w488__d20261113.yaml'
 
     The resulting YAML file will look like:
 
@@ -188,6 +205,7 @@ def power_dataframe_to_yaml(
         site: site
         microscope: microscope
         objective: objective
+        info: some info
         interval: 2.0
         wavelength: 488
         date: '20261113'
@@ -204,7 +222,7 @@ def power_dataframe_to_yaml(
             f"Only DataFrames with 2 columns supported. This one had {len(df.columns)}."
         )
     file_path = create_long_term_power_file_path(
-        path, site, microscope, objective, interval, wavelength, date
+        path, site, microscope, objective, info, interval, wavelength, date
     )
     if Path(file_path).exists() and not overwrite:
         raise FileExistsError("The measurement file already exists.")
@@ -214,6 +232,7 @@ def power_dataframe_to_yaml(
         "site": site,
         "microscope": microscope,
         "objective": objective,
+        "info": info,
         "interval": float(interval),
         "wavelength": int(wavelength),
         "date": str(date),
