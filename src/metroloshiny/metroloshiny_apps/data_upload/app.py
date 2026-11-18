@@ -35,6 +35,7 @@ from metroloshiny.utils.read_csv import (
 )
 from metroloshiny.utils.read_file import (
     check_upload_password,
+    get_data_folder,
     get_sheet,
     load_doc,
 )
@@ -55,12 +56,10 @@ sheet_doc = load_doc(dev_local_file=use_dev_local_file)
 # TODO: maybe OMERO metrics via tags?
 #       - PSF/bead images have tags = beads, psf
 #       - Argolight images have tags = fwhm, argolight
-# TODO: implement upload for long term power measurements
-#       - make multi file upload possible for it
 # TODO: notification to reload the page after successful uploads? (to repopulate drop-downs)
 
 # Variables         ----------------------------------------------------------
-path_data = Path(__file__).parents[4] / "data"
+path_data = get_data_folder()
 path_data_long_term = path_data / "long_term_power_data"
 
 # Reactive values       ------------------------------------------------------

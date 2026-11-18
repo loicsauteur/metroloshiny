@@ -1,11 +1,11 @@
 import os
 import time
-from pathlib import Path
 
 from shiny import reactive
 from shiny.express import input, render, ui
 
 from metroloshiny.utils.common_utils import get_version
+from metroloshiny.utils.read_file import get_data_folder
 from metroloshiny.utils.setting_utils import (
     compare_passwords,
     create_new_data_dict,
@@ -22,8 +22,7 @@ from metroloshiny.utils.setting_utils import (
 
 
 # Get the private data file
-data_dir = Path(__file__).parents[4]
-data_dir = data_dir / "data"
+data_dir = get_data_folder()
 data_file = data_dir / "private_data.csv"
 
 # Create a file if it does not yet exist
@@ -325,7 +324,7 @@ def check_all_settings_and_save():
 def check_settings_password():
     """Check the settings passwords.
 
-    Comares/checks also with loaded password.
+    Compares/checks also with loaded password.
     If all is good, the new_settings_pwd variable is set.
     """
     loaded_pwd = ori_settings_pwd.get()
@@ -381,7 +380,7 @@ def check_settings_password():
             "btn_check_settings_pwd", label="Check", icon=["✅"]
         )
         return
-    # The entered passwords do not macht
+    # The entered passwords do not match
     ui.notification_show(
         "Settings " + msg, id="settings_new_pwd", type="error"
     )
