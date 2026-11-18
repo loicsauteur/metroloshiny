@@ -22,7 +22,8 @@ It makes use of a google sheet as "database", where new metrology measurements c
    1. [Data upload](#Data-upload)
       1. [Data upload for PSF measurements](#Data-upload-for-PSF-measurements)
       2. [Data upload for light source power measurements](#Data-upload-for-light-source-power-measurements)
-      3. [Data upload for field uniformity and distortion](Data-upload-for-field-uniformity-and-distortion)
+      3. [Data upload for field uniformity and distortion](#Data-upload-for-field-uniformity-and-distortion)
+      4. [Data upload for long/short term power measurements](#Data-upload-for-long/short-term-power-measurements)
    2. [Data visualisation](#Data-visualisation)
 3. [Prerequisites](#Prerequisites)
    1. [Google sheet](#Google-sheet)
@@ -73,13 +74,13 @@ Upload is protected by password, which is configured in the `private_data.csv` [
 
 PSF measurements can be uploaded using metrics retrieved from (your) [OMERO](https://www.openmicroscopy.org/omero/) database.
 
-Images on OMERO must be analysed using the [FIJI](https://fiji.sc) script [PSF Inspector](https://github.com/imcf/imcf-fiji-scripts/blob/master/src/main/resources/scripts/Plugins/IMCF_Utilities/Analyze/PSF%20Inspector.py) by the [IMCF team](https://www.biozentrum.unibas.ch/facilities/technology-platforms/technology-platforms-a-z/overview/unit/imaging-core-facility).
+Images on OMERO must be analyzed using the [FIJI](https://fiji.sc) script [PSF Inspector](https://github.com/imcf/imcf-fiji-scripts/blob/master/src/main/resources/scripts/Plugins/IMCF_Utilities/Analyze/PSF%20Inspector.py) by the [IMCF team](https://www.biozentrum.unibas.ch/facilities/technology-platforms/technology-platforms-a-z/overview/unit/imaging-core-facility).
 
-This script uploads key-value pairs to the analysed OMERO images.
+This script uploads key-value pairs to the analyzed OMERO images.
 
 1. Select the Metrology Category: `PSF`
 2. Select the `Upload from OMERO` tab
-2. Provide a dataset ID that contains PSF Inspector analysed images
+2. Provide a dataset ID that contains PSF Inspector analyzed images
 3. Images of the dataset have PSF metrics will be available via drop-down choice
 4. Select an image and specify to which site, microscopy, objective, etc. it belongs
 5. A table will be shown and you may have to check:
@@ -113,13 +114,29 @@ Supported are only integer light power percentages. Floating point numbers will 
 
 ### Data upload for field uniformity and distortion
 
-Information on how to analyse images on OMERO will follow.
+Information on how to analyze images on OMERO will follow.
 
 Follow the instruction for [PSF upload](#Data-upload-for-PSF-measurements), but make sure to select the Metrology Category: `Uniformity/Distortion`
 
+### Data upload for long/short term power measurements
+
+Long/short term power measurements are currently only implemented for CSVs generated with a ThorLabs power meter.
+
+1. Select the Metrology Category: `Long term power`
+2. Select the `Upload multiple CSVs` tab
+3. Select one or multiple CSV files
+   - Make sure that all selected files have measurements with the same time interval
+   - You will get a preview graph of the data
+4. Optionally, use the numeric field to remove data points below a certain power value
+5. Specify the site, microscope, objective and information (in the microscope entry card)
+6. Press the upload button
+   - It will make entries to the google spreadsheet
+   - Save `.yaml` files of the measurements to `./metroloshiny/data/long_term_power_data`
+
+
 ## Data visualisation
 
-You have sidebar drop-down selections to filter for a specific microsocpe entry.
+You have sidebar drop-down selections to filter for a specific microscope entry.
 
 Different cards will give you graphs and additional filtering options.
 
@@ -370,7 +387,9 @@ OMERO entries are optional, in case you want to retrieve data saved on OMERO.
 - OMERO USER: OMERO user name (e.g. user locally created for your OMERO group)
 - OMERO PASSWORD: OMERO password for user
 
-If the default location `path/to/metroloshiny/data/private_data.csv` is not suitable for running on your server, you have to specify the path within the code in `src/metroloshiny/utils/read_fily.py`, line 10-13:
+If the default location `path/to/metroloshiny/data/private_data.csv` is not suitable for running on your server, you have to specify the path within the code in `src/metroloshiny/utils/read_file.py`, line 10-13:
+
+Attention: this has not been tested!
 
 ```python
 # Path of the private_data.csv file on the linux server
@@ -378,11 +397,11 @@ __linux_private_data_path__ = (
     "/absolute/path/to/private_data.csv"
 )
 ```
+<!--
 THIS NEEDS TO BE FIXED FROM MY SIDE... MAYBE I CAN:
-- copy the file somewhere else? i.e. in which directory is python started?
-- Current working directory: /srv/shiny-server/data_upload
-- read_file __file__: /users/stud/s/sautlo01/metroloshiny/src/metroloshiny/utils/read_file.py
-   - > Could use the latter to get the relative path to the metroloshiny repo
+   - I'd like to keep it the way it is. Basically, using the folder metroloshiny/data
+   - This folder is also used for long/short term power measurement data upload
+-->
 
 ## Deploying the Shiny apps
 
