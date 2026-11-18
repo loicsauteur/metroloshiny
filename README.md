@@ -23,7 +23,7 @@ It makes use of a google sheet as "database", where new metrology measurements c
       1. [Data upload for PSF measurements](#Data-upload-for-PSF-measurements)
       2. [Data upload for light source power measurements](#Data-upload-for-light-source-power-measurements)
       3. [Data upload for field uniformity and distortion](#Data-upload-for-field-uniformity-and-distortion)
-      4. [Data upload for long/short term power measurements](#Data-upload-for-long/short-term-power-measurements)
+      4. [Data upload for long & short term power measurements](#Data-upload-for-long-&-short-term-power-measurements)
    2. [Data visualisation](#Data-visualisation)
 3. [Prerequisites](#Prerequisites)
    1. [Google sheet](#Google-sheet)
@@ -118,7 +118,7 @@ Information on how to analyze images on OMERO will follow.
 
 Follow the instruction for [PSF upload](#Data-upload-for-PSF-measurements), but make sure to select the Metrology Category: `Uniformity/Distortion`
 
-### Data upload for long/short term power measurements
+### Data upload for long & short term power measurements
 
 Long/short term power measurements are currently only implemented for CSVs generated with a ThorLabs power meter.
 
