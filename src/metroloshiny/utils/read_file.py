@@ -339,5 +339,16 @@ def check_upload_password(pwd: str, data_path: Optional[str] = None) -> bool:
     return pwd == get_private_data("Upload password", data_path=data_path)
 
 
+def get_data_folder() -> Path:
+    """Get the 'data' folder.
+
+    Returns
+    -------
+    Path
+        to the ./metroloshiny/data/
+    """
+    return Path(__file__).parents[3] / "data"
+
+
 if __name__ == "__main__":
     pass
