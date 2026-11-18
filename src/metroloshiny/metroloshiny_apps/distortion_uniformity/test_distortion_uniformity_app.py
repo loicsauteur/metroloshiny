@@ -1,9 +1,7 @@
 """Test the field distortion/uniformity app."""
 
-import time
-
 import pytest
-from playwright.sync_api import Page
+from playwright.sync_api import Page, expect
 from shiny.playwright import controller as ctrl
 from shiny.run import ShinyAppProc
 
@@ -56,14 +54,18 @@ def test_basic_app(page: Page, local_app: ShinyAppProc) -> None:
     # There should be no data in the plots
     averages_card.set("Plot Field Uniformity")
     plot_uni_avg = ctrl.OutputUi(page, "show_field_uniformity_over_time_plot")
-    # Needs some waiting until ready... (does not work with timeout...)
-    time.sleep(5)
-    assert "No data to visualise!" in str(plot_uni_avg.loc.text_content())
+    # Use playwright expect to check if there is the expected text (more stable & with timeout option)
+    # expect().* raises AssertionError if fail
+    expect(plot_uni_avg.loc).to_contain_text(
+        expected="No data to visualise!", timeout=5000
+    )
+
     averages_card.set("Plot Field Distortion")
     plot_dist_avg = ctrl.OutputUi(page, "show_field_distortion_over_time_plot")
-    # Needs some waiting until ready... (does not work with timeout...)
-    time.sleep(5)
-    assert "No data to visualise!" in str(plot_dist_avg.loc.text_content())
+    expect(plot_dist_avg.loc).to_contain_text(
+        "No data to visualise!", timeout=5000
+    )
+
     averages_card.set("Table")
     avg_table = ctrl.OutputDataFrame(page, "show_uni_dist_avg_over_time_table")
     avg_table.expect_ncol(0)
