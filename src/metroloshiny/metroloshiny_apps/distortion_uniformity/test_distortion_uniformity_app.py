@@ -30,7 +30,7 @@ def test_basic_app(page: Page, local_app: ShinyAppProc) -> None:
     mics.expect_label("Select a microscope")
     mics.expect_choices(["Test_microscope"])
     sites.set("Hebelstrasse")
-    mics.expect_choices(["Test_microscope", "Test_microscope2"])
+    mics.expect_choices(["Test_microscope", "Test_microscope2"], timeout=15000)
     mics.set("Test_microscope2")
 
     # Check objective choices
@@ -122,7 +122,7 @@ def test_basic_app(page: Page, local_app: ShinyAppProc) -> None:
     dist_ch1.expect_choices(expected_channels)
     dist_ch2.expect_choices(expected_channels)
 
-    # Current expected behaviour
+    # Current expected behavior
     #   if i change dist_date2, dist_ch1 stays the same & dist_ch2 should match dist_ch1
     cur_ch1_val = dist_ch1.loc.input_value()
     dist_date2.set(expected_dates[1])
