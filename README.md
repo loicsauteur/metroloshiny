@@ -134,6 +134,12 @@ Long/short term power measurements are currently only implemented for CSVs gener
    - Save `.yaml` files of the measurements to `./metroloshiny/data/long_term_power_data`
 
 
+> [!WARNING]
+> You can delete entries in the google sheet, and the measurements will not be visible to metroloshiny anymore.
+> However, the measurement (`.yaml`) files will still be present on the server.
+> Uploading data may overwrite existing `.yaml` files (in case of re-uploads, after deleting entries in the google sheet).
+
+
 ## Data visualisation
 
 You have sidebar drop-down selections to filter for a specific microscope entry.
