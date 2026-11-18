@@ -66,15 +66,15 @@ def test_multi_csv_upload_category(
         timeout=15000
     )
     # There should be no buttons etc. there yet
-    assert not csv_remove_low_vals.loc.is_visible()
-    assert not multi_csv_upload_btn.loc.is_visible()
+    expect(csv_remove_low_vals.loc).not_to_be_visible()
+    expect(multi_csv_upload_btn.loc).not_to_be_visible()
 
     # Switch to the right category
     category.set("Long term power")
     csv_remove_low_vals.loc.wait_for(state="visible", timeout=7000)
-    assert csv_remove_low_vals.loc.is_visible()
+    expect(csv_remove_low_vals.loc).to_be_visible()
     # Upload button should still not be visible
-    assert not multi_csv_upload_btn.loc.is_visible()
+    expect(multi_csv_upload_btn.loc).not_to_be_visible()
 
 
 @pytest.mark.manual
@@ -150,10 +150,10 @@ def test_better(page: Page, local_app: ShinyAppProc) -> None:
     x.loc.get_by_text("PSF upload from CSV is not implemented!").wait_for(
         timeout=15000
     )
-    assert csv_file_selector.loc.is_hidden()
+    expect(csv_file_selector.loc).to_be_hidden()
     category.set("Power")
     csv_file_selector.loc.wait_for(timeout=5000)
-    assert csv_file_selector.loc.is_visible()
+    expect(csv_file_selector.loc).to_be_visible()
     csv_file_selector.expect_label("Choose a .csv or .xlsx file")
 
     # Set the file to an example file
