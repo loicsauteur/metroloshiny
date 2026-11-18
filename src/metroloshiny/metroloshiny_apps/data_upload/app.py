@@ -1,8 +1,11 @@
+from pathlib import Path
 from typing import TYPE_CHECKING, Optional, Union
 
 import numpy as np
 import pandas as pd
+import seaborn as sns
 from shiny import reactive
+from shiny import ui as core_ui
 from shiny.express import input, render, ui
 
 if TYPE_CHECKING:
@@ -25,7 +28,11 @@ from metroloshiny.utils.omero_utils import (
     get_images_for_metric,
     get_omero_dates,
 )
-from metroloshiny.utils.read_csv import get_power_measurement
+from metroloshiny.utils.plot_utils import no_data_seaborn
+from metroloshiny.utils.read_csv import (
+    get_power_measurement,
+    read_multi_long_term_thorlabs,
+)
 from metroloshiny.utils.read_file import (
     check_upload_password,
     get_sheet,
@@ -34,6 +41,10 @@ from metroloshiny.utils.read_file import (
 from metroloshiny.utils.write_gspread import (
     make_entries,
     prepare_data_for_entry,
+)
+from metroloshiny.utils.yaml_utils import (
+    create_long_term_power_file_path,
+    power_dataframe_to_yaml,
 )
 
 # Load Data
@@ -44,12 +55,19 @@ sheet_doc = load_doc(dev_local_file=use_dev_local_file)
 # TODO: maybe OMERO metrics via tags?
 #       - PSF/bead images have tags = beads, psf
 #       - Argolight images have tags = fwhm, argolight
+# TODO: implement upload for long term power measurements
+#       - make multi file upload possible for it
+# TODO: notification to reload the page after successful uploads? (to repopulate drop-downs)
+
+# Variables         ----------------------------------------------------------
+path_data = Path(__file__).parents[4] / "data"
+path_data_long_term = path_data / "long_term_power_data"
 
 # Reactive values       ------------------------------------------------------
 sheet_reference = reactive.value(None)
 dataframe = reactive.value(None)
 objective_df = reactive.value(None)
-category_list = ["Power", "PSF", "Uniformity/Distortion"]
+category_list = ["Power", "PSF", "Uniformity/Distortion", "Long term power"]
 site_list = reactive.value([])
 microscope_list = reactive.value([])
 objective_list = reactive.value({})
@@ -185,7 +203,7 @@ with ui.nav_panel(title="Data Upload"):
                 def render_csv_ui_elements():
                     """Show additional elements for the csv upload."""
                     # Specific for Power category
-                    if input.category() == "Power":
+                    if warn_csv() == "":
                         file_name_info = (
                             f"Currently loaded file: {get_csv_file_name()}"
                         )
@@ -224,6 +242,48 @@ with ui.nav_panel(title="Data Upload"):
                         return ""
                     return csv_table_checked, csv_upload_btn
 
+            # Upload multiple CSV       --------------------------------------
+            with ui.nav_panel(title="Upload multiple CSVs"):
+
+                @render.ui
+                def render_multi_csv_file_selector():
+                    """Show CSV input selectors only on Power category."""
+                    message = warn_multi_csv()
+                    if message != "":
+                        return message
+                    # For "all" implemented csv upload categories
+                    return multi_csv_file_selector
+
+                @render.ui
+                def render_multi_csv_ui_elements():
+                    """Show additional elements for the csv upload."""
+                    # Specific for Power category
+                    if warn_multi_csv() == "":
+                        file_name_info = get_multi_csv_file_names()
+
+                        # Show: file name info, numeric input for min value
+                        return (
+                            file_name_info,
+                            ui.div(style="margin-top: 20px;"),
+                            csv_remove_low_vals,
+                            ui.div(style="margin-top: 20px;"),
+                        )
+
+                @render.ui
+                def render_multi_csv_upload_btn():
+                    """Render the multi CSV upload button."""
+                    # Only show the button if there is data
+                    if load_multi_csv_data()[0] is None:
+                        return ""
+                    return multi_csv_upload_btn, ui.div(
+                        style="margin-top: 20px;"
+                    )
+
+                @render.plot
+                def render_preview_plot():
+                    """Preview uploaded data."""
+                    plot = preview_multi_long_term_power_measurements()
+                    return plot
 
 # Table edit & style functions  ----------------------------------------------
 
@@ -531,6 +591,118 @@ def create_omero_table_style() -> Optional[list[dict]]:
 
 
 @reactive.calc
+def preview_multi_long_term_power_measurements():
+    """Create a plot to preview the long term power measurement data.
+
+    Merges the dataframes for previewing the data.
+
+    Returns
+    -------
+    seaborn lineplot
+    """
+    dfs, _, waves, _ = load_multi_csv_data()
+    if dfs is None:
+        return no_data_seaborn("No preview available")
+    # Work on copies
+    _dfs = [df.copy() for df in dfs]
+    # Rename the Power (mW) columns according to the wavelength
+    for df, wave in zip(_dfs, waves, strict=True):
+        df.columns = ["Time (s)", str(wave)]
+    # Merge the dataframes on the Time (s) column
+    merged = (
+        pd.concat([df.set_index("Time (s)") for df in _dfs], axis=1)
+        .sort_index()
+        .reset_index()
+    )
+
+    # Pivot the dataframe
+    merged = merged.melt(
+        id_vars=merged.columns[0], var_name="Wavelength", value_name="mW"
+    )
+    merged = pd.DataFrame(merged)
+    # Make sure the wavelengths are integers
+    merged["Wavelength"] = merged["Wavelength"].astype(int)
+    # Convert to minutes if necessary
+    if merged["Time (s)"].max() > 1000:
+        merged["Time (s)"] = merged["Time (s)"].div(60).round(1)
+        merged.rename(columns={"Time (s)": "Time (min)"}, inplace=True)
+
+    # Create preview plot
+    plot = sns.lineplot(
+        data=merged,
+        markers=False,
+        style=merged.columns[1],
+        dashes=False,
+        x=merged.columns[0],
+        y=merged.columns[2],
+        hue=merged.columns[1],
+        palette="turbo",
+        hue_norm=(380, 700),
+        legend="full",
+    )
+    # Move the legend to the right of the plot
+    legend = plot.get_legend()
+    legend.set_bbox_to_anchor((1.05, 1))
+    legend.set_loc("upper left")
+    plot.get_figure().tight_layout()
+    plot.set_title("Data preview")
+    # Avoid cutting off the title
+    plot.get_figure().subplots_adjust(top=0.93)
+    return plot
+
+
+@reactive.calc
+def load_multi_csv_data():
+    """Load multiple csv files to memory.
+
+    Based on input.multi_csv_file_selector() changes.
+    Loads multiple CSVs, is category dependent,
+    and returns 4 elements.
+
+    Returns
+    -------
+    Optional[list[pd.DataFrame]]
+        List of DataFrames for long term power measurements
+    Optional[list[str]]
+        List of dates (YYYYMMDD)
+    Optional[list[int]]
+        List of wavelengths in nm
+    Optional[float]
+        Measurement interval in second
+    """
+    files = input.multi_csv_file_selector()
+    min_val = input.csv_remove_low_vals()
+    if not files:
+        return None, None, None, None
+
+    if input.category() == "Long term power":
+        try:
+            paths = [x["datapath"] for x in files]
+            # Filter by min value!
+            dfs, dates, waves, interval = read_multi_long_term_thorlabs(paths)
+            filtered_dfs = []
+            for df in dfs:
+                _df = pd.DataFrame(df).copy()
+                _df = _df[_df[["Power (mW)"]].gt(min_val).any(axis="columns")]
+                filtered_dfs.append(_df)
+            return filtered_dfs, dates, waves, interval
+        except Exception as err:
+            ui.notification_show(
+                f"Error: {err}", type="error", id="load_multi_csv"
+            )
+            return None, None, None, None
+
+    else:
+        # TODO implement also other categories
+        # Currently give only a warning
+        ui.notification_show(
+            f"CSV upload for {input.category()} is not implemented!",
+            type="error",
+        )
+        return None, None, None, None
+
+
+@reactive.calc
 def load_csv_data() -> tuple[str, pd.DataFrame]:
     """Load and try parse a csv file.
 
@@ -583,7 +755,7 @@ def cpt_select_objective() -> pd.DataFrame:
     """First part to create the power measurement data part of the table.
 
     cpt = create_power_table
-    Check if the dataframe contains measurements for multiple objectes &
+    Check if the dataframe contains measurements for multiple objectives &
     selects only one
 
     1. element in chained reactive calcs
@@ -743,6 +915,268 @@ def get_csv_file_name() -> str:
     if not input.csv_file_selector():
         return "No file loaded"
     return input.csv_file_selector()[0]["name"]
+
+
+@reactive.calc
+def get_multi_csv_file_names():
+    """Return the loaded csv file names."""
+    files = input.multi_csv_file_selector()
+    if not files:
+        return ui.HTML("<p>Selected files: No file loaded</p>")
+    # Create HTML bullet point list for all files
+    txt = "<p>Selected files:</p><ul>"
+    for f in files:
+        txt = txt + f"<li>{f['name']}</li>"
+    txt = txt + "</ul>"
+    return ui.HTML(txt)
+
+
+@reactive.effect
+@reactive.event(input.multi_csv_upload_btn)
+def upload_multi_csv_data():
+    """Upload the data from the multi csv upload tab."""
+    # Prevent upload when working with local file
+    if sheet_reference.get() is None:
+        ui.notification_show(
+            "Can't upload data when working with local file",
+            type="error",
+            id="multi_csv_upload",
+        )
+        return
+
+    # Get the microscope entries                ##############################
+    _site, _mic, _obj, _info = get_common_column_values()
+    # Return if an entry needs to be adjusted
+    for i in [_site, _mic, _obj, _info]:
+        if i.startswith("Please"):
+            return
+
+    # Check the upload password                  #############################
+    pwd = input.upload_pwd()
+    if pwd == "" or not check_upload_password(pwd):
+        ui.notification_show(
+            "Please provide the correct password for upload!", type="error"
+        )
+        return
+
+    # Category based upload         ==========================================
+    if input.category() == "Long term power":
+        # Create data directory if necessary -> expects the parent folder (./metroloshiny/data) to exist
+        try:
+            path_data_long_term.mkdir(exist_ok=True)
+        except Exception:
+            ui.notification_show(
+                "Cannot upload! Please make sure that the folder "
+                f"<{path_data_long_term.parent}> exists. "
+                "Error message: {err}",
+                type="error",
+            )
+            return
+
+        # Init "Wait dialog"
+        wfu = ui.modal(
+            "Please wait",
+            title="Upload in progress...",
+            easy_close=False,
+            footer=None,
+        )
+
+        # Get the data to be written        ##################################
+        dfs, dates, waves, interval = load_multi_csv_data()
+        # Sanity check
+        if None in [dfs, dates, waves, interval]:
+            ui.notification_show(
+                "No data to upload.", type="error", id="long_term_upload"
+            )
+            return
+
+        # Prepare what needs to be uploaded to the google sheet
+        google_dfs = prepare_long_term_sheet_tables(
+            _site, _mic, _obj, _info, interval, waves, dates
+        )
+
+        # Show wait dialog for tasks which connect to google (i.e. take long)
+        ui.modal_show(wfu)
+
+        # Check if entries to google sheet can be made      ##################
+        for g_df in google_dfs:
+            possible, error = make_entries(
+                sheet=sheet_reference.get(), data=g_df, check_only=True
+            )
+            if not possible:
+                ui.modal_remove()
+                ui.notification_show(
+                    f"Error: {error}", type="error", id="long_term_upload"
+                )
+                return
+
+        # Get a list of existing yaml file paths,       ######################
+        # to inform which files are overwritten
+        file_paths = []
+        for date, wave in zip(dates, waves, strict=True):
+            file_paths.append(
+                create_long_term_power_file_path(
+                    str(path_data_long_term),
+                    _site,
+                    _mic,
+                    _obj,
+                    _info,
+                    interval,
+                    wave,
+                    date,
+                )
+            )
+        existing_paths = []
+        for p in file_paths:
+            if Path(p).exists():
+                existing_paths.append(p)
+
+        # Upload information to spreadsheet     ##############################
+        try:
+            for g_df in google_dfs:
+                make_entries(sheet=sheet_reference.get(), data=g_df)
+
+            ui.modal_remove()
+            ui.notification_show(
+                "Successfully uploaded the data to the spreadsheet!",
+                type="message",  # no id on purpose
+            )
+        except Exception as err:
+            # Should not get errors, since checked above...
+            ui.modal_remove()
+            ui.notification_show(
+                f"Upload error:\n{err!s}", type="error"
+            )  # no id on purpose
+            return
+
+        # Create/save yaml files        ######################################
+        file_paths = []
+        for df, date, wave in zip(dfs, dates, waves, strict=True):
+            try:
+                # With overwrite option active
+                file_paths.append(
+                    power_dataframe_to_yaml(
+                        str(path_data_long_term),
+                        df,
+                        _site,
+                        _mic,
+                        _obj,
+                        _info,
+                        interval,
+                        wave,
+                        date,
+                        overwrite=True,
+                    )
+                )
+            except Exception as err:
+                ui.notification_show(
+                    f"Error: {err}",
+                    type="error",
+                    id="long_term_upload",
+                )
+                # Inform if some files have been saved
+                if len(file_paths) > 0:
+                    file_names = [Path(p).name for p in file_paths]
+                    ui.notification_show(
+                        f"Following files were saved: {file_names}",
+                        type="warning",  # no id on purpose
+                    )
+                return
+
+        # Inform on overwritten files & success         ######################
+        if len(existing_paths) > 0:
+            file_names = [Path(p).name for p in existing_paths]
+            ui.notification_show(
+                f"Following files were overwritten: {file_names}",
+                type="warning",
+            )
+
+        ui.notification_show(
+            "Long term power measurement files have been written!",
+            type="message",
+            id="long_term_upload",
+        )
+
+    else:
+        # Should not get here...
+        raise RuntimeError(
+            f"Upload for {input.category()} is not implemented!"
+        )
+
+
+def prepare_long_term_sheet_tables(
+    cur_site: str,
+    cur_mic: str,
+    cur_obj: str,
+    cur_info: str,
+    cur_interval: float,
+    wavelengths: list[int],
+    dates: list[str],
+) -> list[pd.DataFrame]:
+    """Create dataframes for long term power upload to google sheets.
+
+    Dataframes will have the same 'common' columns as in the google sheet.
+    One dataframe per date.
+
+    Parameters
+    ----------
+    cur_site : str
+        Currently selected site
+    cur_mic : str
+        Currently selected microscope
+    cur_obj : str
+        Currently selected objective
+    cur_info : str
+        Current information string
+    cur_interval : float
+        Measurement interval in seconds
+    wavelengths : list[int]
+        List of wavelengths in nm
+    dates : list[str]
+        List of dates in YYYYMMDD format
+
+    Returns
+    -------
+    list[pd.DataFrame]
+        DataFrames with same columns as in the google spread sheet.
+        One dataframe per unique date.
+    """
+    common_cols = [
+        "Site",
+        "Microscope",
+        "Objective",
+        "Info",
+        "Wavelength",
+        "Interval",
+    ]
+    unique_dates = np.unique(np.asarray(dates))
+
+    dfs = []
+    for w, d in zip(wavelengths, dates, strict=True):
+        row = {
+            "Site": [cur_site],
+            "Microscope": [cur_mic],
+            "Objective": [cur_obj],
+            "Info": [cur_info],
+            "Wavelength": [w],
+            "Interval": [f"{cur_interval}s"],
+            d: [f"some_path-{d}"],
+        }
+        dfs.append(pd.DataFrame().from_dict(row))
+    # Merge the individual dataframes
+    if len(dfs) > 1:
+        df = pd.concat(dfs, ignore_index=True)
+    else:
+        df = dfs
+    dfs = []
+
+    # Split the dataframes into ones per data
+    for d in unique_dates:
+        cols = common_cols.copy()
+        cols.append(d)
+        dfs.append(df[cols].dropna(axis=0, how="any"))
+
+    return dfs
 
 
 @reactive.effect
@@ -1184,6 +1618,29 @@ def warn_csv() -> str:
     cat = input.category()
     if cat not in ["Power"]:
         message = f"{cat} upload from CSV is not implemented!"
+        if cat == "Long term power":
+            ui.notification_show(
+                "To upload Long/short term power measurements, please select: 'Upload multiple CSVs'",
+                type="message",
+            )
+        else:
+            ui.notification_show(message, type="warning")
+        return message
+    return ""
+
+
+@reactive.calc
+def warn_multi_csv() -> str:
+    """Warn if multi csv upload for selected category is not implemented.
+
+    Returns
+    -------
+    str
+        Message if warning; empty str if no warning
+    """
+    cat = input.category()
+    if cat not in ["Long term power"]:
+        message = f"{cat} upload for multiple CSVs is not implemented!"
         ui.notification_show(message, type="warning")
         return message
     return ""
@@ -1455,14 +1912,39 @@ def check_new_text_entry(
     cur_entry : str
         Of the text field
     existing : list[str] or dict
-        List of drop-down choices (FYI dict for objectives)
+        List of drop-down choices (FYI dict for objectives, otherwise plain list)
     id : str
-        Drop-down category (e.g. site, microscope, ...) for notifications
+        Drop-down category (e.g. site, microscope, ...), used for notifications
 
     Returns
     -------
     str
-        "final choice" or what needs to be entered into the table.
+        - e.g. "Hebelstrasse" for a  "* New site *",
+        - or if it needs to be defined or modified, i.e. "Please *".
+
+    Examples
+    --------
+    >>> check_new_text_entry(
+    ...     cur_sel="* New site *",
+    ...     cur_entry="Enter name for a new site",
+    ...     existing=["Mattenstrasse"],
+    ...     id="site",
+    ... )
+    'Please define!'
+    >>> check_new_text_entry(
+    ...     cur_sel="* New site *",
+    ...     cur_entry="Hebelstrasse",
+    ...     existing=["Mattenstrasse"],
+    ...     id="site",
+    ... )
+    'Hebelstrasse'
+    >>> check_new_text_entry(
+    ...     cur_sel="Mattenstrasse",
+    ...     cur_entry="Enter name for a new site",
+    ...     existing=["Mattenstrasse"],
+    ...     id="site",
+    ... )
+    'Mattenstrasse'
     """
     # Convert existing to list if dict
     if isinstance(existing, dict):
@@ -1543,6 +2025,12 @@ omero_upload_btn = ui.input_action_button(
 )
 
 # CSV data upload elements      #################
+multi_csv_file_selector = ui.input_file(
+    "multi_csv_file_selector",
+    "Select multiple .csv files",
+    multiple=True,
+    accept=[".csv"],
+)
 csv_file_selector = ui.input_file(
     "csv_file_selector",
     "Choose a .csv or .xlsx file",
@@ -1567,3 +2055,19 @@ csv_table_checked = ui.input_checkbox(
     "csv_table_checked", "Checked and ready for upload?", False
 )
 csv_upload_btn = ui.input_action_button("csv_upload_btn", "Upload CSV data")
+csv_remove_low_vals = (
+    ui.input_numeric(
+        "csv_remove_low_vals",
+        core_ui.tooltip(
+            core_ui.span("Remove entries below x mW ⓘ"),
+            "Removes all data points below entered value. Use with caution, suggested value = 0.1",
+            placement="right",
+            id="low_vals_tip",
+        ),
+        0.0,
+        step=0.1,
+    ),
+)
+multi_csv_upload_btn = ui.input_action_button(
+    "multi_csv_upload_btn", "Upload CSV data"
+)

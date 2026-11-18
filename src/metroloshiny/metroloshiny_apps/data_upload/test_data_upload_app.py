@@ -3,9 +3,17 @@
 from pathlib import Path
 
 import pytest
-from playwright.sync_api import Page
+from playwright.sync_api import Page, expect
 from shiny.playwright import controller as ctrl
 from shiny.run import ShinyAppProc
+
+# Common variables
+_expected_categories = [
+    "Power",
+    "PSF",
+    "Uniformity/Distortion",
+    "Long term power",
+]
 
 
 @pytest.mark.manual
@@ -25,6 +33,51 @@ def test_basic_app(page: Page, local_app: ShinyAppProc) -> None:
 
 
 @pytest.mark.manual
+def test_multi_csv_upload_category(
+    page: Page, local_app: ShinyAppProc
+) -> None:
+    """Test only parts for the multi_csv_upload.
+
+    FYI: this test runs on the local file!
+    """
+    # Navigate to the app URL when it's ready
+    page.goto(local_app.url)
+
+    # Check category choices
+    category = ctrl.InputSelect(page, "category")
+    category.expect_label("Select a Metrology Category")
+    category.expect_choices(_expected_categories)
+
+    # Make sure the Power category is selected
+    category.set("Power")
+
+    # Get the references for multi csv upload ui items
+    csv_remove_low_vals = ctrl.InputNumeric(page, "csv_remove_low_vals")
+    # Upload button only shown when files are selected
+    multi_csv_upload_btn = ctrl.InputActionButton(page, "multi_csv_upload_btn")
+
+    # Switch to the "Upload multiple CSVs", i.e. click it
+    page.get_by_text("Upload multiple CSVs", exact=True).click()
+
+    # Check for the 'not implemented' string
+    x = ctrl.OutputUi(page, "render_multi_csv_file_selector")
+    # If wrong text -> time out error
+    x.loc.get_by_text("upload for multiple CSVs is not implemented!").wait_for(
+        timeout=15000
+    )
+    # There should be no buttons etc. there yet
+    assert not csv_remove_low_vals.loc.is_visible()
+    assert not multi_csv_upload_btn.loc.is_visible()
+
+    # Switch to the right category
+    category.set("Long term power")
+    csv_remove_low_vals.loc.wait_for(state="visible", timeout=7000)
+    assert csv_remove_low_vals.loc.is_visible()
+    # Upload button should still not be visible
+    assert not multi_csv_upload_btn.loc.is_visible()
+
+
+@pytest.mark.manual
 def test_better(page: Page, local_app: ShinyAppProc) -> None:
     """Test more extensively.
 
@@ -36,7 +89,7 @@ def test_better(page: Page, local_app: ShinyAppProc) -> None:
     # Check category choices
     category = ctrl.InputSelect(page, "category")
     category.expect_label("Select a Metrology Category")
-    category.expect_choices(["Power", "PSF", "Uniformity/Distortion"])
+    category.expect_choices(_expected_categories)
 
     # Check site selections
     site = ctrl.InputSelect(page, "site")
@@ -78,11 +131,13 @@ def test_better(page: Page, local_app: ShinyAppProc) -> None:
     x.loc.get_by_text("Power upload from OMERO is not implemented!").wait_for(
         timeout=5000
     )
-    assert not dataset_id_selector.loc.is_visible()
+    expect(dataset_id_selector.loc).not_to_be_visible()
     category.set("PSF")
-    dataset_id_selector.loc.wait_for(state="visible", timeout=5000)
-    assert dataset_id_selector.loc.is_visible()
-    assert image_id_selector.loc.is_visible()
+    dataset_id_selector.loc.wait_for(state="visible", timeout=7000)
+    # Use the playwright expect to make test run more consistently (it has a timeout option)
+    # (Raises AssertionError)
+    expect(dataset_id_selector.loc).to_be_visible(timeout=7000)
+    expect(image_id_selector.loc).to_be_visible(timeout=7000)
 
     # Check some CSV stuff
     # Still PSF category
@@ -110,7 +165,7 @@ def test_better(page: Page, local_app: ShinyAppProc) -> None:
         / "power_at_objective_examples"
         / "example_simple_power_measurement.xlsx"
     )
-    print(path)
+    # print(path)
     assert path.exists()
     table.expect_ncol(0)
     table.expect_nrow(0)
