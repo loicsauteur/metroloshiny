@@ -18,9 +18,6 @@ from metroloshiny.utils.setting_utils import (
     try_connect_omero,
 )
 
-# Idea new: on file change (reactive file reader) show modal popup to authenticate?
-
-
 # Get the private data file
 data_dir = get_data_folder()
 data_file = data_dir / "private_data.csv"
@@ -461,6 +458,11 @@ def check_google_connection():
             type="warning",
             id="warn_json",
         )
+    # Convert relative paths to absolute
+    if _path.startswith("./"):
+        _path = str(get_data_folder().parent / _path.replace("./", ""))
+        ui.update_text("input_g_json", value=_path)
+
     if _url == "":
         ui.notification_show(
             "Please provide a google sheet URL", type="error", id="warn_url"
