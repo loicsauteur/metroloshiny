@@ -35,17 +35,19 @@ It makes use of a google sheet as "database", where new metrology measurements c
    2. [Opening the port](#Opening-the-port)
    3. [Shiny Server configuration](#Shiny-Server-configuration)
    4. [Getting metroloshiny](#Getting-metroloshiny)
-      1. [Configure private_data csv file](#Configure-private_data-csv-file)
+      1. [Configure metroloshiny](#Configure-metroloshiny)
    5. [Deploying the Shiny apps](#Deploying-the-Shiny-apps)
       1. [Deployment automation with pixi](#Deployment-automation-with-pixi)
-      2. [Updating metroloshiny](#Updating-metroloshiny)
+      2. [Manual deployment](#Manual-deployment)
+      3. [Updating metroloshiny](#Updating-metroloshiny)
 
 
 # Usage
 
-As of metroloshiny v0.2.0, it can be used for the visualisation of:
+As of metroloshiny v0.2.2, it can be used for the visualisation of:
 - PSF measurements
 - Light source power measurements
+- Field Uniformity and Distortion
 
 The welcome page (server-address:3838) provides links to the different visualisation apps as well as the upload app.
 
@@ -68,7 +70,7 @@ Alternatively, new entries (e.g. for a new microscope) can be specified by selec
 Upload is protected by password, which is configured in the `private_data.csv` [see here](#Configure-private_data-csv-file).
 
 > [!TIP]
-> * Providing some information for the `Info` columns is necessary.
+> Providing information for the `Info` columns is necessary.
 
 ### Data upload for PSF measurements
 
@@ -121,6 +123,7 @@ Follow the instruction for [PSF upload](#Data-upload-for-PSF-measurements), but 
 ### Data upload for long and short term power measurements
 
 Long/short term power measurements are currently only implemented for CSVs generated with a ThorLabs power meter.
+Intended for power measurements at the objective for an extended period of time (e.g. for 2h with measurements every 30 seconds). This, to simulate light stability during a time-lapse (light source on/off cycling), or keeping the light on continuously during the measurement period.
 
 1. Select the Metrology Category: `Long term power`
 2. Select the `Upload multiple CSVs` tab
@@ -134,7 +137,7 @@ Long/short term power measurements are currently only implemented for CSVs gener
    - Save `.yaml` files of the measurements to `./metroloshiny/data/long_term_power_data`
 
 
-> [!WARNING]
+> [!IMPORTANT]
 > You can delete entries in the google sheet, and the measurements will not be visible to metroloshiny anymore.
 > However, the measurement (`.yaml`) files will still be present on the server.
 > Uploading data may overwrite existing `.yaml` files (in case of re-uploads, after deleting entries in the google sheet).
@@ -145,6 +148,10 @@ Long/short term power measurements are currently only implemented for CSVs gener
 You have sidebar drop-down selections to filter for a specific microscope entry.
 
 Different cards will give you graphs and additional filtering options.
+
+Most graphs are interactive ([plotly plots](https://plotly.com/examples/)):
+- with hover-over information
+- highlight specific entries via the legend
 
 ----
 
@@ -198,7 +205,7 @@ See also [here](https://docs.gspread.org/en/latest/oauth2.html#for-bots-using-se
 5. Select JSON key type and press “Create” -> downloads a json file. Also remember the service email address
 6. Share the google sheet with the service email address created above
 7. **Optional:** Move the downloaded file to `~/.config/gspread/service_account.json`. Windows users should put this file to `%APPDATA%\gspread\service_account.json`.
-8. I suggest you put the `service_account.json` somewhere you will remember, you will also need the file on the Linux server.
+8. I suggest: put the `service_account.json` somewhere you will remember, you will also need a copy of the file on your Linux server.
 
 # Running locally
 
@@ -370,46 +377,48 @@ cd metroloshiny
 pixi install
 ```
 
-### Configure private_data csv file
+### Configure metroloshiny
 
-You can find an example `example_files/private_data_example.csv`.
+Once metroloshiny is online, you can set the metroloshiny settings in the Settings app.
 
-This file is needed for metroloshiny. It contains information to access e.g. the google sheets, or OMERO.
-This information is stored in this file as comma-separated key value pairs.
+The Settings app can be accessed via the metroloshiny landing page (server-address:3838), and clicking on the gear icon.
 
-The file should be located as follows:
-`/path/to/metroloshiny/data/private_data.csv`
+On new instances, you will be asked to set a 'Settings password'. This password is for accessing and modifying the metroloshiny settings.
 
-- GoogleServiceEmail: service email address created in the [Google service account](#Google-service-account)
-- PathToServiceAccountJSON: full path to your `service_account.json` (**you need to save a copy somewhere on your server**)
-- Sheet ID: Google sheet ID
-- Sheet URL: URL to the google sheet
-- Upload password: A password you define, used for uploading data from the metroloshiny app to your google sheet
+Within the metroloshiny Settings, you can:
 
-OMERO entries are optional, in case you want to retrieve data saved on OMERO.
+1. `Settings Password`: Change the password for the Settings (optional)
+2. `Upload Password`: Set a password for uploading data (mandatory)
+3. `Google`: Set the google settings (mandatory)
+   - `Google Service Email`: email-address (optional), see [here](#Google-service-account)
+   - `Path to Service Account JSON file`: full path to your `service_account.json` (copied on your server) (mandatory)
+   - `Google spreadsheet URL`: URL to the metrology google spreadsheet (mandatory)
+4. `OMERO`: Set the OMERO access settings (optional)
+   - `OMERO HOST`: URL to your OMERO instance
+   - `OMERO PORT`: default 4064
+   - `OMERO User`: OMERO user that has access to relevant images
+   - `OMERO Password`: Password for the OMERO User
 
-- OMERO HOST: OMERO web-address
-- OMERO PORT: OMERO port
-- OMERO USER: OMERO user name (e.g. user locally created for your OMERO group)
-- OMERO PASSWORD: OMERO password for user
+To save / update the settings, make sure to check the individual sections by clicking the corresponding `Check` buttons, before clicking the `Save settings` button.
 
-If the default location `path/to/metroloshiny/data/private_data.csv` is not suitable for running on your server, you have to specify the path within the code in `src/metroloshiny/utils/read_file.py`, line 10-13:
+> [!CAUTION]
+> All settings are saved to `/path/to/metroloshiny/data/private_data.csv`.
 
-Attention: this has not been tested!
-
-```python
-# Path of the private_data.csv file on the linux server
-__linux_private_data_path__ = (
-    "/absolute/path/to/private_data.csv"
-)
-```
-<!--
-THIS NEEDS TO BE FIXED FROM MY SIDE... MAYBE I CAN:
-   - I'd like to keep it the way it is. Basically, using the folder metroloshiny/data
-   - This folder is also used for long/short term power measurement data upload
--->
+> [!TIP]
+> Place the service_account.json in `/path/to/metroloshiny/data`, and specify the `Path to Service Account JSON file` accordingly.
+> Alternatively, if the file is in `~/.config/gspread/service_account.json` (or `%APPDATA%\gspread\service_account.json` on Windows), you can leave `Path to Service Account JSON file` empty.
 
 ## Deploying the Shiny apps
+
+### Deployment automation with pixi
+
+There is a pixi task for automatic deployment.
+
+run: `pixi run deploy`
+within your metroloshiny directory.
+
+
+### Manual deployment
 
 As described in the [official documentation](https://shiny.posit.co/py/get-started/deploy-on-prem.html#place-application-files): A Shiny app `app.py` must be located in the shiny-server folder. I.e. Clear out the contents of `/srv/shiny-server/` and replace it with your own app(s).
 
@@ -432,30 +441,11 @@ Finally, **restart the shiny-server**:
 
 `sudo systemctl restart shiny-server`
 
-### Deployment automation with pixi
-
-For testing code modification it can be useful to create a pixi task:
-
-run: `pixi run deploy`
-
-Please adjust your task accordingly:
-
-`deploy = "sudo rm -r /srv/shiny-server/power_at_objective;sudo cp -R /users/stud/s/sautlo01/metroloshiny/src/metroloshiny/power_at_objective /srv/shiny-server/power_at_objective/;sudo systemctl restart shiny-server"`
-
-In case you changed the dependencies, update also your python environment:
-
-`pixi install`
-
 ### Updating metroloshiny
 
-Keep pixi up to date:
+(Optional) Keep pixi up to date with: `pixi self-update`
 
-`pixi self-update`
-
-Update as follows (using deployment automation):
-<!--
-'clean' and 'clean cache' will ensure proper version display
--->
+Update metroloshiny:
 
 ```bash
 git pull
