@@ -1152,6 +1152,11 @@ def prepare_long_term_sheet_tables(
 
     dfs = []
     for w, d in zip(wavelengths, dates, strict=True):
+        # Create file name to add as cell value
+        f_name = create_long_term_power_file_path(
+            "./", cur_site, cur_mic, cur_obj, cur_info, cur_interval, w, d
+        )
+        f_name = Path(f_name).name
         row = {
             "Site": [cur_site],
             "Microscope": [cur_mic],
@@ -1159,7 +1164,7 @@ def prepare_long_term_sheet_tables(
             "Info": [cur_info],
             "Wavelength": [w],
             "Interval": [f"{cur_interval}s"],
-            d: [f"some_path-{d}"],
+            d: [f_name],
         }
         dfs.append(pd.DataFrame().from_dict(row))
     # Merge the individual dataframes
