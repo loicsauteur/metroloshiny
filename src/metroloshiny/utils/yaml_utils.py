@@ -29,7 +29,7 @@ def create_long_term_power_file_path(
     objective: str,
     info: str,
     interval: float,
-    wavelength: float,
+    wavelength: int,
     date: str,
 ) -> str:
     """Create the YAML file path for the long term power measurement.
@@ -86,7 +86,7 @@ def read_long_term_power_yaml(
     objective: str,
     info: str,
     interval: float,
-    wavelength: float,
+    wavelength: int,
     date: str,
 ) -> pd.DataFrame:
     """Read a long term power measurement YAML file.
