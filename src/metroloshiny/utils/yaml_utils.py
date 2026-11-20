@@ -61,11 +61,11 @@ def create_long_term_power_file_path(
 
     Raises
     ------
-    IOError
+    NotADirectoryError
         If path is not a directory
     """
     if not Path(path).is_dir():
-        raise IOError(f"Path is not a directory {path}")
+        raise NotADirectoryError(f"Path is not a directory {path}")
 
     # Convert spaces to dashes
     site = site.replace(" ", "-")

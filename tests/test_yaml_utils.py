@@ -43,7 +43,7 @@ def test_power_dataframe_to_yaml():
 
         # Test error for overwriting an existing file
         with pytest.raises(
-            IOError, match=r"The measurement file already exists."
+            FileExistsError, match=r"The measurement file already exists."
         ):
             yu.power_dataframe_to_yaml(
                 path=save_dir,
@@ -96,7 +96,7 @@ def test_create_long_term_power_file_path():
     assert file == expected, f"Path was {file}, not {expected}"
 
     # Check for error - if path is not a directory
-    with pytest.raises(IOError, match=r"Path is not a directory*"):
+    with pytest.raises(NotADirectoryError, match=r"Path is not a directory*"):
         yu.create_long_term_power_file_path(
             save_dir + "somefile.txt",
             "Basel",
