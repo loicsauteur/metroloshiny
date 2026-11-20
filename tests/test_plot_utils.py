@@ -53,5 +53,27 @@ def test_normalize_df():
     assert_frame_equal(df, out)
 
 
+def test_nm_to_rgb():
+    """Test the nm_to_rgb() function.
+
+    Using values I got from the web-tool where the code is from:
+    https://academo.org/demos/wavelength-to-colour-relationship/
+    """
+    r, g, b = pu.nm_to_rgb(500)
+    assert round(r, 2) == 0.00
+    assert round(g, 2) == 1.00
+    assert round(b, 2) == round(146 / 255, 2), f"{[r, g, b]}"
+
+    r, g, b = pu.nm_to_rgb(400)
+    assert round(r, 2) == round(131 / 255, 2), f"{[r, g, b]}"
+    assert round(g, 2) == 0.00, f"{[r, g, b]}"
+    assert round(b, 2) == round(181 / 255, 2), f"{[r, g, b]}"
+
+    r, g, b = pu.nm_to_rgb(600)
+    assert round(r, 2) == 1.00, f"{[r, g, b]}"
+    assert round(g, 2) == round(190 / 255, 2), f"{[r, g, b]}"
+    assert round(b, 2) == 0.00, f"{[r, g, b]}"
+
+
 if __name__ == "__main__":
     pass

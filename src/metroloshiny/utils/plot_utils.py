@@ -10,7 +10,7 @@ from plotly.graph_objects import Figure
 
 
 def normalize_percentile(values, low: int = 1, high: int = 99) -> list:
-    """Normalise percitenile.
+    """Normalize percentile.
 
     Parameters
     ----------
@@ -24,7 +24,7 @@ def normalize_percentile(values, low: int = 1, high: int = 99) -> list:
     Returns
     -------
     list
-        Normalised values
+        Normalized values
     """
     vmin, vmax = np.nanpercentile(values, q=[low, high])
     return np.clip((values - vmin) / (vmax - vmin), a_min=0, a_max=1)
@@ -242,3 +242,69 @@ def add_center_cross_plotly(
             row=row,
             col=col,
         )
+
+
+def nm_to_rgb(
+    wave: int, gamma: float = 0.8, intensity_max: float = 1.0
+) -> list[float]:
+    """Convert a wavelength to RGB values.
+
+    Function from https://academo.org/demos/wavelength-to-colour-relationship/
+
+    Parameters
+    ----------
+    wave : int
+        Wavelength in nm
+    gamma : float
+        Correction factor. Default = 0.8
+    intensity_max : float
+        Scaling factor (to scale e.g. to values between 0-255). Default = 1
+
+    Returns
+    -------
+    list[float]
+        for RGB values in range 0-1
+    """
+    # FIXME add min max limits 380-780
+    # Base color by wavelength
+    if 380 <= wave < 440:
+        red = -(wave - 440) / (440 - 380)
+        green = 0.0
+        blue = 1.0
+    elif 440 <= wave < 490:
+        red = 0.0
+        green = (wave - 440) / (490 - 440)
+        blue = 1.0
+    elif 490 <= wave < 510:
+        red = 0.0
+        green = 1.0
+        blue = -(wave - 510) / (510 - 490)
+    elif 510 <= wave < 580:
+        red = (wave - 510) / (580 - 510)
+        green = 1.0
+        blue = 0.0
+    elif 580 <= wave < 645:
+        red = 1.0
+        green = -(wave - 645) / (645 - 580)
+        blue = 0.0
+    elif 645 <= wave < 781:
+        red = 1.0
+        green = 0.0
+        blue = 0.0
+    else:
+        red = green = blue = 0.0
+
+    # Let the intensity fall off near the vision limits
+    if 380 <= wave < 420:
+        factor = 0.3 + 0.7 * (wave - 380) / (420 - 380)
+    elif 420 <= wave < 701:
+        factor = 1.0
+    elif 701 <= wave < 781:
+        factor = 0.3 + 0.7 * (780 - wave) / (780 - 700)
+    else:
+        factor = 0.0
+
+    def scale(c):
+        return round(intensity_max * (c * factor) ** gamma, 2) if c != 0 else 0
+
+    return [scale(red), scale(green), scale(blue)]
