@@ -1145,8 +1145,8 @@ def prepare_long_term_sheet_tables(
         "Microscope",
         "Objective",
         "Info",
-        "Wavelength",
         "Interval",
+        "Wavelength",
     ]
     unique_dates = np.unique(np.asarray(dates))
 
@@ -1162,8 +1162,8 @@ def prepare_long_term_sheet_tables(
             "Microscope": [cur_mic],
             "Objective": [cur_obj],
             "Info": [cur_info],
-            "Wavelength": [w],
             "Interval": [f"{cur_interval}s"],
+            "Wavelength": [w],
             d: [f_name],
         }
         dfs.append(pd.DataFrame().from_dict(row))
@@ -1832,7 +1832,7 @@ def check_channel_names_provided(df: pd.DataFrame) -> bool:
     ori_ch_names = list(np.unique(np.asarray(ori_df["Channel"].astype(str))))
     entered_ch_names = list(np.unique(np.asarray(df["Channel"])))
 
-    # Intermediate check if channel name was entere twice
+    # Intermediate check if channel name was entered twice
     occurrence = {}
     for ch in entered_ch_names:
         occurrence[ch] = list(np.asarray(df["Channel"])).count(ch)
