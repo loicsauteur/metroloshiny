@@ -60,19 +60,29 @@ def test_nm_to_rgb():
     https://academo.org/demos/wavelength-to-colour-relationship/
     """
     r, g, b = pu.nm_to_rgb(500)
-    assert round(r, 2) == 0.00
-    assert round(g, 2) == 1.00
-    assert round(b, 2) == round(146 / 255, 2), f"{[r, g, b]}"
+    assert r == 0
+    assert g == 255
+    assert b == 146
 
     r, g, b = pu.nm_to_rgb(400)
-    assert round(r, 2) == round(131 / 255, 2), f"{[r, g, b]}"
-    assert round(g, 2) == 0.00, f"{[r, g, b]}"
-    assert round(b, 2) == round(181 / 255, 2), f"{[r, g, b]}"
+    assert r == 131
+    assert g == 0
+    assert b == 181
 
     r, g, b = pu.nm_to_rgb(600)
-    assert round(r, 2) == 1.00, f"{[r, g, b]}"
-    assert round(g, 2) == round(190 / 255, 2), f"{[r, g, b]}"
-    assert round(b, 2) == 0.00, f"{[r, g, b]}"
+    assert r == 255
+    assert g == 190
+    assert b == 0
+
+    r, g, b = pu.nm_to_rgb(9000)
+    assert r == 0
+    assert g == 0
+    assert b == 0
+
+    r, g, b = pu.nm_to_rgb(90)
+    assert r == 0
+    assert g == 0
+    assert b == 0
 
 
 if __name__ == "__main__":

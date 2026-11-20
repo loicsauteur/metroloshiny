@@ -245,9 +245,9 @@ def add_center_cross_plotly(
 
 
 def nm_to_rgb(
-    wave: int, gamma: float = 0.8, intensity_max: float = 1.0
+    wave: int, gamma: float = 0.8, intensity_max: int = 255
 ) -> list[float]:
-    """Convert a wavelength to RGB values.
+    """Convert a wavelength (range 380-780nm) to RGB values.
 
     Function from https://academo.org/demos/wavelength-to-colour-relationship/
 
@@ -257,15 +257,14 @@ def nm_to_rgb(
         Wavelength in nm
     gamma : float
         Correction factor. Default = 0.8
-    intensity_max : float
-        Scaling factor (to scale e.g. to values between 0-255). Default = 1
+    intensity_max : int
+        Scaling factor (to scale e.g. to values between 0-255). Default = 255
 
     Returns
     -------
-    list[float]
-        for RGB values in range 0-1
+    list[int]
+        for RGB values in range 0-255
     """
-    # FIXME add min max limits 380-780
     # Base color by wavelength
     if 380 <= wave < 440:
         red = -(wave - 440) / (440 - 380)
@@ -305,6 +304,6 @@ def nm_to_rgb(
         factor = 0.0
 
     def scale(c):
-        return round(intensity_max * (c * factor) ** gamma, 2) if c != 0 else 0
+        return round(intensity_max * (c * factor) ** gamma) if c != 0 else 0
 
     return [scale(red), scale(green), scale(blue)]
