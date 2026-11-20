@@ -142,6 +142,7 @@ def test_read_long_term_power_yaml():
             wavelength=wave,
             date=date,
         )
+        # Read file with all parameters in use
         df = yu.read_long_term_power_yaml(
             save_dir,
             site="Hebelstrasse",
@@ -156,6 +157,23 @@ def test_read_long_term_power_yaml():
         assert len(df.columns) == len(df_ori.columns)
         for col in df.columns:
             assert col in df_ori.columns
+
+        # Read file with absolute path
+        df = yu.read_long_term_power_yaml(out_file)
+        assert len(df) == len(df_ori)
+        assert len(df.columns) == len(df_ori.columns)
+        for col in df.columns:
+            assert col in df_ori.columns
+
+        # Test for error when path = directory and other parameters are not specified correctly
+        with pytest.raises(
+            TypeError,
+            match=r"`path` is a directory therefore other parameters are not optional*",
+        ):
+            yu.read_long_term_power_yaml(
+                save_dir,
+                site="Hebelstrasse",
+            )
 
     finally:
         # Delete the written file

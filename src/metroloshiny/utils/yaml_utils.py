@@ -16,7 +16,7 @@ Writing long (/short) term power measurement yaml files:
 """
 
 from pathlib import Path
-from typing import Any
+from typing import Any, Optional
 
 import pandas as pd
 import yaml
@@ -81,33 +81,34 @@ def create_long_term_power_file_path(
 
 def read_long_term_power_yaml(
     path: str,
-    site: str,
-    microscope: str,
-    objective: str,
-    info: str,
-    interval: float,
-    wavelength: int,
-    date: str,
+    site: Optional[str] = None,
+    microscope: Optional[str] = None,
+    objective: Optional[str] = None,
+    info: Optional[str] = None,
+    interval: Optional[float] = None,
+    wavelength: Optional[int] = None,
+    date: Optional[str] = None,
 ) -> pd.DataFrame:
     """Read a long term power measurement YAML file.
 
     Parameters
     ----------
     path : str
-        Path to folder containing the file.
-    site : str
+        Path to folder containing the file -> requires other parameters.
+        Path to .yaml file -> other parameters can be None.
+    site : Optional[str]
         Site name
-    microscope : str
+    microscope : Optional[str]
         Microscope name
-    objective : str
+    objective : Optional[str]
         Objective name
-    info : str
+    info : Optional[str]
         Additional info (according to google sheet column)
-    interval : float
+    interval : Optional[float]
         Measurement interval in s
-    wavelength : int
+    wavelength : Optional[int]
         Wavelength in nm
-    date : str
+    date : Optional[str]
         Acquisition date (YYYYMMDD)
 
     Returns
@@ -116,11 +117,32 @@ def read_long_term_power_yaml(
         with columns:
         - Time (s)
         - Power (mW)
+
+    Raises
+    ------
+    TypeError if path is a directory (not a yaml file),
+    and any of the other parameters are None.
     """
-    # Build the file path
-    file = create_long_term_power_file_path(
-        path, site, microscope, objective, info, interval, wavelength, date
-    )
+    # Check if path is dir or yaml file directly
+    if path.endswith(".yaml"):
+        file = path
+    else:
+        if None in [
+            site,
+            microscope,
+            objective,
+            info,
+            interval,
+            wavelength,
+            date,
+        ]:
+            raise TypeError(
+                "`path` is a directory therefore other parameters are not optional."
+            )
+        # Build the file path
+        file = create_long_term_power_file_path(
+            path, site, microscope, objective, info, interval, wavelength, date
+        )
     # FYI: open will raise FileNotFoundError
     with open(file) as f:
         doc = yaml.safe_load(f)
